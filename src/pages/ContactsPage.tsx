@@ -18,6 +18,7 @@ import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '@/lib/ohada';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
 import type { SupplierBill, PaymentMethod } from '@/lib/accounting-data';
 import { useSupplierBills } from '@/lib/accounting-hooks';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -497,8 +498,9 @@ function SupplierDetailDrawer({ supplier, onClose, onMarkPaid, onNewBill }: {
 
 export default function ContactsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // Suppliers (and their bills) belong to the accounting module
   const [tab, setTab] = useState<Tab>(() =>
-    searchParams.get('tab') === 'suppliers' ? 'suppliers' : 'clients'
+    ACCOUNTING_ENABLED && searchParams.get('tab') === 'suppliers' ? 'suppliers' : 'clients'
   );
 
   useEffect(() => {
@@ -707,7 +709,7 @@ export default function ContactsPage() {
     { icon: 'briefcase',      iconBg: '#E7F3E2',            iconColor: '#2E7D32',      label: 'Fournisseurs',    value: suppCount,                sub: 'avec activité' },
   ];
 
-  const tabSwitcher = (
+  const tabSwitcher = !ACCOUNTING_ENABLED ? <div className="section-title">Clients</div> : (
     <PageTabs<Tab>
       tabs={[
         { key: 'clients',   label: 'Clients',      icon: 'users',          count: clients.length },
@@ -725,7 +727,7 @@ export default function ContactsPage() {
         <div className="topbar">
           <div>
             <div className="page-title">Contacts</div>
-            <div className="page-sub">Clients &amp; fournisseurs</div>
+            <div className="page-sub">{ACCOUNTING_ENABLED ? 'Clients & fournisseurs' : 'Vos clients'}</div>
           </div>
           <div className="topbar-actions">
             <button className="btn"><Icon name="download" size={15} />Exporter</button>

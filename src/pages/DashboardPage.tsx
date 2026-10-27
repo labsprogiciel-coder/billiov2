@@ -8,6 +8,7 @@ import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { fmt, fmtCompact, fmtDate, fmtDue, clientInitials } from '@/data';
 import type { ActivityPart } from '@/data';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 
 function ActivityLine({ parts }: { parts: ActivityPart[] }) {
   return (
@@ -64,6 +65,8 @@ export default function DashboardPage() {
   const { invoices, activity, clientsMap, loading, userRole } = useApp();
   const navigate = useNavigate();
   const role = userRole as Role;
+  // Accountants get the billing shortcuts while the accounting pages are switched off
+  const actionsRole: Role = role === 'accountant' && !ACCOUNTING_ENABLED ? 'member' : role;
 
   if (loading) return <PageSkeleton title="Tableau de bord" variant="dashboard" />;
 
@@ -230,12 +233,12 @@ export default function DashboardPage() {
               </div>
               <div className="qa-role-note">
                 <Icon name={role === 'admin' ? 'shield-check' : role === 'accountant' ? 'book' : 'user'} size={13} ariaHidden />
-                {' '}<b>{ROLE_LABELS[role]}</b> — {ROLE_NOTES[role]}
+                {' '}<b>{ROLE_LABELS[role]}</b> — {ROLE_NOTES[actionsRole]}
               </div>
             </div>
             <div style={{ padding: '14px 17px', flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div className="qa-grid">
-                {ROLE_ACTIONS[role].map((tile, i) => (
+                {ROLE_ACTIONS[actionsRole].map((tile, i) => (
                   <button
                     key={i}
                     className={`qa-tile${tile.primary ? ' primary' : ''}`}

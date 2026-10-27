@@ -6,6 +6,7 @@ import UpgradeModal from '@/components/UpgradeModal';
 import { useApp } from '@/context/AppContext';
 import { PLAN_LABELS, minPlanForFeature, type Feature } from '@/lib/plans';
 import BillioMark from '@/components/BillioMark';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 
 type NavItem = { icon: string; label: string; to: string };
 
@@ -140,11 +141,13 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
           <div className="nav-section">Finance</div>
           {NAV_FINANCE.map(item => renderNavItem(item))}
 
-          <div className="nav-section">Comptabilité</div>
-          {NAV_ACCOUNTING
-            .filter(({ to }) => to !== '/accounting/opening-balances' || !openingBalancesAdopted)
-            .map(item => renderNavItem(item))
-          }
+          {ACCOUNTING_ENABLED && (<>
+            <div className="nav-section">Comptabilité</div>
+            {NAV_ACCOUNTING
+              .filter(({ to }) => to !== '/accounting/opening-balances' || !openingBalancesAdopted)
+              .map(item => renderNavItem(item))
+            }
+          </>)}
 
           <div className="nav-section">Compte</div>
           {NAV_ACCOUNT.map(item => renderNavItem(item))}
