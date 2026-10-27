@@ -70,7 +70,7 @@ export default function QuotePage() {
       <div className="main">
         <div className="topbar">
           <div className="crumbs">
-            <button className="crumb-back" onClick={() => navigate('/quotes')} aria-label="Retour">
+            <button className="crumb-back" onClick={() => navigate('/invoices?tab=quotes')} aria-label="Retour">
               <Icon name="arrow-left" ariaHidden />
             </button>
             <div className="crumb-text">Devis introuvable</div>
@@ -224,11 +224,11 @@ export default function QuotePage() {
     <div className="main">
       <div className="topbar">
         <div className="crumbs">
-          <button className="crumb-back" onClick={() => navigate('/quotes')} aria-label="Retour aux devis">
+          <button className="crumb-back" onClick={() => navigate('/invoices?tab=quotes')} aria-label="Retour aux devis">
             <Icon name="arrow-left" ariaHidden />
           </button>
           <div className="crumb-text">
-            <button className="crumb-link" onClick={() => navigate('/quotes')}>Devis</button>
+            <button className="crumb-link" onClick={() => navigate('/invoices?tab=quotes')}>Devis</button>
             {' / '}<b>#{quote.id}</b>
           </div>
         </div>
