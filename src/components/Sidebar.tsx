@@ -11,7 +11,7 @@ type NavItem = { icon: string; label: string; to: string };
 
 const NAV_WORKSPACE: NavItem[] = [
   { icon: 'layout-dashboard', label: 'Tableau de bord', to: '/dashboard' },
-  { icon: 'receipt',          label: 'Factures & devis', to: '/invoices'  },
+  { icon: 'receipt',          label: 'Facturation',     to: '/invoices'  },
   { icon: 'users',            label: 'Contacts',        to: '/contacts'  },
   { icon: 'package',          label: 'Produits',        to: '/products'  },
   { icon: 'layout-grid',      label: 'Modèles',         to: '/templates' },
@@ -69,7 +69,7 @@ const PLAN_BADGE_CLASS: Record<string, string> = {
 export default function Sidebar({ onLogout }: { onLogout: () => void }) {
   const { invoices, userLabel, userInitials, openingBalancesAdopted, plan, hasFeature } = useApp();
   const [lockedFeature, setLockedFeature] = useState<Feature | null>(null);
-  // Quote detail pages live under /quotes but belong to the Factures & devis item
+  // Quote detail pages live under /quotes but belong to the Facturation item
   const onQuotePage = useLocation().pathname.startsWith('/quotes');
 
   const overdueCount = useMemo(

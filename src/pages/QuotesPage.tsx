@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
 import { EmptyState } from '@/components/EmptyState';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { QuotesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
@@ -48,7 +49,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
   const { showToast, quotes, setQuotes, setInvoices, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const navigate = useNavigate();
 
-  if (loading) return <PageSkeleton title="Factures & devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -227,7 +228,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
         {/* Topbar */}
         <div className="topbar">
           <div>
-            <div className="page-title">Factures &amp; devis</div>
+            <div className="page-title">Facturation</div>
             <div className="page-sub">Estimations envoyées avant facturation</div>
           </div>
           <div className="topbar-actions">
@@ -309,7 +310,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
           </div>
 
           {/* Quote table */}
-          <div className="quote-table">
+          <div className="quote-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'quotes') } : {})}>
             <div className="table-head q-grid-cols">
               <div className="th">Devis</div>
               <div className="th">Client</div>

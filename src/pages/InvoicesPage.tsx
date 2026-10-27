@@ -3,6 +3,7 @@ import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
@@ -183,14 +184,14 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     }
   };
 
-  if (loading) return <PageSkeleton title="Factures & devis" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
 
   return (
     <>
       <div className="main">
         <div className="topbar">
           <div>
-            <div className="page-title">Factures &amp; devis</div>
+            <div className="page-title">Facturation</div>
             <div className="page-sub">Gérez et suivez vos factures</div>
           </div>
           <div className="topbar-actions">
@@ -268,7 +269,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
             </div>
           </div>
 
-          <div className="invoice-table">
+          <div className="invoice-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'invoices') } : {})}>
             <div className="table-head grid-cols">
               <div className="th">Facture</div>
               <div className="th">Client</div>

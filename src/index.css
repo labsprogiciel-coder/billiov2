@@ -317,7 +317,7 @@ select.input {
 /* Section header */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; gap: 12px; flex-wrap: wrap; }
 
-/* Tabs that share a row with the list filters (Contacts, Factures & devis) */
+/* Tabs that share a row with the list filters (Contacts, Facturation) */
 .page-tabs { display: flex; gap: 3px; background: var(--color-background-secondary); padding: 3px; border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); width: fit-content; }
 .page-tab { display: flex; align-items: center; gap: 7px; padding: 7px 16px; border-radius: var(--border-radius-md); border: none; cursor: pointer; font-family: var(--font-sans); font-size: 13px; font-weight: 500; background: transparent; color: var(--color-text-secondary); transition: all .12s; }
 .page-tab.active { font-weight: 600; background: var(--color-background-primary); color: var(--brand); box-shadow: var(--shadow-sm); }

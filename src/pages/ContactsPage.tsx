@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
 import PageTabs from '@/components/PageTabs';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { EmptyState, EmptyInline } from '@/components/EmptyState';
 import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
@@ -714,6 +715,7 @@ export default function ContactsPage() {
       ]}
       active={tab}
       onChange={setTab}
+      idPrefix="contacts"
     />
   );
 
@@ -769,7 +771,7 @@ export default function ContactsPage() {
                 </div>
               </div>
 
-              <div className="client-table">
+              <div className="client-table" role="tabpanel" id={tabPanelId('contacts')} aria-labelledby={tabId('contacts', tab)}>
                 <div className="table-head client-grid-cols">
                   <div className="th">Client</div>
                   <div className="th">Localisation</div>
@@ -849,7 +851,7 @@ export default function ContactsPage() {
                 </div>
               </div>
 
-              <div className="client-table">
+              <div className="client-table" role="tabpanel" id={tabPanelId('contacts')} aria-labelledby={tabId('contacts', tab)}>
                 <div className="table-head supplier-grid-cols" style={{ padding: '10px 18px' }}>
                   <div className="th">Fournisseur</div>
                   <div className="th">Factures</div>
