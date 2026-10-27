@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
 import AppShell from '@/components/AppShell';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 
 // ── Lazy page chunks ────────────────────────────────────────────────────────
 // Each import() becomes its own JS chunk; the browser only downloads a page
@@ -108,15 +109,19 @@ export default function App() {
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/clients"  element={<Navigate to="/contacts" replace />} />
             <Route path="/products" element={<ProductsPage />} />
-            <Route path="/accounting/chart-of-accounts"    element={<ChartOfAccountsPage />} />
-            <Route path="/accounting/journals"             element={<JournalsPage />} />
-            <Route path="/accounting/trial-balance"        element={<TrialBalancePage />} />
-            <Route path="/accounting/financial-statements" element={<FinancialStatementsPage />} />
-            <Route path="/accounting/fixed-assets"         element={<FixedAssetsPage />} />
-            <Route path="/accounting/suppliers"            element={<Navigate to="/contacts?tab=suppliers" replace />} />
-            <Route path="/accounting/tax"                  element={<TaxPage />} />
-            <Route path="/accounting/period-closing"       element={<PeriodClosingPage />} />
-            <Route path="/accounting/opening-balances"     element={<OpeningBalancesPage />} />
+            {ACCOUNTING_ENABLED ? (<>
+              <Route path="/accounting/chart-of-accounts"    element={<ChartOfAccountsPage />} />
+              <Route path="/accounting/journals"             element={<JournalsPage />} />
+              <Route path="/accounting/trial-balance"        element={<TrialBalancePage />} />
+              <Route path="/accounting/financial-statements" element={<FinancialStatementsPage />} />
+              <Route path="/accounting/fixed-assets"         element={<FixedAssetsPage />} />
+              <Route path="/accounting/suppliers"            element={<Navigate to="/contacts?tab=suppliers" replace />} />
+              <Route path="/accounting/tax"                  element={<TaxPage />} />
+              <Route path="/accounting/period-closing"       element={<PeriodClosingPage />} />
+              <Route path="/accounting/opening-balances"     element={<OpeningBalancesPage />} />
+            </>) : (
+              <Route path="/accounting/*" element={<Navigate to="/dashboard" replace />} />
+            )}
             <Route path="/reports"  element={<PlaceholderPage title="Rapports" />} />
             <Route path="/payments" element={<PaymentsPage />} />
             <Route path="/quotes"     element={<Navigate to="/invoices?tab=quotes" replace />} />
