@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
+import PageTabs from '@/components/PageTabs';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { EmptyState, EmptyInline } from '@/components/EmptyState';
 import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
@@ -705,15 +707,17 @@ export default function ContactsPage() {
     { icon: 'briefcase',      iconBg: '#E7F3E2',            iconColor: '#2E7D32',      label: 'Fournisseurs',    value: suppCount,                sub: 'avec activité' },
   ];
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 7, padding: '7px 16px',
-    borderRadius: 'var(--border-radius-md)', border: 'none', cursor: 'pointer',
-    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: active ? 600 : 500,
-    background: active ? 'var(--color-background-primary)' : 'transparent',
-    color: active ? 'var(--brand)' : 'var(--color-text-secondary)',
-    boxShadow: active ? 'var(--shadow-sm)' : 'none',
-    transition: 'all .12s',
-  });
+  const tabSwitcher = (
+    <PageTabs<Tab>
+      tabs={[
+        { key: 'clients',   label: 'Clients',      icon: 'users',          count: clients.length },
+        { key: 'suppliers', label: 'Fournisseurs', icon: 'truck-delivery', count: suppCount },
+      ]}
+      active={tab}
+      onChange={setTab}
+      idPrefix="contacts"
+    />
+  );
 
   return (
     <>
@@ -747,36 +751,27 @@ export default function ContactsPage() {
             ))}
           </div>
 
-          {/* ── Tab switcher ──────────────────────────────────────────────── */}
-          <div style={{ display: 'flex', gap: 3, background: 'var(--color-background-secondary)', padding: 3, borderRadius: 'var(--border-radius-lg)', border: '0.5px solid var(--color-border-tertiary)', width: 'fit-content', marginBottom: 16 }}>
-            <button style={tabStyle(tab === 'clients')} onClick={() => setTab('clients')}>
-              <Icon name="users" size={14} />Clients
-              <span style={{ fontSize: 11, fontWeight: 600, background: tab === 'clients' ? 'var(--brand-tint)' : 'var(--color-background-tertiary)', color: tab === 'clients' ? 'var(--brand)' : 'var(--color-text-tertiary)', borderRadius: 10, padding: '1px 6px' }}>{clients.length}</span>
-            </button>
-            <button style={tabStyle(tab === 'suppliers')} onClick={() => setTab('suppliers')}>
-              <Icon name="truck-delivery" size={14} />Fournisseurs
-              <span style={{ fontSize: 11, fontWeight: 600, background: tab === 'suppliers' ? 'var(--brand-tint)' : 'var(--color-background-tertiary)', color: tab === 'suppliers' ? 'var(--brand)' : 'var(--color-text-tertiary)', borderRadius: 10, padding: '1px 6px' }}>{suppCount}</span>
-            </button>
-          </div>
-
           {/* ── Clients tab ──────────────────────────────────────────────── */}
           {tab === 'clients' && (
             <>
-              <div className="toolbar" style={{ marginBottom: 12 }}>
-                <div className="search-box">
-                  <Icon name="search" size={15} />
-                  <input type="text" placeholder="Rechercher un client…" value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
-                </div>
-                <div className="filters">
-                  {CLIENT_FILTERS.map(f => (
-                    <button key={f.key} className={'filter-chip' + (clientFilter === f.key ? ' active' : '')} onClick={() => setClientFilter(f.key)}>
-                      {f.label}<span className="cnt">{clientCounts[f.key]}</span>
-                    </button>
-                  ))}
+              <div className="section-header">
+                {tabSwitcher}
+                <div className="list-controls">
+                  <div className="search-box">
+                    <Icon name="search" size={15} />
+                    <input type="text" placeholder="Rechercher un client…" value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
+                  </div>
+                  <div className="filters">
+                    {CLIENT_FILTERS.map(f => (
+                      <button key={f.key} className={'filter-chip' + (clientFilter === f.key ? ' active' : '')} onClick={() => setClientFilter(f.key)}>
+                        {f.label}<span className="cnt">{clientCounts[f.key]}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="client-table">
+              <div className="client-table" role="tabpanel" id={tabPanelId('contacts')} aria-labelledby={tabId('contacts', tab)}>
                 <div className="table-head client-grid-cols">
                   <div className="th">Client</div>
                   <div className="th">Localisation</div>
@@ -838,22 +833,25 @@ export default function ContactsPage() {
               {/* AP Aging strip */}
               <AgingStrip bills={supplierBillsAll} />
 
-              {/* Toolbar: search + filter chips */}
-              <div className="toolbar" style={{ marginBottom: 12 }}>
-                <div className="search-box">
-                  <Icon name="search" size={15} />
-                  <input type="text" placeholder="Rechercher un fournisseur…" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} />
-                </div>
-                <div className="filters">
-                  {SUPPLIER_FILTERS.map(f => (
-                    <button key={f.key} className={'filter-chip' + (supplierFilter === f.key ? ' active' : '')} onClick={() => setSupplierFilter(f.key)}>
-                      {f.label}<span className="cnt">{supplierCounts[f.key]}</span>
-                    </button>
-                  ))}
+              {/* Tabs + search + filter chips */}
+              <div className="section-header">
+                {tabSwitcher}
+                <div className="list-controls">
+                  <div className="search-box">
+                    <Icon name="search" size={15} />
+                    <input type="text" placeholder="Rechercher un fournisseur…" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} />
+                  </div>
+                  <div className="filters">
+                    {SUPPLIER_FILTERS.map(f => (
+                      <button key={f.key} className={'filter-chip' + (supplierFilter === f.key ? ' active' : '')} onClick={() => setSupplierFilter(f.key)}>
+                        {f.label}<span className="cnt">{supplierCounts[f.key]}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="client-table">
+              <div className="client-table" role="tabpanel" id={tabPanelId('contacts')} aria-labelledby={tabId('contacts', tab)}>
                 <div className="table-head supplier-grid-cols" style={{ padding: '10px 18px' }}>
                   <div className="th">Fournisseur</div>
                   <div className="th">Factures</div>

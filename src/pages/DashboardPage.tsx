@@ -54,7 +54,7 @@ const ROLE_ACTIONS: Record<Role, QATile[]> = {
   ],
   member: [
     { icon: 'file-plus', label: 'Nouvelle facture', sub: 'Envoyer rapidement', primary: true, path: '/invoices' },
-    { icon: 'file-text', label: 'Nouveau devis', sub: 'Transformer en facture', path: '/quotes' },
+    { icon: 'file-text', label: 'Nouveau devis', sub: 'Transformer en facture', path: '/invoices?tab=quotes' },
     { icon: 'users', label: 'Mes clients', sub: 'Carnet d\'adresses', path: '/clients' },
     { icon: 'bell', label: 'Rappels', sub: 'Suivi automatique', path: '/reminders' },
   ],

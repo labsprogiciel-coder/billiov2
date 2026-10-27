@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
@@ -24,7 +25,8 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'draft',   label: 'Brouillons' },
 ];
 
-export default function InvoicesPage() {
+/** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
+export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
 
   const navigate = useNavigate();
@@ -182,14 +184,14 @@ export default function InvoicesPage() {
     }
   };
 
-  if (loading) return <PageSkeleton title="Factures" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
 
   return (
     <>
       <div className="main">
         <div className="topbar">
           <div>
-            <div className="page-title">Factures</div>
+            <div className="page-title">Facturation</div>
             <div className="page-sub">Gérez et suivez vos factures</div>
           </div>
           <div className="topbar-actions">
@@ -253,7 +255,7 @@ export default function InvoicesPage() {
           </div>
 
           <div className="section-header">
-            <div className="section-title">Toutes les factures</div>
+            {tabs ?? <div className="section-title">Toutes les factures</div>}
             <div className="filters">
               {FILTERS.map(f => (
                 <button
@@ -267,7 +269,7 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          <div className="invoice-table">
+          <div className="invoice-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'invoices') } : {})}>
             <div className="table-head grid-cols">
               <div className="th">Facture</div>
               <div className="th">Client</div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useMemo } from 'react';
 import Icon from '@/components/Icon';
 import UpgradeModal from '@/components/UpgradeModal';
@@ -11,7 +11,7 @@ type NavItem = { icon: string; label: string; to: string };
 
 const NAV_WORKSPACE: NavItem[] = [
   { icon: 'layout-dashboard', label: 'Tableau de bord', to: '/dashboard' },
-  { icon: 'receipt',          label: 'Factures',        to: '/invoices'  },
+  { icon: 'receipt',          label: 'Facturation',     to: '/invoices'  },
   { icon: 'users',            label: 'Contacts',        to: '/contacts'  },
   { icon: 'package',          label: 'Produits',        to: '/products'  },
   { icon: 'layout-grid',      label: 'Modèles',         to: '/templates' },
@@ -20,7 +20,6 @@ const NAV_WORKSPACE: NavItem[] = [
 const NAV_FINANCE: NavItem[] = [
   { icon: 'chart-bar',   label: 'Rapports',  to: '/reports'  },
   { icon: 'credit-card', label: 'Paiements', to: '/payments' },
-  { icon: 'file-text',   label: 'Devis',     to: '/quotes'   },
 ];
 
 const NAV_ACCOUNTING: NavItem[] = [
@@ -48,7 +47,6 @@ const NAV_ACCOUNT: NavItem[] = [
 const ROUTE_FEATURE: Record<string, Feature> = {
   // Business+
   '/reports':                            'reports',
-  '/quotes':                             'quotes',
   '/payments':                           'payments_mobilemoney',
   '/accounting/opening-balances':        'accounting_syscohada',
   '/accounting/chart-of-accounts':       'accounting_syscohada',
@@ -71,6 +69,8 @@ const PLAN_BADGE_CLASS: Record<string, string> = {
 export default function Sidebar({ onLogout }: { onLogout: () => void }) {
   const { invoices, userLabel, userInitials, openingBalancesAdopted, plan, hasFeature } = useApp();
   const [lockedFeature, setLockedFeature] = useState<Feature | null>(null);
+  // Quote detail pages live under /quotes but belong to the Facturation item
+  const onQuotePage = useLocation().pathname.startsWith('/quotes');
 
   const overdueCount = useMemo(
     () => invoices.filter(i => i.status === 'overdue').length,
@@ -102,7 +102,7 @@ export default function Sidebar({ onLogout }: { onLogout: () => void }) {
       <NavLink
         key={to}
         to={to}
-        className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+        className={({ isActive }) => `nav-item${isActive || (to === '/invoices' && onQuotePage) ? ' active' : ''}`}
       >
         <Icon name={icon} ariaHidden />
         {label}

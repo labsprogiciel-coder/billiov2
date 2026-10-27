@@ -1,9 +1,10 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
 import { EmptyState } from '@/components/EmptyState';
+import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { QuotesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
@@ -43,11 +44,12 @@ function fmtCompact(n: number) {
 
 const TVA = 0.18;
 
-export default function QuotesPage() {
+/** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
+export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
   const { showToast, quotes, setQuotes, setInvoices, clientsMap, products, orgSettings, orgId, loading } = useApp();
   const navigate = useNavigate();
 
-  if (loading) return <PageSkeleton title="Devis" subtitle="Gérez vos devis" metrics={0} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez vos devis" metrics={0} rows={6} />;
   const [filter, setFilter] = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -226,7 +228,7 @@ export default function QuotesPage() {
         {/* Topbar */}
         <div className="topbar">
           <div>
-            <div className="page-title">Devis</div>
+            <div className="page-title">Facturation</div>
             <div className="page-sub">Estimations envoyées avant facturation</div>
           </div>
           <div className="topbar-actions">
@@ -293,7 +295,7 @@ export default function QuotesPage() {
 
           {/* Section header */}
           <div className="section-header">
-            <div className="section-title">Tous les devis</div>
+            {tabs ?? <div className="section-title">Tous les devis</div>}
             <div className="filters">
               {FILTERS.map(f => (
                 <button
@@ -308,7 +310,7 @@ export default function QuotesPage() {
           </div>
 
           {/* Quote table */}
-          <div className="quote-table">
+          <div className="quote-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'quotes') } : {})}>
             <div className="table-head q-grid-cols">
               <div className="th">Devis</div>
               <div className="th">Client</div>
