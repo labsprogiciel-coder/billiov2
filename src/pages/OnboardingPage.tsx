@@ -9,6 +9,7 @@ import { clientIssues, sellerIssues } from '@/lib/invoice-compliance';
 import { snoozeCompliance } from '@/lib/use-compliance-guard';
 import { usePermissions } from '@/lib/use-permissions';
 import FiscalDivisionSelect from '@/components/FiscalDivisionSelect';
+import { safeReturn } from '@/lib/safe-return';
 import './OnboardingPage.css';
 import { fmtDateLong } from '@/data';
 
@@ -46,10 +47,6 @@ const TAX_REGIMES = [
   { value: 'CME', label: 'CME — Contribution des micro-entreprises (CA < 15M F CFA)' },
 ];
 
-/** Only same-app paths: never send the user to another site after the wizard. */
-function safeReturn(path: string | null): string {
-  return path && path.startsWith('/') && !path.startsWith('//') ? path : '/dashboard';
-}
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -149,7 +146,8 @@ export default function OnboardingPage() {
    */
   const [searchParams] = useSearchParams();
   const complete = searchParams.get('complete') === '1';
-  const returnTo = safeReturn(searchParams.get('return'));
+  // Only same-app paths: never send the user to another site after the wizard
+  const returnTo = safeReturn(searchParams.get('return'), window.location.origin);
   const targetClientCode = searchParams.get('client') ?? '';
   const targetClient = orgClients.find(c => c.code === targetClientCode);
 

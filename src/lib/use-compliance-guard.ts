@@ -71,7 +71,10 @@ export function useComplianceGuard() {
     try {
       const { seller, payments } = await loadSeller(orgId, orgSettings);
       const sellerMissing = sellerIssues(seller, payments).length > 0;
-      const clientMissing = clientIssues(clients.find(c => c.code === clientCode)).length > 0;
+      // A missing client IFU alone doesn't open the wizard: private individuals
+      // have none, and Billio can't tell them apart from businesses yet. The
+      // wizard still asks for it when it opens for another reason.
+      const clientMissing = clientIssues(clients.find(c => c.code === clientCode)).some(i => i.key !== 'client-ifu');
       if (!sellerMissing && !clientMissing) { action(); return; }
       if (!clientMissing && !managesOrg) {
         showToast("Les informations de l'entreprise sont incomplètes (IFU, RCCM, coordonnées bancaires…). Demandez à un administrateur de les compléter.", true);
