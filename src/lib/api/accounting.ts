@@ -409,6 +409,7 @@ export async function createManualJournalEntry(
     lines: Array<{ accountNum: string; debit: number; credit: number }>;
   },
 ): Promise<string> {
+  if (payload.lines.length === 0) throw new Error('A journal entry needs at least one line');
   if (MOCK) return `MOCK-${Date.now()}`;
   const { journalId, periodId } = await resolveJournalAndPeriod(orgId, payload.journalCode, payload.date);
   return createJournalEntry(orgId, {
