@@ -18,7 +18,7 @@ import {
   fetchSupplierBills,
   postJournalEntry,
   deleteJournalEntry,
-  createJournalEntry,
+  createManualJournalEntry,
   createFixedAsset as apiCreateFixedAsset,
   markBillPaid as apiBillPaid,
   createSupplierBill as apiCreateBill,
@@ -168,8 +168,8 @@ export function useJournalsData(includeDraft = true) {
     }
   }, [result]);
 
-  const saveEntry = useCallback(async (payload: Parameters<typeof createJournalEntry>[1]) => {
-    await createJournalEntry(orgId, payload);
+  const saveEntry = useCallback(async (payload: Parameters<typeof createManualJournalEntry>[1]) => {
+    await createManualJournalEntry(orgId, payload);
     result.reload();
   }, [orgId, result]);
 

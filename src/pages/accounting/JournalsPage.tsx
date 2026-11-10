@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import Icon from '@/components/Icon';
 import { PageSkeleton } from '@/components/SkeletonLoader';
@@ -89,17 +89,51 @@ function Composer({
   journals: Record<string, Journal>;
   accounts: Account[];
   onClose: () => void;
-  onSave: (p: { journalId: string; periodId: string; date: string; piece: string; label: string; lines: Array<{ accountNum: string; debit: number; credit: number }> }) => Promise<void>;
+  onSave: (p: { journalCode: string; date: string; piece: string; label: string; lines: Array<{ accountNum: string; debit: number; credit: number }> }) => Promise<void>;
 }) {
   const [state, setState] = useState<ComposerState>({
     journal: Object.keys(journals)[0] ?? 'VE',
     date: new Date().toISOString().slice(0, 10),
     label: '', piece: '', lines: [EMPTY_LINE, EMPTY_LINE],
   });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // A save that finishes after this composer was closed must not close a newer one
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+  // An old error no longer applies once the entry is edited
+  useEffect(() => { setSaveError(null); }, [state]);
+
+  const save = async () => {
+    setSaving(true); setSaveError(null);
+    try {
+      await onSave({
+        journalCode: state.journal,
+        date: state.date,
+        piece: state.piece.trim(),
+        label: state.label.trim(),
+        lines: state.lines
+          .filter(l => l.acct && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0))
+          .map(l => ({ accountNum: l.acct, debit: parseFloat(l.debit) || 0, credit: parseFloat(l.credit) || 0 })),
+      });
+      if (mounted.current) onClose();
+    } catch (err) {
+      console.error('[saveEntry]', err);
+      if (!mounted.current) return;
+      const msg = err instanceof Error ? err.message : '';
+      setSaveError(/is closed/.test(msg)
+        ? 'Cette période est clôturée : choisissez une date dans une période ouverte.'
+        : 'L\'écriture n\'a pas pu être enregistrée. Vérifiez votre connexion et réessayez.');
+    } finally {
+      if (mounted.current) setSaving(false);
+    }
+  };
 
   const debitTotal  = state.lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
   const creditTotal = state.lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
   const balanced = Math.abs(debitTotal - creditTotal) < 0.01 && debitTotal > 0;
+  // A line with an amount but no account would be dropped on save and unbalance the entry
+  const amountWithoutAccount = state.lines.some(l => !l.acct && ((parseFloat(l.debit) || 0) > 0 || (parseFloat(l.credit) || 0) > 0));
 
   const setLine = (i: number, field: keyof ComposerLine, value: string) =>
     setState(p => ({ ...p, lines: p.lines.map((l, j) => j === i ? { ...l, [field]: value } : l) }));
@@ -130,7 +164,7 @@ function Composer({
           <button className="acc-drawer-close" onClick={onClose} style={{ marginTop: 2 }}><Icon name="x" size={16} /></button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        <fieldset disabled={saving} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', border: 0, margin: 0, minWidth: 0 }}>
 
           {/* ── Row 1: Journal + Libellé ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12, marginBottom: 12 }}>
@@ -259,7 +293,16 @@ function Composer({
             <span className="mono">Crédit {fmt(creditTotal)}</span>
             {balanced && <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>Équilibré ✓</span>}
           </div>
-        </div>
+          {amountWithoutAccount && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#A32D2D' }}>Choisissez un compte pour chaque ligne qui a un montant.</div>
+          )}
+        </fieldset>
+
+        {saveError && (
+          <div role="alert" style={{ margin: '0 24px 12px', padding: '10px 12px', borderRadius: 8, background: '#FCEBEB', color: '#A32D2D', fontSize: 12.5, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Icon name="alert-triangle" size={15} />{saveError}
+          </div>
+        )}
 
         {/* ── Footer ── */}
         <div style={{ padding: '14px 24px', borderTop: '0.5px solid var(--color-border-tertiary)', display: 'flex', gap: 10 }}>
@@ -267,19 +310,10 @@ function Composer({
           <button
             className="btn btn-primary"
             style={{ flex: 2, justifyContent: 'center' }}
-            disabled={!balanced}
-            onClick={() => onSave({
-              journalId: state.journal,
-              periodId: '',
-              date: state.date,
-              piece: state.piece,
-              label: state.label,
-              lines: state.lines
-                .filter(l => l.acct && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0))
-                .map(l => ({ accountNum: l.acct, debit: parseFloat(l.debit) || 0, credit: parseFloat(l.credit) || 0 })),
-            }).then(onClose)}
+            disabled={!balanced || amountWithoutAccount || !state.label.trim() || saving}
+            onClick={save}
           >
-            <Icon name="check" size={15} />Enregistrer l'écriture
+            <Icon name="check" size={15} />{saving ? 'Enregistrement…' : 'Enregistrer l\'écriture'}
           </button>
         </div>
       </div>
