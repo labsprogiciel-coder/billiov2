@@ -89,13 +89,39 @@ function Composer({
   journals: Record<string, Journal>;
   accounts: Account[];
   onClose: () => void;
-  onSave: (p: { journalId: string; periodId: string; date: string; piece: string; label: string; lines: Array<{ accountNum: string; debit: number; credit: number }> }) => Promise<void>;
+  onSave: (p: { journalCode: string; date: string; piece: string; label: string; lines: Array<{ accountNum: string; debit: number; credit: number }> }) => Promise<void>;
 }) {
   const [state, setState] = useState<ComposerState>({
     journal: Object.keys(journals)[0] ?? 'VE',
     date: new Date().toISOString().slice(0, 10),
     label: '', piece: '', lines: [EMPTY_LINE, EMPTY_LINE],
   });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true); setSaveError(null);
+    try {
+      await onSave({
+        journalCode: state.journal,
+        date: state.date,
+        piece: state.piece.trim(),
+        label: state.label.trim(),
+        lines: state.lines
+          .filter(l => l.acct && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0))
+          .map(l => ({ accountNum: l.acct, debit: parseFloat(l.debit) || 0, credit: parseFloat(l.credit) || 0 })),
+      });
+      onClose();
+    } catch (err) {
+      console.error('[saveEntry]', err);
+      const msg = err instanceof Error ? err.message : '';
+      setSaveError(/is closed/.test(msg)
+        ? 'Cette période est clôturée : choisissez une date dans une période ouverte.'
+        : 'L\'écriture n\'a pas pu être enregistrée. Vérifiez votre connexion et réessayez.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const debitTotal  = state.lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
   const creditTotal = state.lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
@@ -261,25 +287,22 @@ function Composer({
           </div>
         </div>
 
+        {saveError && (
+          <div role="alert" style={{ margin: '0 24px 12px', padding: '10px 12px', borderRadius: 8, background: '#FCEBEB', color: '#A32D2D', fontSize: 12.5, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Icon name="alert-triangle" size={15} />{saveError}
+          </div>
+        )}
+
         {/* ── Footer ── */}
         <div style={{ padding: '14px 24px', borderTop: '0.5px solid var(--color-border-tertiary)', display: 'flex', gap: 10 }}>
           <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Annuler</button>
           <button
             className="btn btn-primary"
             style={{ flex: 2, justifyContent: 'center' }}
-            disabled={!balanced}
-            onClick={() => onSave({
-              journalId: state.journal,
-              periodId: '',
-              date: state.date,
-              piece: state.piece,
-              label: state.label,
-              lines: state.lines
-                .filter(l => l.acct && (parseFloat(l.debit) > 0 || parseFloat(l.credit) > 0))
-                .map(l => ({ accountNum: l.acct, debit: parseFloat(l.debit) || 0, credit: parseFloat(l.credit) || 0 })),
-            }).then(onClose)}
+            disabled={!balanced || !state.label.trim() || saving}
+            onClick={save}
           >
-            <Icon name="check" size={15} />Enregistrer l'écriture
+            <Icon name="check" size={15} />{saving ? 'Enregistrement…' : 'Enregistrer l\'écriture'}
           </button>
         </div>
       </div>

@@ -386,8 +386,35 @@ export async function createJournalEntry(
       credit:      l.credit,
     }))
   );
-  if (linesErr) throw linesErr;
+  if (linesErr) {
+    // Don't leave an entry with no lines behind (best effort: deleting a draft is admin-only)
+    await supabase.from('journal_entries').delete().eq('id', entryId);
+    throw linesErr;
+  }
   return entryId;
+}
+
+/**
+ * Saves a manual entry (Journaux → Nouvelle écriture) as a draft. The form
+ * knows the journal by its code and the entry by its date, so the journal and
+ * fiscal period ids are looked up here, as for invoice entries.
+ */
+export async function createManualJournalEntry(
+  orgId: string,
+  payload: {
+    journalCode: string;
+    date: string;
+    piece: string;
+    label: string;
+    lines: Array<{ accountNum: string; debit: number; credit: number }>;
+  },
+): Promise<string> {
+  if (MOCK) return `MOCK-${Date.now()}`;
+  const { journalId, periodId } = await resolveJournalAndPeriod(orgId, payload.journalCode, payload.date);
+  return createJournalEntry(orgId, {
+    journalId, periodId,
+    date: payload.date, piece: payload.piece, label: payload.label, lines: payload.lines,
+  });
 }
 
 export async function postJournalEntry(entryId: string): Promise<void> {
