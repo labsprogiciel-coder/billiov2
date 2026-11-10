@@ -8,6 +8,7 @@ import { useApp } from '@/context/AppContext';
 import { updateQuote } from '@/lib/api/quotes';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
+import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
@@ -35,6 +36,7 @@ export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
+  const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -203,6 +205,12 @@ export default function QuotePage() {
     }
   };
 
+  // Converting issues an invoice: check the mandatory mentions first
+  const requestConvert = () => {
+    if (convertingRef.current) return;
+    void compliance.guard(quote.client, () => void handleConvertToInvoice(), { returnTo: `/quotes/${quote.id}` });
+  };
+
   const handleConvertToInvoice = async () => {
     if (convertingRef.current) return;
     convertingRef.current = true;
@@ -247,7 +255,7 @@ export default function QuotePage() {
             </button>
           )}
           {canConvert && (
-            <button className="btn btn-primary" onClick={handleConvertToInvoice} disabled={converting}>
+            <button className="btn btn-primary" onClick={requestConvert} disabled={converting || compliance.checking}>
               <Icon name="arrow-right" ariaHidden />
               {converting ? 'Conversion…' : 'Créer une facture'}
             </button>
@@ -380,7 +388,7 @@ export default function QuotePage() {
 
               <div className="rail-actions">
                 {canConvert && (
-                  <button className="btn btn-primary btn-block" onClick={handleConvertToInvoice} disabled={converting}>
+                  <button className="btn btn-primary btn-block" onClick={requestConvert} disabled={converting || compliance.checking}>
                     <Icon name="arrow-right" ariaHidden />
                     {converting ? 'Conversion…' : 'Créer une facture'}
                   </button>

@@ -23,6 +23,7 @@ import {
 import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import { useComplianceGuard } from '@/lib/use-compliance-guard';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -168,7 +169,24 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     navigate(`/invoices/${id}`, { state: { openSend: true } });
   };
 
-  const submitInvoice = async (status: 'draft' | 'pending') => {
+  // Issuing: check the mandatory mentions first (after the form's own checks,
+  // which submitInvoice reports). Missing ones open the onboarding wizard; the
+  // invoice is kept as a draft meanwhile and the user comes back to it.
+  const compliance = useComplianceGuard();
+  const issueInvoice = () => {
+    if (submittingRef.current) return;
+    if (!fClient || lineItemsError(lineItems) || fDue < fDate) { void submitInvoice('pending'); return; }
+    void compliance.guard(fClient, () => void submitInvoice('pending'), {
+      returnTo: '/invoices',
+      beforeLeave: async () => {
+        const id = await submitInvoice('draft');
+        return id ? `/invoices/${id}` : null;
+      },
+    });
+  };
+
+  /** Saves the invoice; returns its number, or undefined when it wasn't saved. */
+  const submitInvoice = async (status: 'draft' | 'pending'): Promise<string | undefined> => {
     if (submittingRef.current) return;
     if (!fClient)      { showToast('Veuillez sélectionner un client.', true); return; }
     const linesErr = lineItemsError(lineItems);
@@ -224,6 +242,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           clientName: cName,
         }).catch(err => console.error('[recordInvoiceIssuanceEntry] failed:', err));
       }
+      return id;
     } catch (err) {
       console.error('[submitInvoice] error:', err);
       showToast(invoiceCreated
@@ -552,8 +571,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('draft')}>
             {submitting ? 'Enregistrement…' : 'Enregistrer brouillon'}
           </button>
-          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('pending')}>
-            <Icon name="send" ariaHidden /> {submitting ? 'Émission…' : 'Émettre la facture'}
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting || compliance.checking} onClick={issueInvoice}>
+            <Icon name="send" ariaHidden /> {submitting ? 'Émission…' : compliance.checking ? 'Vérification…' : 'Émettre la facture'}
           </button>
         </div>
       </div>

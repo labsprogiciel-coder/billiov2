@@ -232,12 +232,30 @@ function Footer({ cfg }: { cfg: PaperConfig }) {
   return <div className="tp-foot">{cfg.footer.trim() || 'Facture générée via Billio'}</div>;
 }
 
+/**
+ * Where a certified invoice (SECeF) prints its QR code, SECeF number and
+ * transaction code. Shown here as a reserved area; the PDF prints the real
+ * elements once the invoice is certified (PRO-137).
+ */
+function CertArea() {
+  return (
+    <div className="tp-cert" aria-label="Zone réservée à la certification SECeF">
+      <div className="tp-cert-qr" aria-hidden="true">QR</div>
+      <div>
+        <div className="tp-cert-title">Facture certifiée — SECeF</div>
+        <div className="tp-cert-sub">Zone réservée : QR code, n° SECeF et code de la facture, ajoutés à la certification.</div>
+      </div>
+    </div>
+  );
+}
+
 function Rest({ cfg }: { cfg: PaperConfig }) {
   return (
     <>
       <Subject />
       <InvoiceTable cfg={cfg} />
       <Totals cfg={cfg} />
+      <CertArea />
       <PayNotes />
       <Signature cfg={cfg} />
       <Footer cfg={cfg} />
@@ -389,6 +407,7 @@ function ReceiptBody({ cfg }: { cfg: PaperConfig }) {
         <span>Total dû</span><span>{fmt(total)} F CFA</span>
       </div>
       <div className="tp-rcpt-divider dashed" />
+      <CertArea />
       <PayNotes />
       <Signature cfg={cfg} />
       <div className="tp-rcpt-foot">{cfg.footer.trim() || 'Facture générée via Billio'}</div>
