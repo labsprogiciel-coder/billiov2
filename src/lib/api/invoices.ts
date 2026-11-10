@@ -14,6 +14,7 @@ export function dbToInvoice(row: Record<string, unknown>): Invoice {
     amount:      Number(row.amount),
     status:      row.status as Invoice['status'],
     discountPct: Number(row.discount_pct ?? 0),
+    firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined,
   };
 }
 

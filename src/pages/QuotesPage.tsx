@@ -18,6 +18,7 @@ import { confirmDiscard } from '@/lib/confirm-discard';
 import { contactValue } from '@/lib/share-links';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-items';
 import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
@@ -202,6 +203,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
       if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
     } catch (err) {
       console.error('[convertToInvoice] failed:', err);
+      if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast('Erreur lors de la conversion. Aucune facture n\'a été créée — veuillez réessayer.', true);
     } finally {
       convertingRef.current.delete(id);
@@ -674,6 +676,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
           />
         );
       })()}
+      {compliance.dialog}
     </>
   );
 }

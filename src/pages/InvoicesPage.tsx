@@ -24,6 +24,7 @@ import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -245,6 +246,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       return id;
     } catch (err) {
       console.error('[submitInvoice] error:', err);
+      // Solo limit reached (the database refused the invoice): offer the upgrade
+      if (!invoiceCreated && isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast(invoiceCreated
         ? `La facture #${id} a été créée, mais une erreur est survenue ensuite. Vérifiez-la avant de réessayer.`
         : 'Une erreur est survenue. La facture n\'a pas été enregistrée — veuillez réessayer.', true);
@@ -576,6 +579,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           </button>
         </div>
       </div>
+      {compliance.dialog}
     </>
   );
 }

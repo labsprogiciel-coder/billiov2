@@ -35,6 +35,8 @@ export const invoiceSchema = z.object({
   amount:      z.number().min(0),
   status:      invoiceStatusSchema,
   discountPct: z.number().min(0).max(100).default(0),
+  /** When the invoice was first issued (set by the database); counts toward the Solo limit */
+  firstIssuedAt: z.string().optional(),
 });
 
 export const serviceWithholdingScenarioSchema = z.enum([

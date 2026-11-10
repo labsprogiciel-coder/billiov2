@@ -1,10 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { fetchPaymentSettings, type PaymentSettings } from '@/lib/api/payment-settings';
 import { clientIssues, sellerIssues, type SellerInfo } from '@/lib/invoice-compliance';
 import { usePermissions } from '@/lib/use-permissions';
+import { invoiceLimitReached } from '@/lib/invoice-limit';
+import UpgradeModal from '@/components/UpgradeModal';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -47,7 +49,8 @@ export interface GuardOptions {
 }
 
 /**
- * Checks the mandatory invoice mentions before an invoice is issued. When
+ * Checks the plan's invoice limit, then the mandatory invoice mentions, before
+ * an invoice is issued. At the Solo limit it shows the upgrade offer. When
  * nothing is missing, `guard` runs the action. Otherwise it opens the
  * onboarding wizard on the missing details (/onboarding?complete=1), which
  * saves them and brings the user back to issue the invoice.
@@ -58,13 +61,16 @@ export interface GuardOptions {
  */
 export function useComplianceGuard() {
   const navigate = useNavigate();
-  const { orgId, orgSettings, clients, showToast } = useApp();
+  const { orgId, orgSettings, clients, invoices, plan, showToast } = useApp();
   const { managesOrg } = usePermissions();
   const [checking, setChecking] = useState(false);
+  const [limitHit, setLimitHit] = useState(false);
   const checkingRef = useRef(false);
 
   const guard = useCallback(async (clientCode: string, action: () => void, opts: GuardOptions) => {
     if (checkingRef.current) return;
+    // Solo plan: the monthly limit comes first (the database refuses the invoice anyway)
+    if (invoiceLimitReached(plan, invoices)) { setLimitHit(true); return; }
     if (complianceSnoozed()) { action(); return; }
     checkingRef.current = true;
     setChecking(true);
@@ -90,8 +96,16 @@ export function useComplianceGuard() {
       checkingRef.current = false;
       setChecking(false);
     }
-  }, [orgId, orgSettings, clients, managesOrg, navigate, showToast]);
+  }, [orgId, orgSettings, clients, invoices, plan, managesOrg, navigate, showToast]);
 
-  /** `checking` is true while the settings are read: disable the issue button meanwhile. */
-  return { guard, checking };
+  const closeLimit = useCallback(() => setLimitHit(false), []);
+  /** Shows the upgrade offer, e.g. when the database refused an invoice for the Solo limit. */
+  const showLimit = useCallback(() => setLimitHit(true), []);
+  const dialog: ReactNode = limitHit ? <UpgradeModal feature="invoices_unlimited" onClose={closeLimit} /> : null;
+
+  /**
+   * `checking` is true while the settings are read: disable the issue button
+   * meanwhile. Render `dialog` (the upgrade offer when the Solo limit is hit).
+   */
+  return { guard, checking, dialog, showLimit };
 }

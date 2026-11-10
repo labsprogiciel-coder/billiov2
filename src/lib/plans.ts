@@ -1,7 +1,8 @@
 export type PlanId     = 'solo' | 'business' | 'cabinet' | 'enterprise';
 export type PlanStatus = 'free' | 'trialing' | 'active' | 'canceled' | 'past_due';
 
-export const SOLO_INVOICE_LIMIT = 10;
+/** Issued invoices per calendar month on the free Solo plan (drafts don't count). Enforced in the database: supabase/migrations/20261111_solo_limit_and_plan_protection.sql */
+export const SOLO_INVOICE_LIMIT = 5;
 
 export const PLAN_ORDER: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
 
@@ -14,7 +15,7 @@ export const PLAN_ORDER: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'
 // Enterprise: ERP integrations, unlimited team members.
 
 export type Feature =
-  | 'invoices_unlimited'    // Business+ (Solo capped at 10/month)
+  | 'invoices_unlimited'    // Business+ (Solo capped at 5 issued invoices/month)
   | 'quotes'                // Business+
   | 'ai_reminders'          // Business+ (moved from Solo in new pricing)
   | 'payments_mobilemoney'  // Business+
@@ -77,7 +78,7 @@ export const PLANS: PlanDef[] = [
     ctaLabel: 'Commencer gratuitement',
     popular:  false,
     perks: [
-      "Jusqu'à 10 factures / mois",
+      "Jusqu'à 5 factures émises / mois",
       'Clients & produits',
       'Suivi TVA de base (non certifié)',
       'Comptabilité conforme DGI',

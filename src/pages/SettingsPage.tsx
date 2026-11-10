@@ -17,6 +17,7 @@ import {
 } from '@/lib/api/payment-settings';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import { sellerIssues, type SellerInfo } from '@/lib/invoice-compliance';
+import { issuedThisMonth } from '@/lib/invoice-limit';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -1527,8 +1528,8 @@ function fmtDate(iso: string) {
 function PlanSection() {
   const { plan, planStatus, planRenewsAt, trialEndsAt, invoices } = useApp();
 
-  const thisMonth    = new Date().toISOString().slice(0, 7);
-  const monthlyCount = invoices.filter(inv => inv.issued.startsWith(thisMonth)).length;
+  // Counted like the database enforces it: issued (not draft) this UTC month
+  const monthlyCount = issuedThisMonth(invoices);
   const isSolo       = plan === 'solo';
   const usageLimit   = isSolo ? SOLO_INVOICE_LIMIT : null;
   const usagePct     = usageLimit ? Math.min(100, (monthlyCount / usageLimit) * 100) : Math.min(100, (monthlyCount / 100) * 30);

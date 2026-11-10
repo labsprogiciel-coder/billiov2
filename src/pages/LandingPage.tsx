@@ -495,7 +495,7 @@ const FAQ_ITEMS = [
   { q: 'Billio est-il conforme à la DGI et au SYSCOHADA ?', a: 'Oui. Billio s\'appuie sur le plan comptable et les journaux SYSCOHADA révisé, suit la TVA à 18 % et génère le bilan et le compte de résultat attendus par l\'administration, dans les 8 pays OHADA couverts.' },
   { q: 'Et si je viens d\'une autre plateforme ?', a: 'Reprenez vos soldes de clôture en une seule écriture d\'à-nouveaux datée du début de l\'exercice : Billio l\'adopte comme position d\'ouverture, et votre balance démarre de là.' },
   { q: 'Quels moyens de paiement pour mes clients ?', a: 'Mobile Money (MTN, Orange, Wave), virement bancaire et paiement à la livraison. Les paiements Mobile Money et bancaires sont rapprochés automatiquement de la facture correspondante.' },
-  { q: "Que se passe-t-il après l'offre gratuite ou l'essai ?", a: "Rien ne se bloque. L'offre Solo reste gratuite jusqu'à 10 factures par mois. Si vous grandissez, passez à Business quand vous voulez — et exportez vos données à tout moment." },
+  { q: "Que se passe-t-il après l'offre gratuite ou l'essai ?", a: "L'offre Solo reste gratuite jusqu'à 5 factures émises par mois ; les brouillons sont illimités. Au-delà, passez à Business quand vous voulez — et exportez vos données à tout moment." },
 ];
 
 function FAQSection() {

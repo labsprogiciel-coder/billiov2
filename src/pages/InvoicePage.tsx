@@ -19,6 +19,7 @@ import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId } from '@/lib/api/credit-notes';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
@@ -263,6 +264,7 @@ export default function InvoicePage() {
       setSendKind('send');
     } catch (err) {
       console.error('[handleIssue] failed:', err);
+      if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast('Impossible d\'émettre la facture. Veuillez réessayer.', true);
     } finally {
       setBusyAction(null);
@@ -1068,6 +1070,7 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+      {compliance.dialog}
     </>
   );
 }

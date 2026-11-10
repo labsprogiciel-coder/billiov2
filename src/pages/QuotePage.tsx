@@ -9,6 +9,7 @@ import { updateQuote } from '@/lib/api/quotes';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
@@ -225,6 +226,7 @@ export default function QuotePage() {
       navigate(`/invoices/${invoice.id}`);
     } catch (err) {
       console.error('[convertToInvoice] failed:', err);
+      if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast('Erreur lors de la conversion. Aucune facture n\'a été créée — veuillez réessayer.', true);
     } finally {
       convertingRef.current = false;
@@ -558,6 +560,7 @@ export default function QuotePage() {
         </button>
       </div>
     </div>
+      {compliance.dialog}
     </>
   );
 }
