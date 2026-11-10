@@ -387,13 +387,19 @@ export default function InvoicePage() {
       await deleteLineItems(orgId, { invoiceId: invoice.id });
       await saveLineItems(orgId, filledLines(eLines), { invoiceId: invoice.id });
       const editedClientName = (clientsMap[eClient] ?? { name: eClient }).name;
-      updateInvoiceIssuanceEntry(orgId, {
-        invoiceId:  invoice.id,
-        htAmount:   eDiscountedSub,
-        tvaAmount:  eTax,
-        date:       eDate,
-        clientName: editedClientName,
-      }).catch(err => console.error('Accounting update failed:', err));
+      // A draft has no sales entry yet: it is booked when the invoice is issued
+      if (invoice.status !== 'draft') {
+        updateInvoiceIssuanceEntry(orgId, {
+          invoiceId:  invoice.id,
+          htAmount:   eDiscountedSub,
+          tvaAmount:  eTax,
+          date:       eDate,
+          clientName: editedClientName,
+        }).catch(err => {
+          console.error('Accounting update failed:', err);
+          showToast('Facture mise à jour, mais l\'écriture comptable n\'a pas pu être rectifiée. Signalez-le à votre comptable.', true);
+        });
+      }
       setInvoices(prev => prev.map(i => i.id === invoice.id
         ? { ...i, subject: eSubject.trim() || 'Facture sans titre', client: eClient, issued: eDate, due: eDue, amount: eTotal, discountPct: eDiscount }
         : i));
