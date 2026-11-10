@@ -72,7 +72,7 @@ export async function fetchDefaultTemplate(orgId: string): Promise<SavedTemplate
 }
 
 export async function createTemplate(orgId: string, draft: TemplateDraft): Promise<SavedTemplate> {
-  const name = draft.name.trim() || 'Nouveau modèle';
+  const name = draft.name.trim().slice(0, 80).trim() || 'Nouveau modèle';
   if (MOCK) {
     const list = mockRead(orgId);
     const t: SavedTemplate = {
@@ -103,7 +103,7 @@ export async function updateTemplate(
     return list[i];
   }
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (patch.name !== undefined)    row.name = patch.name.trim() || 'Nouveau modèle';
+  if (patch.name !== undefined)    row.name = patch.name.trim().slice(0, 80).trim() || 'Nouveau modèle';
   if (patch.config !== undefined)  row.config = patch.config;
   if (patch.starred !== undefined) row.starred = patch.starred;
   // RLS filters rows the caller may not change without an error; .single()

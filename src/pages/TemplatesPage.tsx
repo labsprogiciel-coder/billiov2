@@ -60,6 +60,8 @@ interface Template {
 }
 
 const PRESET_ID = (key: string) => `preset:${key}`;
+/** invoice_templates.name is limited to 80 characters */
+const NAME_MAX = 80;
 
 function galleryTemplates(saved: SavedTemplate[]): Template[] {
   const hasDefault = saved.some(t => t.isDefault);
@@ -76,7 +78,8 @@ function galleryTemplates(saved: SavedTemplate[]): Template[] {
       id: t.id, presetKey: t.presetKey, saved: true, name: t.name,
       purpose: preset?.purpose ?? 'Modèle personnalisé',
       chips: preset?.chips ?? [LAYOUTS.find(l => l.key === t.config.layout)?.label ?? 'Personnalisé'],
-      isDefault: t.isDefault, starred: t.starred, config: t.config,
+      // A saved copy of the standard template stays the one in use until another is chosen
+      isDefault: t.isDefault || (!hasDefault && t.presetKey === PRESETS[0].key), starred: t.starred, config: t.config,
     };
   });
   // Presets first in their usual order, saved copies in place of their preset
@@ -487,16 +490,21 @@ export default function TemplatesPage() {
   function saveTemplate() {
     if (view === 'gallery') return;
     const { id } = view;
-    const name = edName.trim() || 'Nouveau modèle';
+    const name = edName.trim().slice(0, NAME_MAX).trim() || 'Nouveau modèle';
     const config = { ...edConfig };
     void run(async () => {
       if (id === 'new') {
         await createTemplate(orgId, { name, config });
       } else {
         const tpl = templates.find(t => t.id === id)!;
-        await ensureSaved(tpl, { name, config });
-        // Editing the template in use changes the next PDFs straight away
-        if (tpl.isDefault) setInvoiceTemplate(config);
+        const row = await ensureSaved(tpl, { name, config });
+        // Editing the template in use changes the next PDFs straight away.
+        // The standard template is only implicitly in use: save it as the
+        // default, or PDFs would fall back to the unedited one after a reload.
+        if (tpl.isDefault) {
+          if (!row.isDefault) await setDefaultTemplate(orgId, row.id);
+          setInvoiceTemplate(config);
+        }
       }
       showToast('Modèle enregistré');
       setView('gallery');
@@ -623,6 +631,8 @@ export default function TemplatesPage() {
                   className="ed-name-input"
                   value={edName}
                   onChange={e => setEdName(e.target.value)}
+                  maxLength={NAME_MAX}
+                  aria-label="Nom du modèle"
                   spellCheck={false}
                 />
                 <div className="ed-sub">
