@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { canManageOrg } from '@/lib/permissions';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
@@ -15,6 +16,7 @@ import {
   DEFAULT_PAYMENT_SETTINGS, type PaymentSettings,
 } from '@/lib/api/payment-settings';
 import { getFiscalIdLabel } from '@/lib/ohada';
+import { sellerIssues, type SellerInfo } from '@/lib/invoice-compliance';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -169,6 +171,63 @@ const CURRENCIES = [
 ];
 
 /* ─── Business ─────────────────────────────────────────────────── */
+/* ─── DGI compliance checklist (PRO-133) ─────────────────────────── */
+// The seller mentions every invoice must carry, from the values in the form
+// below and the payment settings. Missing ones trigger a warning when an
+// invoice is issued.
+function ComplianceChecklist({ seller, orgId }: { seller: SellerInfo; orgId: string }) {
+  const [payments, setPayments] = useState<PaymentSettings | null | undefined>(undefined);
+  useEffect(() => {
+    if (!orgId) return;
+    fetchPaymentSettings(orgId).then(setPayments, () => setPayments(null));
+  }, [orgId]);
+
+  const missing = new Set(sellerIssues(seller, payments ?? null).map(i => i.key));
+  const id = getFiscalIdLabel(seller.country);
+  const rows: { key: string; label: string; hint?: string }[] = [
+    { key: 'seller-name', label: 'Raison sociale' },
+    { key: 'seller-address', label: 'Adresse' },
+    { key: 'seller-ifu', label: id },
+    { key: 'seller-rccm', label: 'RCCM' },
+    { key: 'seller-regime', label: 'Régime fiscal' },
+    { key: 'seller-division', label: 'Division fiscale' },
+    { key: 'seller-bank', label: 'Coordonnées bancaires', hint: 'onglet Moyens de paiement' },
+  ];
+  const count = rows.filter(r => missing.has(r.key)).length;
+
+  return (
+    <div className="s-card" style={{ marginBottom: 16 }}>
+      <div className="s-card-head">
+        <div className="s-card-title">Conformité DGI</div>
+        <div className="s-card-desc">
+          {count === 0
+            ? 'Vos factures portent toutes les mentions obligatoires de l\'entreprise.'
+            : `${count} mention${count > 1 ? 's' : ''} obligatoire${count > 1 ? 's' : ''} manquante${count > 1 ? 's' : ''} : sans elles, vos clients professionnels risquent de ne pas pouvoir déduire la TVA.`}
+        </div>
+      </div>
+      <div className="s-card-body">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+          {rows.map(r => {
+            const ok = !missing.has(r.key);
+            const unknown = r.key === 'seller-bank' && payments === null;
+            return (
+              <li key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, color: ok ? 'var(--color-text-secondary)' : 'var(--color-text-primary, #1C2733)' }}>
+                <Icon name={unknown ? 'dots' : ok ? 'circle-check' : 'alert-triangle'} size={16} ariaHidden
+                  style={{ color: unknown ? 'var(--color-text-tertiary)' : ok ? '#276C2B' : '#8A5207', flexShrink: 0 }} />
+                <span>
+                  {r.label}
+                  <span className="sr-only">{unknown ? ' : non vérifié' : ok ? ' : renseigné' : ' : manquant'}</span>
+                  {!ok && r.hint && <small style={{ display: 'block', color: 'var(--color-text-tertiary)' }}>{r.hint}</small>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function BusinessSection() {
   const { orgId, showToast, setOrgSettings } = useApp();
 
@@ -228,6 +287,13 @@ function BusinessSection() {
   }
 
   return (
+    <>
+    {!loading && (
+      <ComplianceChecklist
+        seller={{ name, address, city, country, ifu, rccm, taxRegime, divisionFiscale }}
+        orgId={orgId}
+      />
+    )}
     <div className="s-card">
       <div className="s-card-head">
         <div className="s-card-title">Informations entreprise</div>
@@ -309,6 +375,7 @@ function BusinessSection() {
         </button>
       </div>
     </div>
+    </>
   );
 }
 
@@ -1619,7 +1686,12 @@ const ORG_TABS: SettingsTab[] = ['business', 'invoicing', 'payments', 'providers
 export default function SettingsPage() {
   const { showToast } = useApp();
   const { managesOrg } = usePermissions();
-  const [tab, setTab] = useState<SettingsTab>('profile');
+  // ?tab= opens a section directly (e.g. links from the invoice compliance warning)
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<SettingsTab>(() => {
+    const t = searchParams.get('tab');
+    return TABS.some(x => x.key === t) ? (t as SettingsTab) : 'profile';
+  });
   const onSave = () => showToast('Paramètres enregistrés');
 
   return (

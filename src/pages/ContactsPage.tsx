@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import { useSearchParams } from 'react-router-dom';
 import Icon from '@/components/Icon';
@@ -528,7 +528,11 @@ export default function ContactsPage() {
   const { clients, setClients, invoices, quotes, payments, orgId, showToast, loading: clientsLoading } = useApp();
   const [clientFilter, setClientFilter] = useState<ClientFilterKey>('all');
   const [clientSearch, setClientSearch] = useState('');
-  const [clientPanel, setClientPanel] = useState<null | { kind: 'detail'; code: string } | { kind: 'new' }>(null);
+  // ?client=CODE opens that client's form (link from the invoice compliance warning)
+  const [linkedClient] = useState(() => searchParams.get('client'));
+  const [clientPanel, setClientPanel] = useState<null | { kind: 'detail'; code: string } | { kind: 'new' }>(
+    () => linkedClient ? { kind: 'detail', code: linkedClient } : null,
+  );
   const [form, setForm] = useState<NewClientForm>(EMPTY_FORM);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
@@ -602,6 +606,16 @@ export default function ContactsPage() {
   }, [supplierContacts, supplierFilter, supplierSearch]);
 
   const loading = tab === 'clients' ? clientsLoading : suppLoading;
+  // Opens the linked client's form once it is loaded (writers only)
+  const linkedEditOpened = useRef(false);
+  useEffect(() => {
+    if (!linkedClient || linkedEditOpened.current || !writable) return;
+    const cl = clients.find(c => c.code === linkedClient);
+    if (!cl) return;
+    linkedEditOpened.current = true;
+    openDetailEdit(cl);
+  }, [linkedClient, clients, writable]);
+
   if (loading) return <PageSkeleton title="Contacts" variant="accounting" rows={6} />;
 
   // ── Clients computed ──────────────────────────────────────────────────────
@@ -992,7 +1006,7 @@ export default function ContactsPage() {
                       </select>
                     </div>
                     <div className="form-group" style={{ marginBottom: 8 }}>
-                      <label className="form-label">{getFiscalIdLabel(editForm.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+                      <label className="form-label">{getFiscalIdLabel(editForm.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— requis pour un client professionnel</span></label>
                       <input className="form-input" type="text" placeholder="00012345 B" value={editForm.ifu} onChange={e => setEditForm(f => ({ ...f, ifu: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ marginBottom: 8 }}>
@@ -1107,7 +1121,7 @@ export default function ContactsPage() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">{getFiscalIdLabel(form.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— optionnel</span></label>
+              <label className="form-label">{getFiscalIdLabel(form.country)} <span style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}>— requis pour un client professionnel</span></label>
               <input className="form-input" placeholder={form.country === 'Sénégal' ? '0123456789123' : form.country === 'Cameroun' ? 'M012345678901R' : '00012345 B'} value={form.ifu} onChange={e => setForm(f => ({ ...f, ifu: e.target.value }))} />
             </div>
             <div className="form-group">

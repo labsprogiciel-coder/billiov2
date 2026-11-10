@@ -18,6 +18,7 @@ import { invoiceMessage } from '@/lib/document-messages';
 import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId } from '@/lib/api/credit-notes';
+import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
@@ -71,6 +72,7 @@ export default function InvoicePage() {
   const navigate = useNavigate();
   const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
   const writable = canWrite(userRole);
+  const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
   const [sendKind, setSendKind] = useState<'send' | 'reminder' | null>(null);
@@ -230,6 +232,14 @@ export default function InvoicePage() {
     } finally {
       setBusyAction(null);
     }
+  };
+
+  // Issuing a draft: check the mandatory mentions first; handleIssue reports
+  // its own problems (lines not loaded or invalid) without the check
+  const requestIssue = () => {
+    if (busyAction || linesLoading) return;
+    if (linesError || lineItemsError(lines)) { void handleIssue(); return; }
+    void compliance.guard(invoice.client, () => void handleIssue());
   };
 
   // Draft → pending: the invoice becomes payable and gets its sales journal entry
@@ -477,7 +487,7 @@ export default function InvoicePage() {
             </button>
           )}
           {writable && invoice.status === 'draft' && (
-            <button className="btn btn-primary" onClick={handleIssue} disabled={busyAction !== null || linesLoading}>
+            <button className="btn btn-primary" onClick={requestIssue} disabled={busyAction !== null || linesLoading || compliance.checking}>
               <Icon name="send" ariaHidden /> {busyAction === 'issue' ? 'Émission…' : 'Émettre la facture'}
             </button>
           )}
@@ -659,7 +669,7 @@ export default function InvoicePage() {
                   </button>
                 </>)}
                 {writable && invoice.status === 'draft' && (
-                  <button className="btn btn-primary btn-block" onClick={handleIssue} disabled={busyAction !== null || linesLoading}>
+                  <button className="btn btn-primary btn-block" onClick={requestIssue} disabled={busyAction !== null || linesLoading || compliance.checking}>
                     <Icon name="send" ariaHidden /> {busyAction === 'issue' ? 'Émission…' : 'Émettre la facture'}
                   </button>
                 )}
@@ -1058,6 +1068,7 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+      {compliance.dialog}
     </>
   );
 }

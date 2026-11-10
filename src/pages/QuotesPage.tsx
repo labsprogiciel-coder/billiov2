@@ -17,6 +17,7 @@ import { filledLines, lineItemsError } from '@/lib/line-validation';
 import { confirmDiscard } from '@/lib/confirm-discard';
 import { contactValue } from '@/lib/share-links';
 import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
+import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-items';
 import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
@@ -72,6 +73,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
   const [showPicker, setShowPicker]   = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
   const convertingRef = useRef<Set<string>>(new Set());
+  const compliance = useComplianceGuard();
   const submittingRef = useRef(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -182,8 +184,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  async function convertToInvoice(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function convertToInvoice(id: string) {
     if (convertingRef.current.has(id)) return;
     const quote = quotes.find(q => q.id === id);
     if (!quote) return;
@@ -417,7 +418,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
                       {writable && !['invoiced', 'declined', 'expired'].includes(q.status) && (
                         <button
                           className="btn-convert"
-                          onClick={e => convertToInvoice(q.id, e)}
+                          onClick={e => { e.stopPropagation(); void compliance.guard(q.client, () => void convertToInvoice(q.id), 'Convertir quand même'); }}
                         >
                           <Icon name="arrow-right" size={13} />
                           Facturer
@@ -673,6 +674,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
           />
         );
       })()}
+      {compliance.dialog}
     </>
   );
 }

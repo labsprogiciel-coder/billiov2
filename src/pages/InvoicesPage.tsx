@@ -23,6 +23,7 @@ import {
 import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import { useComplianceGuard } from '@/lib/use-compliance-guard';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -166,6 +167,15 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const openSend = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     navigate(`/invoices/${id}`, { state: { openSend: true } });
+  };
+
+  // Issuing: check the mandatory mentions first (after the form's own checks,
+  // which submitInvoice reports)
+  const compliance = useComplianceGuard();
+  const issueInvoice = () => {
+    if (submittingRef.current) return;
+    if (!fClient || lineItemsError(lineItems) || fDue < fDate) { void submitInvoice('pending'); return; }
+    void compliance.guard(fClient, () => void submitInvoice('pending'));
   };
 
   const submitInvoice = async (status: 'draft' | 'pending') => {
@@ -552,11 +562,12 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('draft')}>
             {submitting ? 'Enregistrement…' : 'Enregistrer brouillon'}
           </button>
-          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('pending')}>
-            <Icon name="send" ariaHidden /> {submitting ? 'Émission…' : 'Émettre la facture'}
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting || compliance.checking} onClick={issueInvoice}>
+            <Icon name="send" ariaHidden /> {submitting ? 'Émission…' : compliance.checking ? 'Vérification…' : 'Émettre la facture'}
           </button>
         </div>
       </div>
+      {compliance.dialog}
     </>
   );
 }
