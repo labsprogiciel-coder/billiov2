@@ -35,7 +35,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 /** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
 export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const { writable } = usePermissions();
-  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, orgId, loading } = useApp();
+  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading } = useApp();
 
   const navigate = useNavigate();
 
@@ -147,6 +147,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       }
       const client = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
       const blob = await renderInvoicePdf({
+        template: invoiceTemplate,
         invoice, lines, client, biz: orgSettings,
         paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
         deliveryTerms: orgSettings.deliveryTerms || 'À convenir',

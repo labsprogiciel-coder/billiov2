@@ -69,7 +69,7 @@ const BillioLogoSvg = () => (
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, orgId, loading, userRole } = useApp();
+  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
   const writable = canWrite(userRole);
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
@@ -264,6 +264,7 @@ export default function InvoicePage() {
     if (!paymentMethodsReady) { showToast(paymentMethodsNotReadyMessage(paymentMethodsStatus), true); return; }
     try {
       const blob = await renderInvoicePdf({
+        template: invoiceTemplate,
         invoice,
         lines,
         client,
