@@ -3,6 +3,8 @@
 // same mock constants used by the static prototype pages.
 
 import { supabase } from '@/lib/supabase';
+import { invoiceSalesLines, salesAdjustmentLines, type EntryLine } from '@/lib/invoice-entry';
+import { todayISO } from '@/lib/invoice-status';
 import {
   CLASSES, ACCOUNTS, JOURNALS, ENTRIES, OPENING,
   FIXED_ASSETS, SUPPLIER_BILLS,
@@ -539,6 +541,11 @@ async function resolveJournalAndPeriod(
 
 // ─── Auto-entry helpers ───────────────────────────────────────────────────────
 
+/**
+ * Books the sales entry of an invoice when it is issued. Idempotent: it posts
+ * only what the books are missing for this invoice, so a retry, a double click
+ * or an entry left over from an earlier edit never doubles the sale.
+ */
 export async function recordInvoiceIssuanceEntry(
   orgId: string,
   opts: {
@@ -549,22 +556,7 @@ export async function recordInvoiceIssuanceEntry(
     clientName: string;
   },
 ): Promise<void> {
-  if (MOCK) return;
-  const { journalId, periodId } = await resolveJournalAndPeriod(orgId, 'VE', opts.date);
-  const total = opts.htAmount + opts.tvaAmount;
-  const entryId = await createJournalEntry(orgId, {
-    journalId,
-    periodId,
-    date:  opts.date,
-    piece: `VE-${opts.invoiceId}`,
-    label: `Facture — ${opts.clientName} (${opts.invoiceId})`,
-    lines: [
-      { accountNum: '411', debit: total,          credit: 0              },
-      { accountNum: '706', debit: 0,               credit: opts.htAmount  },
-      ...(opts.tvaAmount > 0 ? [{ accountNum: '443', debit: 0, credit: opts.tvaAmount }] : []),
-    ],
-  });
-  await postJournalEntry(entryId);
+  await syncInvoiceSalesEntry(orgId, opts);
 }
 
 export async function recordInvoicePaymentEntry(
@@ -671,30 +663,64 @@ export async function recordSupplierBillPaymentEntry(
   await postJournalEntry(entryId);
 }
 
+/**
+ * Brings the sales entry of an issued invoice in line with its amounts after
+ * an edit. Posted entries can't be changed or deleted, so instead of
+ * replacing the original this posts one adjustment with the difference
+ * between every posted VE line of the invoice and what the invoice now says.
+ * Nothing is booked when they already match. Returns whether an adjustment
+ * was posted.
+ */
 export async function updateInvoiceIssuanceEntry(
   orgId: string,
-  opts: {
-    invoiceId: string;
-    htAmount: number;
-    tvaAmount: number;
-    date: string;
-    clientName: string;
-  },
-): Promise<void> {
-  if (MOCK) return;
-  // Delete the original VE entry, then re-record with updated amounts
+  opts: { invoiceId: string; htAmount: number; tvaAmount: number; date: string; clientName: string },
+): Promise<boolean> {
+  return syncInvoiceSalesEntry(orgId, opts);
+}
+
+async function syncInvoiceSalesEntry(
+  orgId: string,
+  opts: { invoiceId: string; htAmount: number; tvaAmount: number; date: string; clientName: string },
+): Promise<boolean> {
+  if (MOCK) return false;
+  const piece = `VE-${opts.invoiceId}`;
   const { data, error } = await supabase
     .from('journal_entries')
-    .select('id')
+    .select('piece, entry_lines ( account_num, debit, credit )')
     .eq('org_id', orgId)
-    .eq('piece', `VE-${opts.invoiceId}`);
+    .eq('posted', true)
+    .or(`piece.eq.${piece},piece.like.${piece}-R*`);
   if (error) throw error;
-  if (data?.length) {
-    await Promise.all(
-      (data as Array<Record<string, unknown>>).map(r => deleteJournalEntry(String(r.id)))
-    );
+
+  const entries = (data ?? []) as Array<{ piece: string; entry_lines: Array<{ account_num: string; debit: number; credit: number }> }>;
+  const current: EntryLine[] = entries.flatMap(e => e.entry_lines.map(l => ({
+    accountNum: l.account_num, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0,
+  })));
+  const lines = salesAdjustmentLines(current, invoiceSalesLines(opts.htAmount, opts.tvaAmount));
+  if (lines.length === 0) return false;
+
+  // Book the correction in the invoice's own period, or today's if that one is closed
+  let ids: { journalId: string; periodId: string };
+  let date = opts.date;
+  try {
+    ids = await resolveJournalAndPeriod(orgId, 'VE', date);
+  } catch (err) {
+    if (!(err instanceof Error && /is closed/.test(err.message))) throw err;
+    date = todayISO();
+    ids = await resolveJournalAndPeriod(orgId, 'VE', date);
   }
-  await recordInvoiceIssuanceEntry(orgId, opts);
+  const entryId = await createJournalEntry(orgId, {
+    ...ids,
+    date,
+    // The first entry is the invoice itself; later ones are numbered corrections
+    piece: entries.length === 0 ? piece : `${piece}-R${entries.filter(e => e.piece !== piece).length + 1}`,
+    label: entries.length === 0
+      ? `Facture — ${opts.clientName} (${opts.invoiceId})`
+      : `Rectification facture — ${opts.clientName} (${opts.invoiceId})`,
+    lines,
+  });
+  await postJournalEntry(entryId);
+  return true;
 }
 
 export async function deleteInvoiceEntries(orgId: string, invoiceId: string): Promise<void> {
