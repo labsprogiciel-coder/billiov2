@@ -1640,7 +1640,7 @@ function PlanSection() {
                   <div className="s-upgrade-tagline">{p.tagline}</div>
                   <ul className="s-upgrade-perks">
                     {p.perks.map(perk => (
-                      <li key={perk}><Icon name="check" size={12} className="s-upgrade-check" />{perk}</li>
+                      <li key={perk} title={perk}><Icon name="check" size={12} className="s-upgrade-check" /><span>{perk}</span></li>
                     ))}
                   </ul>
                 </div>
@@ -1655,6 +1655,7 @@ function PlanSection() {
                         </>
                     }
                   </div>
+                  {p.annualPrice && <div className="s-upgrade-price-period">ou {formatPrice(p.annualPrice)} {p.currency} / an</div>}
                   <button className={`btn btn-sm${p.popular ? ' btn-primary' : ''}`}>
                     {p.ctaLabel}
                   </button>

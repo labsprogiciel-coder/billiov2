@@ -62,9 +62,12 @@ export interface PlanDef {
   name:     string;
   tagline:  string;
   price:    number | null; // null = on-quote
+  /** Price when paid yearly, shown next to the monthly price */
+  annualPrice?: number;
   currency: string;
   ctaLabel: string;
   popular:  boolean;
+  /** One line each on the pricing cards: keep them short (≈ 24 characters) */
   perks:    string[];
 }
 
@@ -78,11 +81,11 @@ export const PLANS: PlanDef[] = [
     ctaLabel: 'Commencer gratuitement',
     popular:  false,
     perks: [
-      "Jusqu'à 5 factures émises / mois",
+      '5 factures émises / mois',
+      'Brouillons illimités',
       'Clients & produits',
-      'Suivi TVA de base (non certifié)',
-      'Comptabilité conforme DGI',
-      'États financiers & contrôle fiscal',
+      'Suivi TVA de base',
+      'Comptabilité SYSCOHADA',
     ],
   },
   {
@@ -90,17 +93,18 @@ export const PLANS: PlanDef[] = [
     name:     'Business',
     tagline:  'Zéro stress à la clôture, serein face à la DGI.',
     price:    25_000,
+    annualPrice: 300_000,
     currency: 'XOF',
     ctaLabel: 'Essai 14 jours gratuit',
     popular:  true,
     perks: [
-      'Conforme SYSCOHADA ',
+      'Factures illimitées',
+      'Devis illimités',
+      'Conforme SYSCOHADA',
       'États financiers',
       'Déclarations TVA',
-      'Factures & devis illimités',
-      "Jusqu'à 3 membres d'équipe",
-      "Relance WhatsApp",
-      "Relance par email"
+      "3 membres d'équipe",
+      'Relances WhatsApp & email',
     ],
   },
   {
@@ -117,7 +121,7 @@ export const PLANS: PlanDef[] = [
       'Clôture de période',
       'Immobilisations',
       'Rappels de paiement IA',
-      'Accès par rôles pour le staff',
+      'Accès par rôles',
       'Support prioritaire',
     ],
   },
@@ -132,13 +136,31 @@ export const PLANS: PlanDef[] = [
     perks: [
       'Tout le plan Cabinet',
       'Intégration Odoo',
-      'Integration Sage 100',
-      'SLA garanti & support dédié',
-      'Onboarding & Formation',
-      "Membres d'équipe illimités",
+      'Intégration Sage 100',
+      'SLA & support dédié',
+      'Onboarding & formation',
+      'Équipe illimitée',
     ],
   },
 ];
+
+/**
+ * Certified electronic invoicing (FEC / SECeF), not available yet (PRO-137).
+ * Annual only, nothing up front; re-certification is Billio's cost, not the
+ * customer's. Shown on the pricing pages as "coming soon".
+ */
+export const CERTIFIED_OFFER = {
+  name:        'Facture certifiée DGI',
+  badge:       'Bientôt',
+  annualPrice: 450_000,
+  currency:    'XOF',
+  points: [
+    'QR code et n° SECeF sur chaque facture',
+    "Aucun frais d'installation",
+    'Mises à jour DGI incluses',
+  ],
+  ctaLabel:    'Être prévenu',
+} as const;
 
 export const PLAN_LABELS: Record<PlanId, string> = {
   solo:       'Solo',
