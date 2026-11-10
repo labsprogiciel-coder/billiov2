@@ -1978,3 +1978,9 @@ select.form-input {
     --tter: #4E5A6B;
   }
 }
+
+/* Template preview: reserved area for the SECeF elements of a certified invoice (PRO-135) */
+.tp-cert { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 10px 12px; border: 1px dashed #848FA0; border-radius: 6px; }
+.tp-cert-qr { width: 46px; height: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px dashed #848FA0; border-radius: 4px; font-size: 10px; font-weight: 700; color: var(--tter); }
+.tp-cert-title { font-size: 11px; font-weight: 700; }
+.tp-cert-sub { font-size: 10px; color: var(--tter); line-height: 1.4; }

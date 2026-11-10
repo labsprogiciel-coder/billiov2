@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { DEFAULT_CONFIG, FONT_FAMILIES, PRESETS, accentDark, accentTint, mixHex, normalizeConfig, pdfFont } from '@/lib/invoice-template';
 import { registerPdfFonts } from '@/lib/pdf-fonts';
+import { qrMatrix, qrRuns } from '@/lib/certification';
 import { InvoicePDFDocument, type InvoicePDFProps } from '@/components/InvoicePDF';
 
 describe('normalizeConfig', () => {
@@ -34,6 +35,27 @@ describe('accent colours', () => {
   });
 });
 
+describe('QR code', () => {
+  it('encodes text as a square matrix with finder patterns', () => {
+    const m = qrMatrix('https://example.invalid/verify?c=TX-1');
+    expect(m.size).toBeGreaterThanOrEqual(21);
+    // Top-left finder pattern: dark border, light ring, dark centre
+    expect(m.dark(0, 0)).toBe(true);
+    expect(m.dark(6, 6)).toBe(true);
+    expect(m.dark(1, 1)).toBe(false);
+    expect(m.dark(3, 3)).toBe(true);
+  });
+
+  it('draws exactly the dark modules as runs', () => {
+    const m = qrMatrix('SECEF-BF-000123');
+    const runs = qrRuns(m);
+    let dark = 0;
+    for (let y = 0; y < m.size; y++) for (let x = 0; x < m.size; x++) if (m.dark(x, y)) dark++;
+    expect(runs.reduce((n, r) => n + r.w, 0)).toBe(dark);
+    expect(runs.every(r => r.w > 0 && r.x + r.w <= m.size)).toBe(true);
+  });
+});
+
 describe('invoice PDF', () => {
   // The app loads the fonts by URL; under Node they are read from disk
   const mod = (path: string) => decodeURIComponent(new URL(`../../../node_modules/${path}`, import.meta.url).pathname);
@@ -59,5 +81,14 @@ describe('invoice PDF', () => {
     const buf = await renderToBuffer(createElement(InvoicePDFDocument, { ...props, template }) as Parameters<typeof renderToBuffer>[0]);
     expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(buf.length).toBeGreaterThan(5000);
+  }, 30000);
+
+  // A certified invoice prints its SECeF block in every layout
+  it.each(PRESETS.map(p => [p.key, p.config] as const))('prints the SECeF block in the %s template', async (_key, template) => {
+    const certification = { secefId: 'SECEF-BF-000123', transactionCode: 'TX-9F2A-77C1', qrPayload: 'https://example.invalid/verify?c=TX-9F2A-77C1', certifiedAt: '2026-11-10T09:30:00Z' };
+    const buf = await renderToBuffer(createElement(InvoicePDFDocument, { ...props, lines: props.lines.slice(0, 3), template, certification }) as Parameters<typeof renderToBuffer>[0]);
+    expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
+    const plain = await renderToBuffer(createElement(InvoicePDFDocument, { ...props, lines: props.lines.slice(0, 3), template }) as Parameters<typeof renderToBuffer>[0]);
+    expect(buf.length).toBeGreaterThan(plain.length);
   }, 30000);
 });

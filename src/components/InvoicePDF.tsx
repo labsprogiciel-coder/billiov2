@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, Text, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { calculateServiceWithholding } from '@/lib/tax-bf';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
@@ -8,6 +8,7 @@ import type { PaymentMethodLine } from '@/lib/payment-methods';
 import { VAT_LABEL, chargesVat, documentHasVat, vatOn } from '@/lib/vat';
 import { DEFAULT_CONFIG, accentDark, accentTint, densityScale, normalizeConfig, pdfFont } from '@/lib/invoice-template';
 import { registerPdfFonts } from '@/lib/pdf-fonts';
+import { qrMatrix, qrRuns, type InvoiceCertification } from '@/lib/certification';
 
 // toLocaleString is unreliable in the react-pdf renderer environment
 const pdfFmt = (n: number): string =>
@@ -50,6 +51,8 @@ export interface InvoicePDFProps {
   deliveryTerms?: string;
   /** From the organisation's payment settings; see paymentMethodLines(). */
   paymentMethods?: PaymentMethodLine[];
+  /** SECeF elements of a certified invoice (PRO-137); printed in a fixed area of every layout. */
+  certification?: InvoiceCertification;
 }
 
 const PAD = 40;
@@ -180,6 +183,12 @@ function makeStyles(t: PaperConfig) {
       payCol: isReceipt ? {} : { flex: 1 },
       payMethod: { fontSize: 8, color: '#444', marginBottom: 2 },
       notesText: { fontSize: 8, color: '#666', lineHeight: 1.5 },
+      certBox: {
+        flexDirection: 'row', alignItems: 'center', gap: 12, padding: 8, marginBottom: sp(16),
+        borderWidth: 1, borderColor: '#1C2733', borderRadius: 4,
+      },
+      certTitle: { fontSize: 8.5, ...bold, marginBottom: 3 },
+      certLine: { fontSize: 8, color: '#1a1a1a', lineHeight: 1.45 },
       sign: { marginTop: sp(18), width: 180, alignSelf: 'flex-end', alignItems: 'center' },
       signLine: { borderTopWidth: 1, borderTopColor: '#B7C0CC', width: '100%', marginBottom: 5 },
       signLabel: { fontSize: 8, color: '#606C7E', ...bold },
@@ -201,9 +210,28 @@ function makeStyles(t: PaperConfig) {
   };
 }
 
+/** QR code drawn as vector rectangles (scannable at any zoom, a few KB). */
+function PdfQr({ text, size }: { text: string; size: number }) {
+  const m = qrMatrix(text);
+  const quiet = 2;
+  const n = m.size + quiet * 2;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${n} ${n}`}>
+      <Rect x={0} y={0} width={n} height={n} fill="#ffffff" />
+      {qrRuns(m).map(r => <Rect key={`${r.x}-${r.y}`} x={r.x + quiet} y={r.y + quiet} width={r.w} height={1} fill="#000000" />)}
+    </Svg>
+  );
+}
+
+const pdfFmtDateTime = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 export function InvoicePDFDocument({
   invoice, lines, client, biz, template, title = 'Facture', clientLabel = 'Facturé à',
-  paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [],
+  paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [], certification,
 }: InvoicePDFProps) {
   registerPdfFonts();
   const t = normalizeConfig(template ?? DEFAULT_CONFIG);
@@ -400,6 +428,20 @@ export function InvoicePDFDocument({
     </View>
   );
 
+  // Certified invoice (SECeF): same fixed block in every layout, not styled by the template
+  const certified = certification ? (
+    <View style={s.certBox} wrap={false}>
+      <PdfQr text={certification.qrPayload} size={t.layout === 'receipt' ? 72 : 80} />
+      <View style={{ flex: 1 }}>
+        <Text style={s.certTitle}>Facture certifiée — SECeF</Text>
+        <Text style={s.certLine}>N° SECeF : {certification.secefId}</Text>
+        <Text style={s.certLine}>Code : {certification.transactionCode}</Text>
+        {certification.counter ? <Text style={s.certLine}>Compteur : {certification.counter}</Text> : null}
+        {certification.certifiedAt ? <Text style={s.certLine}>Certifiée le {pdfFmtDateTime(certification.certifiedAt)}</Text> : null}
+      </View>
+    </View>
+  ) : null;
+
   const signature = t.showSignature ? (
     <View style={s.sign} wrap={false}>
       <View style={s.signLine} />
@@ -515,6 +557,7 @@ export function InvoicePDFDocument({
         {subject}
         {table}
         {totals}
+        {certified}
         {payment}
         {signature}
 
