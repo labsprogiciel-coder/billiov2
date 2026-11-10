@@ -34,7 +34,7 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, orgId, loading, userRole } = useApp();
+  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -184,6 +184,7 @@ export default function QuotePage() {
     const pdfAmount  = editOpen ? eTotal : total;
     try {
       const blob = await renderInvoicePdf({
+        template: invoiceTemplate,
         invoice: { id: quote.id, subject: pdfSubject, client: quote.client, issued: pdfIssued, due: pdfValid, amount: pdfAmount, status: 'pending', discountPct: 0 },
         lines: pdfLines,
         client,

@@ -15,6 +15,9 @@ import { fetchOpeningBalanceAdopted } from '@/lib/api/accounting';
 import type { Invoice, Activity, ClientRecord, Payment, Product, Quote, Client } from '@/lib/schemas';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { withEffectiveStatus } from '@/lib/invoice-status';
+import type { PaperConfig } from '@/components/InvoicePaper';
+import { DEFAULT_CONFIG } from '@/lib/invoice-template';
+import { fetchDefaultTemplate } from '@/lib/api/invoice-templates';
 import { hasFeature as checkFeature, type PlanId, type PlanStatus, type Feature } from '@/lib/plans';
 
 export interface OrgSettings {
@@ -51,6 +54,9 @@ interface AppContextValue {
   // Org profile (used by invoice templates)
   orgSettings: OrgSettings;
   setOrgSettings: Dispatch<SetStateAction<OrgSettings>>;
+  /** The organisation's default invoice template; the PDF is drawn from it. */
+  invoiceTemplate:    PaperConfig;
+  setInvoiceTemplate: Dispatch<SetStateAction<PaperConfig>>;
   // Auth
   userId:      string;
   orgId:       string;
@@ -86,6 +92,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [quotes,    setQuotes]    = useState<Quote[]>(MOCK ? INITIAL_QUOTES : []);
 
   const [orgSettings,     setOrgSettings]     = useState<OrgSettings>(EMPTY_ORG);
+  const [invoiceTemplate, setInvoiceTemplate] = useState<PaperConfig>(DEFAULT_CONFIG);
 
   const [userId,          setUserId]          = useState(MOCK ? 'mock-user' : '');
   const [orgId,           setOrgId]           = useState(MOCK ? 'mock-org'  : '');
@@ -122,6 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (MOCK) {
       setUserLabel('Serge W.');
       setUserInitials('SW');
+      fetchDefaultTemplate('mock-org').then(t => { if (t) setInvoiceTemplate(t.config); }).catch(() => {});
       return;
     }
 
@@ -225,6 +233,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setActivity(act);
           setOpeningBalancesAdopted(obAdopted);
           setupRealtime(resolvedOrgId);
+          // Not fatal: without a saved default the PDF uses the standard template
+          fetchDefaultTemplate(resolvedOrgId)
+            .then(t => setInvoiceTemplate(t?.config ?? DEFAULT_CONFIG))
+            .catch(err => console.warn('[boot] invoice template fetch failed, using the standard one:', err));
         } catch (err) {
           console.error('[boot] data fetch error:', err);
           showToast('Erreur lors du chargement des données. Veuillez réessayer.', true);
@@ -330,6 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUserInitials('??');
         setUserRole('observer');
         setOrgSettings(EMPTY_ORG);
+        setInvoiceTemplate(DEFAULT_CONFIG);
         setNeedsOnboarding(false);
         setInvoices([]);
         setClients([]);
@@ -368,6 +381,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       quotes,    setQuotes,
       clientsMap,
       orgSettings, setOrgSettings,
+      invoiceTemplate, setInvoiceTemplate,
       userId,
       orgId,
       userLabel, userInitials, userRole,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
@@ -7,6 +7,11 @@ import InvoicePaper from '@/components/InvoicePaper';
 import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle, BizInfo } from '@/components/InvoicePaper';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
+import { usePermissions } from '@/lib/use-permissions';
+import { DEFAULT_CONFIG, FONT_FAMILIES, PRESETS } from '@/lib/invoice-template';
+import { createTemplate, fetchTemplates, setDefaultTemplate, updateTemplate, type SavedTemplate } from '@/lib/api/invoice-templates';
+import { fetchPaymentSettings } from '@/lib/api/payment-settings';
+import { paymentMethodLines, type PaymentMethodLine } from '@/lib/payment-methods';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -23,10 +28,10 @@ const ACCENT_COLORS = [
 ];
 
 const FONTS: { label: string; desc: string; family: string; sample: string }[] = [
-  { label: 'Jakarta Sans', desc: 'Sans-serif moderne',          family: '"Plus Jakarta Sans", sans-serif',        sample: 'Aa' },
-  { label: 'Space Grotesk',desc: 'Géométrique technique',       family: '"Space Grotesk", sans-serif',            sample: 'Aa' },
-  { label: 'Lora',         desc: 'Serif élégant',               family: '"Lora", Georgia, serif',                 sample: 'Aa' },
-  { label: 'IBM Plex Mono',desc: 'Monospace professionnel',     family: '"IBM Plex Mono", "Courier New", monospace', sample: 'Aa' },
+  { label: 'Jakarta Sans', desc: 'Sans-serif moderne',          family: FONT_FAMILIES.jakarta, sample: 'Aa' },
+  { label: 'Space Grotesk',desc: 'Géométrique technique',       family: FONT_FAMILIES.grotesk, sample: 'Aa' },
+  { label: 'Lora',         desc: 'Serif élégant',               family: FONT_FAMILIES.lora,    sample: 'Aa' },
+  { label: 'IBM Plex Mono',desc: 'Monospace professionnel',     family: FONT_FAMILIES.plex,    sample: 'Aa' },
 ];
 
 const LAYOUTS: { key: PaperLayout; label: string }[] = [
@@ -38,64 +43,49 @@ const LAYOUTS: { key: PaperLayout; label: string }[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Template type
+// Template shown in the gallery: a saved one (invoice_templates) or a
+// built-in preset the organisation hasn't saved yet
 // ---------------------------------------------------------------------------
 interface Template {
-  id:       string;
-  name:     string;
-  purpose:  string;
-  chips:    string[];
+  /** invoice_templates.id, or `preset:<key>` for an unsaved preset */
+  id:        string;
+  presetKey: string | null;
+  saved:     boolean;
+  name:      string;
+  purpose:   string;
+  chips:     string[];
   isDefault: boolean;
-  starred:  boolean;
-  config:   PaperConfig;
+  starred:   boolean;
+  config:    PaperConfig;
 }
 
-const DEFAULT_CONFIG: PaperConfig = {
-  layout: 'classic', color: '#185FA5',
-  fontFamily: '"Plus Jakarta Sans", sans-serif',
-  density: 'cozy', tableStyle: 'tinted', totalStyle: 'filled',
-  showQty: true, showTax: true, showDiscount: false,
-  showSignature: false, showPayment: true, footer: '',
-};
+const PRESET_ID = (key: string) => `preset:${key}`;
+/** invoice_templates.name is limited to 80 characters */
+const NAME_MAX = 80;
 
-const INITIAL_TEMPLATES: Template[] = [
-  {
-    id: '1', name: 'Classique Billio', purpose: 'Facture standard tout usage',
-    chips: ['Classique', 'TVA', 'Paiement'],
-    isDefault: true, starred: false,
-    config: { ...DEFAULT_CONFIG, layout: 'classic', color: '#185FA5', tableStyle: 'tinted', totalStyle: 'filled' },
-  },
-  {
-    id: '2', name: 'Bandeau Vert', purpose: 'En-tête coloré percutant',
-    chips: ['Bandeau', 'TVA', 'Signature'],
-    isDefault: false, starred: true,
-    config: { ...DEFAULT_CONFIG, layout: 'band', color: '#1A7A47', fontFamily: '"Space Grotesk", sans-serif', tableStyle: 'band-h', totalStyle: 'ruled', showSignature: true },
-  },
-  {
-    id: '3', name: 'Minimal Serif', purpose: 'Épuré, idéal pour agences créatives',
-    chips: ['Minimal', 'Serif', 'Aéré'],
-    isDefault: false, starred: false,
-    config: { ...DEFAULT_CONFIG, layout: 'minimal', color: '#334155', fontFamily: '"Lora", Georgia, serif', density: 'spacious', tableStyle: 'plain', totalStyle: 'ruled', showPayment: false },
-  },
-  {
-    id: '4', name: 'Colonne Violette', purpose: 'Mise en page en deux colonnes',
-    chips: ['Colonne', 'Premium', 'Moderne'],
-    isDefault: false, starred: false,
-    config: { ...DEFAULT_CONFIG, layout: 'sidebar', color: '#5B2D8E', tableStyle: 'tinted', totalStyle: 'plain' },
-  },
-  {
-    id: '5', name: 'Reçu Teal', purpose: 'Format reçu compact pour petites transactions',
-    chips: ['Reçu', 'Compact', 'Mono'],
-    isDefault: false, starred: false,
-    config: { ...DEFAULT_CONFIG, layout: 'receipt', color: '#0D7B7B', fontFamily: '"IBM Plex Mono", monospace', density: 'compact', tableStyle: 'plain', totalStyle: 'plain' },
-  },
-  {
-    id: '6', name: 'Orange Moderne', purpose: 'Bandeau audacieux pour prestataires',
-    chips: ['Bandeau', 'Moderne', 'Sans-serif'],
-    isDefault: false, starred: false,
-    config: { ...DEFAULT_CONFIG, layout: 'band', color: '#C4540A', fontFamily: '"Space Grotesk", sans-serif', tableStyle: 'band-h', totalStyle: 'filled' },
-  },
-];
+function galleryTemplates(saved: SavedTemplate[]): Template[] {
+  const hasDefault = saved.some(t => t.isDefault);
+  const presets: Template[] = PRESETS
+    .filter(p => !saved.some(t => t.presetKey === p.key))
+    .map(p => ({
+      id: PRESET_ID(p.key), presetKey: p.key, saved: false, name: p.name, purpose: p.purpose, chips: p.chips,
+      // With no saved default, invoices use the standard template: Classique Billio
+      isDefault: !hasDefault && p.key === PRESETS[0].key, starred: false, config: p.config,
+    }));
+  const own: Template[] = saved.map(t => {
+    const preset = PRESETS.find(p => p.key === t.presetKey);
+    return {
+      id: t.id, presetKey: t.presetKey, saved: true, name: t.name,
+      purpose: preset?.purpose ?? 'Modèle personnalisé',
+      chips: preset?.chips ?? [LAYOUTS.find(l => l.key === t.config.layout)?.label ?? 'Personnalisé'],
+      // A saved copy of the standard template stays the one in use until another is chosen
+      isDefault: t.isDefault || (!hasDefault && t.presetKey === PRESETS[0].key), starred: t.starred, config: t.config,
+    };
+  });
+  // Presets first in their usual order, saved copies in place of their preset
+  const ordered = PRESETS.map(p => own.find(t => t.presetKey === p.key) ?? presets.find(t => t.presetKey === p.key)!);
+  return [...ordered, ...own.filter(t => !t.presetKey || !PRESETS.some(p => p.key === t.presetKey))];
+}
 
 // ---------------------------------------------------------------------------
 // Layout mini-diagrams (SVG-like using absolute divs)
@@ -162,10 +152,14 @@ function thumbScale(layout: PaperLayout) {
 // Template card
 // ---------------------------------------------------------------------------
 function TemplateCard({
-  tpl, biz, onEdit, onUse, onToggleStar,
+  tpl, biz, payLines, paymentTerms, canEdit, busy, onEdit, onUse, onToggleStar,
 }: {
   tpl: Template;
   biz: BizInfo;
+  payLines?: PaymentMethodLine[];
+  paymentTerms: string;
+  canEdit: boolean;
+  busy: boolean;
   onEdit: () => void;
   onUse: () => void;
   onToggleStar: () => void;
@@ -183,7 +177,7 @@ function TemplateCard({
           className="tp-paper-wrap"
           style={{ transform: `scale(${scale})`, left: offsetX }}
         >
-          <InvoicePaper config={tpl.config} biz={biz} />
+          <InvoicePaper config={tpl.config} biz={biz} paymentMethods={payLines} paymentTerms={paymentTerms} />
         </div>
 
         {tpl.isDefault && <div className="tpl-badge default-badge">Défaut</div>}
@@ -196,8 +190,8 @@ function TemplateCard({
 
         <div className="tpl-hoverbtn">
           <button className="btn" onClick={e => { e.stopPropagation(); onEdit(); }}>
-            <Icon name="edit" size={14} ariaHidden />
-            Personnaliser
+            <Icon name={canEdit ? 'edit' : 'eye'} size={14} ariaHidden />
+            {canEdit ? 'Personnaliser' : 'Aperçu'}
           </button>
         </div>
       </div>
@@ -220,17 +214,23 @@ function TemplateCard({
           {tpl.chips.map(c => <span key={c} className="tpl-chip">{c}</span>)}
         </div>
         <div className="tpl-foot">
-          <button className="btn btn-sm tpl-star" onClick={onToggleStar} title={tpl.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
-            <Icon name={tpl.starred ? 'star-filled' : 'star'} size={15} ariaHidden />
-          </button>
+          {canEdit && (
+            <button className="btn btn-sm tpl-star" onClick={onToggleStar} disabled={busy}
+              aria-label={tpl.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'} title={tpl.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
+              <Icon name={tpl.starred ? 'star-filled' : 'star'} size={15} ariaHidden />
+            </button>
+          )}
           <button className="btn btn-sm" onClick={onEdit}>
-            <Icon name="edit" size={14} ariaHidden />
-            Modifier
+            <Icon name={canEdit ? 'edit' : 'eye'} size={14} ariaHidden />
+            {canEdit ? 'Modifier' : 'Aperçu'}
           </button>
-          <button className="btn btn-sm btn-primary" onClick={onUse}>
-            <Icon name="check" size={14} ariaHidden />
-            Utiliser
-          </button>
+          {canEdit && !tpl.isDefault && (
+            <button className="btn btn-sm btn-primary" onClick={onUse} disabled={busy}>
+              <Icon name="check" size={14} ariaHidden />
+              Utiliser
+            </button>
+          )}
+          {tpl.isDefault && <span className="tpl-chip">Utilisé pour vos factures</span>}
         </div>
       </div>
     </div>
@@ -245,13 +245,9 @@ function EditorControls({ cfg, onChange }: { cfg: PaperConfig; onChange: (c: Pap
     onChange({ ...cfg, [k]: v });
   }
 
-  const COL_OPTS: { key: keyof PaperConfig; label: string; sub: string }[] = [
-    { key: 'showQty',      label: 'Quantité',  sub: 'Colonne Qté dans le tableau' },
-    { key: 'showTax',      label: 'TVA',       sub: 'Ligne TVA dans les totaux' },
-    { key: 'showDiscount', label: 'Remise',    sub: 'Ligne remise dans les totaux' },
-  ];
+  // Quantities, VAT, discount and payment details always appear: they are
+  // mentions an invoice must carry, so a template can't hide them
   const SEC_OPTS: { key: keyof PaperConfig; label: string; sub: string }[] = [
-    { key: 'showPayment',   label: 'Modes de paiement', sub: 'Bloc paiement & notes' },
     { key: 'showSignature', label: 'Signature',          sub: 'Ligne de signature' },
   ];
 
@@ -363,29 +359,6 @@ function EditorControls({ cfg, onChange }: { cfg: PaperConfig; onChange: (c: Pap
         </div>
       </div>
 
-      {/* Columns */}
-      <div className="ed-group">
-        <div className="ed-group-title"><Icon name="columns" size={14} ariaHidden />Colonnes</div>
-        {COL_OPTS.map(o => (
-          <div key={o.key} className="chk-row">
-            <div
-              className={`chk${cfg[o.key] ? ' on' : ''}`}
-              onClick={() => set(o.key as keyof PaperConfig, !cfg[o.key] as PaperConfig[typeof o.key])}
-              role="checkbox"
-              aria-checked={!!cfg[o.key]}
-              tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && set(o.key as keyof PaperConfig, !cfg[o.key] as PaperConfig[typeof o.key])}
-            >
-              {cfg[o.key] && <Icon name="check" size={12} ariaHidden />}
-            </div>
-            <div className="row-label">
-              {o.label}
-              <small>{o.sub}</small>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Sections */}
       <div className="ed-group">
         <div className="ed-group-title"><Icon name="eye" size={14} ariaHidden />Sections</div>
@@ -411,7 +384,8 @@ function EditorControls({ cfg, onChange }: { cfg: PaperConfig; onChange: (c: Pap
         <textarea
           className="ed-textarea"
           rows={3}
-          placeholder="Studio Wend SARL · Facture générée via Billio"
+          placeholder="Facture générée via Billio"
+          maxLength={200}
           value={cfg.footer}
           onChange={e => set('footer', e.target.value)}
         />
@@ -426,16 +400,41 @@ function EditorControls({ cfg, onChange }: { cfg: PaperConfig; onChange: (c: Pap
 type View = 'gallery' | { kind: 'editor'; id: string };
 
 export default function TemplatesPage() {
-  const { orgSettings, loading } = useApp();
-
-  if (loading) return <PageSkeleton title="Modèles de factures" subtitle="Personnalisez vos modèles" variant="table-only" rows={4} />;
-  const [templates, setTemplates] = useState<Template[]>(INITIAL_TEMPLATES);
+  const { orgSettings, orgId, loading, showToast, setInvoiceTemplate } = useApp();
+  const { managesOrg } = usePermissions();
+  const [saved, setSaved] = useState<SavedTemplate[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [payLines, setPayLines] = useState<PaymentMethodLine[] | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
   const [view, setView] = useState<View>('gallery');
   const [zoom, setZoom] = useState(100);
 
   // Editor state — editing a copy of the template's config
   const [edConfig, setEdConfig] = useState<PaperConfig>(DEFAULT_CONFIG);
   const [edName, setEdName] = useState('');
+
+  const load = useCallback(async () => {
+    if (!orgId) return;
+    try {
+      setSaved(await fetchTemplates(orgId));
+      setLoadError(false);
+    } catch (err) {
+      console.error('[templates] load failed:', err);
+      setLoadError(true);
+      setSaved([]);
+    }
+  }, [orgId]);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!orgId) return;
+    // Preview with the organisation's payment methods; not fatal if unavailable
+    fetchPaymentSettings(orgId).then(s => setPayLines(paymentMethodLines(s))).catch(() => setPayLines([]));
+  }, [orgId]);
+
+  const templates = useMemo(() => galleryTemplates(saved ?? []), [saved]);
+
+  if (loading || saved === null) return <PageSkeleton title="Modèles de factures" subtitle="Personnalisez vos modèles" variant="table-only" rows={4} />;
 
   function openEditor(id: string) {
     const tpl = id === 'new'
@@ -463,33 +462,71 @@ export default function TemplatesPage() {
     }
   }
 
+  /** The saved row for a gallery template, creating it from its preset if needed. */
+  async function ensureSaved(tpl: Template, patch?: { name?: string; config?: PaperConfig; starred?: boolean }): Promise<SavedTemplate> {
+    if (tpl.saved) {
+      if (!patch) return saved!.find(t => t.id === tpl.id)!;
+      return updateTemplate(orgId, tpl.id, patch);
+    }
+    return createTemplate(orgId, {
+      presetKey: tpl.presetKey, name: patch?.name ?? tpl.name, config: patch?.config ?? tpl.config, starred: patch?.starred ?? tpl.starred,
+    });
+  }
+
+  async function run(action: () => Promise<void>, failure: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action();
+    } catch (err) {
+      console.error('[templates]', err);
+      showToast(failure, true);
+    } finally {
+      setBusy(false);
+      void load();
+    }
+  }
+
   function saveTemplate() {
     if (view === 'gallery') return;
     const { id } = view;
-    if (id === 'new') {
-      const newId = String(Date.now());
-      setTemplates(prev => [...prev, {
-        id: newId, name: edName.trim() || 'Nouveau modèle',
-        purpose: 'Modèle personnalisé', chips: [LAYOUTS.find(l => l.key === edConfig.layout)?.label ?? 'Personnalisé'],
-        isDefault: false, starred: false, config: { ...edConfig },
-      }]);
-    } else {
-      setTemplates(prev => prev.map(t => t.id === id
-        ? { ...t, name: edName.trim() || t.name, config: { ...edConfig } }
-        : t,
-      ));
-    }
-    setView('gallery');
+    const name = edName.trim().slice(0, NAME_MAX).trim() || 'Nouveau modèle';
+    const config = { ...edConfig };
+    void run(async () => {
+      if (id === 'new') {
+        await createTemplate(orgId, { name, config });
+      } else {
+        const tpl = templates.find(t => t.id === id)!;
+        const row = await ensureSaved(tpl, { name, config });
+        // Editing the template in use changes the next PDFs straight away.
+        // The standard template is only implicitly in use: save it as the
+        // default, or PDFs would fall back to the unedited one after a reload.
+        if (tpl.isDefault) {
+          if (!row.isDefault) await setDefaultTemplate(orgId, row.id);
+          setInvoiceTemplate(config);
+        }
+      }
+      showToast('Modèle enregistré');
+      setView('gallery');
+    }, "Le modèle n'a pas pu être enregistré. Réessayez.");
   }
 
   function toggleStar(id: string) {
-    setTemplates(prev => prev.map(t => t.id === id ? { ...t, starred: !t.starred } : t));
+    const tpl = templates.find(t => t.id === id);
+    if (!tpl) return;
+    void run(async () => { await ensureSaved(tpl, { starred: !tpl.starred }); }, "Le favori n'a pas pu être enregistré.");
   }
 
-  function useTemplate(id: string) {
+  function applyTemplate(id: string) {
     const tpl = templates.find(t => t.id === id);
-    posthog.capture('template_changed', { template_name: tpl?.name, layout: tpl?.config.layout });
-    setTemplates(prev => prev.map(t => ({ ...t, isDefault: t.id === id })));
+    if (!tpl) return;
+    void run(async () => {
+      const row = await ensureSaved(tpl);
+      await setDefaultTemplate(orgId, row.id);
+      setInvoiceTemplate(row.config);
+      posthog.capture('template_changed', { template_name: row.name, layout: row.config.layout });
+      showToast(`« ${row.name} » sera utilisé pour vos factures et devis`);
+    }, "Le modèle n'a pas pu être appliqué. Réessayez.");
   }
 
   function zoomStep(dir: 1 | -1) {
@@ -509,12 +546,14 @@ export default function TemplatesPage() {
               <div className="page-title">Modèles de facture</div>
               <div className="page-sub">Choisissez un design prêt à l'emploi ou créez le vôtre</div>
             </div>
-            <div className="topbar-actions">
-              <button className="btn btn-primary" onClick={() => openEditor('new')}>
-                <Icon name="plus" size={16} ariaHidden />
-                Créer un modèle
-              </button>
-            </div>
+            {managesOrg && (
+              <div className="topbar-actions">
+                <button className="btn btn-primary" onClick={() => openEditor('new')}>
+                  <Icon name="plus" size={16} ariaHidden />
+                  Créer un modèle
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="content">
@@ -525,8 +564,10 @@ export default function TemplatesPage() {
                 <div>
                   <div className="gi-title">Vos factures, à votre image</div>
                   <div className="gi-sub">
-                    Choisissez un modèle et utilisez-le sur vos nouvelles factures, ou personnalisez-le — couleurs, police, mise en page, colonnes et sections. Vous pouvez aussi créer un modèle vierge.
+                    Le modèle utilisé s'applique à toutes vos factures et devis en PDF. Personnalisez la mise en page, les couleurs et la police : les mentions obligatoires (identifiants fiscaux, quantités, TVA, modes de paiement) restent toujours affichées.
                   </div>
+                  {!managesOrg && <div className="gi-sub" style={{ marginTop: 6 }}>Seuls les administrateurs peuvent changer de modèle.</div>}
+                  {loadError && <div className="gi-sub" role="alert" style={{ marginTop: 6, color: 'var(--color-danger, #B42318)' }}>Vos modèles enregistrés n'ont pas pu être chargés. <button className="btn btn-sm" onClick={() => void load()}>Réessayer</button></div>}
                 </div>
               </div>
 
@@ -552,20 +593,24 @@ export default function TemplatesPage() {
                     key={tpl.id}
                     tpl={tpl}
                     biz={orgSettings}
+                    payLines={payLines}
+                    paymentTerms={orgSettings.paymentTerms}
+                    canEdit={managesOrg}
+                    busy={busy}
                     onEdit={() => openEditor(tpl.id)}
-                    onUse={() => useTemplate(tpl.id)}
+                    onUse={() => applyTemplate(tpl.id)}
                     onToggleStar={() => toggleStar(tpl.id)}
                   />
                 ))}
 
                 {/* Create blank card */}
-                <div className="tpl-card create" onClick={() => openEditor('new')}>
+                {managesOrg && <div className="tpl-card create" onClick={() => openEditor('new')}>
                   <div className="create-inner">
                     <div className="create-ico"><Icon name="plus" size={26} ariaHidden /></div>
                     <div className="create-title">Modèle vierge</div>
                     <div className="create-sub">Partez de zéro et configurez chaque détail</div>
                   </div>
-                </div>
+                </div>}
               </div>
             </div>
           </div>
@@ -586,6 +631,8 @@ export default function TemplatesPage() {
                   className="ed-name-input"
                   value={edName}
                   onChange={e => setEdName(e.target.value)}
+                  maxLength={NAME_MAX}
+                  aria-label="Nom du modèle"
                   spellCheck={false}
                 />
                 <div className="ed-sub">
@@ -594,20 +641,24 @@ export default function TemplatesPage() {
               </div>
             </div>
             <div className="topbar-actions">
-              <button className="btn" onClick={resetEditor}>
-                <Icon name="arrow-down-left" size={15} ariaHidden />
-                Réinitialiser
-              </button>
-              <button className="btn btn-primary" onClick={saveTemplate}>
-                <Icon name="check" size={15} ariaHidden />
-                Enregistrer
-              </button>
+              {managesOrg && (
+                <>
+                  <button className="btn" onClick={resetEditor} disabled={busy}>
+                    <Icon name="arrow-down-left" size={15} ariaHidden />
+                    Réinitialiser
+                  </button>
+                  <button className="btn btn-primary" onClick={saveTemplate} disabled={busy}>
+                    <Icon name="check" size={15} ariaHidden />
+                    {busy ? 'Enregistrement…' : 'Enregistrer'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
           {/* Editor body */}
           <div className="ed-body">
-            <EditorControls cfg={edConfig} onChange={setEdConfig} />
+            {managesOrg && <EditorControls cfg={edConfig} onChange={setEdConfig} />}
 
             {/* Preview */}
             <div className="ed-preview">
@@ -629,7 +680,7 @@ export default function TemplatesPage() {
                     display: 'inline-block',
                   }}
                 >
-                  <InvoicePaper config={edConfig} biz={orgSettings} />
+                  <InvoicePaper config={edConfig} biz={orgSettings} paymentMethods={payLines} paymentTerms={orgSettings.paymentTerms} />
                 </div>
               </div>
             </div>
