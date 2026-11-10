@@ -170,15 +170,23 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   };
 
   // Issuing: check the mandatory mentions first (after the form's own checks,
-  // which submitInvoice reports)
+  // which submitInvoice reports). Missing ones open the onboarding wizard; the
+  // invoice is kept as a draft meanwhile and the user comes back to it.
   const compliance = useComplianceGuard();
   const issueInvoice = () => {
     if (submittingRef.current) return;
     if (!fClient || lineItemsError(lineItems) || fDue < fDate) { void submitInvoice('pending'); return; }
-    void compliance.guard(fClient, () => void submitInvoice('pending'));
+    void compliance.guard(fClient, () => void submitInvoice('pending'), {
+      returnTo: '/invoices',
+      beforeLeave: async () => {
+        const id = await submitInvoice('draft');
+        return id ? `/invoices/${id}` : null;
+      },
+    });
   };
 
-  const submitInvoice = async (status: 'draft' | 'pending') => {
+  /** Saves the invoice; returns its number, or undefined when it wasn't saved. */
+  const submitInvoice = async (status: 'draft' | 'pending'): Promise<string | undefined> => {
     if (submittingRef.current) return;
     if (!fClient)      { showToast('Veuillez sélectionner un client.', true); return; }
     const linesErr = lineItemsError(lineItems);
@@ -234,6 +242,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           clientName: cName,
         }).catch(err => console.error('[recordInvoiceIssuanceEntry] failed:', err));
       }
+      return id;
     } catch (err) {
       console.error('[submitInvoice] error:', err);
       showToast(invoiceCreated
@@ -567,7 +576,6 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           </button>
         </div>
       </div>
-      {compliance.dialog}
     </>
   );
 }

@@ -371,3 +371,7 @@ select.ob-input {
   .ob-main-inner { padding: 28px 24px; }
   .ob-head { padding: 14px 16px; }
 }
+
+/* Completion mode: a required field that is still empty */
+.ob-field-err .ob-field-hint { color: #B42318; }
+.ob-field-err input { border-color: #D87171; }

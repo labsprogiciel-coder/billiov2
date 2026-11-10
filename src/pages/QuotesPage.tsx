@@ -418,7 +418,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
                       {writable && !['invoiced', 'declined', 'expired'].includes(q.status) && (
                         <button
                           className="btn-convert"
-                          onClick={e => { e.stopPropagation(); void compliance.guard(q.client, () => void convertToInvoice(q.id), 'Convertir quand même'); }}
+                          onClick={e => { e.stopPropagation(); void compliance.guard(q.client, () => void convertToInvoice(q.id), { returnTo: '/invoices?tab=quotes' }); }}
                         >
                           <Icon name="arrow-right" size={13} />
                           Facturer
@@ -674,7 +674,6 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
           />
         );
       })()}
-      {compliance.dialog}
     </>
   );
 }

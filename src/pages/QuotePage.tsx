@@ -208,7 +208,7 @@ export default function QuotePage() {
   // Converting issues an invoice: check the mandatory mentions first
   const requestConvert = () => {
     if (convertingRef.current) return;
-    void compliance.guard(quote.client, () => void handleConvertToInvoice(), 'Convertir quand même');
+    void compliance.guard(quote.client, () => void handleConvertToInvoice(), { returnTo: `/quotes/${quote.id}` });
   };
 
   const handleConvertToInvoice = async () => {
@@ -558,7 +558,6 @@ export default function QuotePage() {
         </button>
       </div>
     </div>
-      {compliance.dialog}
     </>
   );
 }

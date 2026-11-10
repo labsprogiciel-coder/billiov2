@@ -1,11 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import posthog from 'posthog-js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/context/AppContext';
-import { nextClientCode } from '@/lib/api/clients';
+import { nextClientCode, updateClient } from '@/lib/api/clients';
+import { fetchPaymentSettings, upsertPaymentSettings } from '@/lib/api/payment-settings';
+import { clientIssues, sellerIssues } from '@/lib/invoice-compliance';
+import { snoozeCompliance } from '@/lib/use-compliance-guard';
+import { usePermissions } from '@/lib/use-permissions';
+import FiscalDivisionSelect from '@/components/FiscalDivisionSelect';
 import './OnboardingPage.css';
 import { fmtDateLong } from '@/data';
+
+const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 /* ── types ── */
 interface TeamInvite { id: string; email: string; role: string }
@@ -21,13 +28,28 @@ function previewDue(terms: string): string {
   d.setDate(d.getDate() + (TERMS_DAYS[terms] ?? 14));
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-const STEPS = [
-  { label: 'Informations entreprise', skippable: false },
-  { label: 'Paramètres factures',     skippable: false },
-  { label: 'Inviter l\'équipe',       skippable: true  },
-  { label: 'Ajouter des clients',     skippable: true  },
-  { label: 'Terminer',                skippable: false },
+type StepKey = 'business' | 'invoicing' | 'team' | 'clients' | 'finish' | 'bank' | 'client';
+const STEP_INFO: Record<StepKey, { label: string; skippable: boolean }> = {
+  business:  { label: 'Informations entreprise', skippable: false },
+  invoicing: { label: 'Paramètres factures',     skippable: false },
+  team:      { label: 'Inviter l\'équipe',       skippable: true  },
+  clients:   { label: 'Ajouter des clients',     skippable: true  },
+  finish:    { label: 'Terminer',                skippable: false },
+  bank:      { label: 'Coordonnées bancaires',   skippable: false },
+  client:    { label: 'Informations du client',  skippable: false },
+};
+const ONBOARDING_STEPS: StepKey[] = ['business', 'invoicing', 'team', 'clients', 'finish'];
+
+const TAX_REGIMES = [
+  { value: 'RNI', label: "RNI — Régime normal d'imposition (CA ≥ 50M F CFA)" },
+  { value: 'RSI', label: "RSI — Régime simplifié d'imposition (CA 15–50M F CFA)" },
+  { value: 'CME', label: 'CME — Contribution des micro-entreprises (CA < 15M F CFA)' },
 ];
+
+/** Only same-app paths: never send the user to another site after the wizard. */
+function safeReturn(path: string | null): string {
+  return path && path.startsWith('/') && !path.startsWith('//') ? path : '/dashboard';
+}
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -116,11 +138,28 @@ function Ico({ name, style }: { name: IcoName; style?: React.CSSProperties }) {
 /* ═══════════════════════════════════════════════════════════════ */
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const { orgId, userId, completeOnboarding, showToast } = useApp();
+  const { orgId, userId, completeOnboarding, showToast, clients: orgClients, setClients: setOrgClients, orgSettings, setOrgSettings } = useApp();
+  const { managesOrg, writable } = usePermissions();
+
+  /*
+   * Completion mode (/onboarding?complete=1&return=…&client=…): opened when an
+   * invoice is about to be issued without its mandatory mentions. Shows only
+   * the steps with missing details, prefilled, saves just those details and
+   * goes back to the invoice.
+   */
+  const [searchParams] = useSearchParams();
+  const complete = searchParams.get('complete') === '1';
+  const returnTo = safeReturn(searchParams.get('return'));
+  const targetClientCode = searchParams.get('client') ?? '';
+  const targetClient = orgClients.find(c => c.code === targetClientCode);
 
   /* ── navigation ── */
+  const [steps, setSteps] = useState<StepKey[]>(complete ? [] : ONBOARDING_STEPS);
   const [step, setStep] = useState(0);
   const [maxReached, setMaxReached] = useState(0);
+  const cur: StepKey | undefined = steps[step];
+  /** Mentions found missing when the completion wizard opened (invoice-compliance keys) */
+  const [missing, setMissing] = useState<Set<string>>(new Set());
 
   /* ── step 1: business ── */
   const [bizName,  setBizName]  = useState('');
@@ -130,6 +169,14 @@ export default function OnboardingPage() {
   const [city,     setCity]     = useState('');
   const [country,  setCountry]  = useState('Burkina Faso');
   const [currency, setCurrency] = useState('F CFA');
+  const [taxRegime, setTaxRegime] = useState('');
+  const [divisionFiscale, setDivisionFiscale] = useState('');
+  const [iban,     setIban]     = useState('');
+  /* ── completion mode: the client being invoiced ── */
+  const [cliCity,  setCliCity]  = useState('');
+  const [cliIfu,   setCliIfu]   = useState('');
+  const [cliRccm,  setCliRccm]  = useState('');
+  const [fieldErr, setFieldErr] = useState<Set<string>>(new Set());
   const [logoType, setLogoType] = useState<'none' | 'mono' | 'img'>('none');
   const [logoUrl,  setLogoUrl]  = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -172,15 +219,131 @@ export default function OnboardingPage() {
 
   /* ── navigation helpers ── */
   const goTo = useCallback((i: number) => {
-    const next = Math.max(0, Math.min(STEPS.length - 1, i));
+    const next = Math.max(0, Math.min(steps.length - 1, i));
     setStep(next);
     setMaxReached(prev => Math.max(prev, next));
-  }, []);
+  }, [steps.length]);
 
   function validateCurrentStep() {
-    if (step === 0 && !bizName.trim()) { setBizNameErr(true); return false; }
-    if (step === 1 && !nextNum.trim())  { setNextNumErr(true); return false; }
+    if (cur === 'business' && !bizName.trim()) { setBizNameErr(true); return false; }
+    if (cur === 'invoicing' && !nextNum.trim())  { setNextNumErr(true); return false; }
+    if (complete) {
+      // The mentions that were missing must now be filled in
+      const empty = (v: string) => !v.trim();
+      const errs = new Set<string>();
+      if (cur === 'business') {
+        if (missing.has('seller-ifu') && empty(taxId)) errs.add('ifu');
+        if (missing.has('seller-rccm') && empty(rccm)) errs.add('rccm');
+        if (missing.has('seller-address') && empty(address) && empty(city)) errs.add('city');
+        if (missing.has('seller-regime') && empty(taxRegime)) errs.add('regime');
+        if (missing.has('seller-division') && empty(divisionFiscale)) errs.add('division');
+      }
+      if (cur === 'bank' && empty(iban)) errs.add('iban');
+      if (cur === 'client' && missing.has('client-address') && empty(cliCity)) errs.add('cliCity');
+      setFieldErr(errs);
+      if (errs.size > 0) return false;
+    }
     return true;
+  }
+  const errCls = (k: string) => (fieldErr.has(k) ? ' err' : '');
+
+  /* ── completion mode: load what is saved and pick the steps ── */
+  const [completeLoaded, setCompleteLoaded] = useState(false);
+  useEffect(() => {
+    if (!complete || !orgId || completeLoaded) return;
+    if (targetClientCode && !targetClient && orgClients.length === 0) return; // clients still loading
+    let cancelled = false;
+    (async () => {
+      const [orgRes, payments] = await Promise.all([
+        // Demo mode has no database: start from what the app holds
+        MOCK
+          ? Promise.resolve({ error: null, data: {
+              name: orgSettings.name, ifu: orgSettings.ifu, rccm: orgSettings.rccm, address: orgSettings.address,
+              city: orgSettings.city, country: orgSettings.country, currency: 'F CFA',
+              tax_regime: orgSettings.taxRegime, division_fiscale: orgSettings.divisionFiscale,
+            } })
+          : supabase.from('organizations')
+              .select('name, ifu, rccm, address, city, country, currency, tax_regime, division_fiscale')
+              .eq('id', orgId).single(),
+        fetchPaymentSettings(orgId).catch(() => null),
+      ]);
+      if (cancelled) return;
+      const org = orgRes.data;
+      if (orgRes.error || !org) {
+        showToast("Impossible de charger les informations de l'entreprise. Réessayez.", true);
+        navigate(returnTo, { replace: true });
+        return;
+      }
+      setBizName(org.name ?? ''); setTaxId(org.ifu ?? ''); setRccm(org.rccm ?? '');
+      setAddress(org.address ?? ''); setCity(org.city ?? ''); setCountry(org.country || 'Burkina Faso');
+      setCurrency(org.currency || 'F CFA'); setTaxRegime(org.tax_regime ?? ''); setDivisionFiscale(org.division_fiscale ?? '');
+      setIban(payments?.methodBankIban ?? '');
+      if (targetClient) {
+        setCliCity(targetClient.city === '—' ? '' : targetClient.city);
+        setCliIfu(targetClient.ifu ?? ''); setCliRccm(targetClient.rccm ?? '');
+      }
+      const seller = sellerIssues({
+        name: org.name ?? '', address: org.address ?? '', city: org.city ?? '', country: org.country ?? '',
+        ifu: org.ifu ?? '', rccm: org.rccm ?? '', taxRegime: org.tax_regime ?? '', divisionFiscale: org.division_fiscale ?? '',
+      }, payments);
+      const forClient = clientIssues(targetClient);
+      const keys = new Set([...seller, ...forClient].map(i => i.key));
+      const next: StepKey[] = [];
+      if (managesOrg && seller.some(i => i.key !== 'seller-bank')) next.push('business');
+      if (managesOrg && keys.has('seller-bank')) next.push('bank');
+      if (writable && forClient.length > 0) next.push('client');
+      setMissing(keys);
+      setCompleteLoaded(true);
+      if (next.length === 0) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
+      setSteps(next);
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complete, orgId, targetClientCode, targetClient, orgClients.length, completeLoaded]);
+
+  async function handleCompleteSave() {
+    if (saving || !validateCurrentStep()) return;
+    setSaving(true);
+    try {
+      if (steps.includes('business')) {
+        const patch = {
+          name: bizName.trim(), ifu: taxId.trim(), rccm: rccm.trim(), address: address.trim(), city: city.trim(),
+          country, tax_regime: taxRegime, division_fiscale: divisionFiscale,
+        };
+        if (!MOCK) {
+          const { error } = await supabase.from('organizations').update(patch).eq('id', orgId);
+          if (error) throw error;
+        }
+        setOrgSettings(prev => ({ ...prev, name: patch.name, ifu: patch.ifu, rccm: patch.rccm, address: patch.address,
+          city: patch.city, country, taxRegime, divisionFiscale }));
+      }
+      if (steps.includes('bank') && !MOCK) {
+        await upsertPaymentSettings(orgId, { methodBankEnabled: true, methodBankIban: iban.trim() });
+      }
+      // Demo payment settings aren't stored: don't send the user back here this session
+      if (MOCK) snoozeCompliance();
+      if (steps.includes('client') && targetClient) {
+        const patch = { city: cliCity.trim() || '—', ifu: cliIfu.trim(), rccm: cliRccm.trim() };
+        await updateClient(orgId, targetClient.code, patch);
+        setOrgClients(prev => prev.map(c => c.code === targetClient.code ? { ...c, ...patch } : c));
+      }
+      posthog.capture('compliance_completed', { steps });
+      showToast('Informations enregistrées. Vous pouvez émettre la facture.');
+      navigate(returnTo);
+    } catch (err) {
+      console.error('[onboarding] completion save failed:', err);
+      showToast("Les informations n'ont pas pu être enregistrées. Réessayez.", true);
+      setSaving(false);
+    }
+  }
+
+  function postpone() {
+    snoozeCompliance();
+    showToast('Vous pourrez compléter ces informations dans Paramètres → Entreprise.');
+    navigate(returnTo);
   }
 
   function onNext() {
@@ -264,6 +427,8 @@ export default function OnboardingPage() {
           name:                  orgName,
           ifu:                   taxId.trim(),
           rccm:                  rccm.trim(),
+          tax_regime:            taxRegime,
+          division_fiscale:      divisionFiscale,
           address:               address.trim(),
           city:                  city.trim(),
           country,
@@ -278,6 +443,14 @@ export default function OnboardingPage() {
         })
         .eq('id', targetOrgId);
       if (orgErr) throw orgErr;
+
+      // Bank details printed on invoices (Paramètres → Moyens de paiement)
+      if (iban.trim()) {
+        await upsertPaymentSettings(targetOrgId, { methodBankEnabled: true, methodBankIban: iban.trim() }).catch(err => {
+          console.warn('Bank details save error:', err);
+          showToast("Les coordonnées bancaires n'ont pas pu être enregistrées. Ajoutez-les dans Paramètres → Moyens de paiement.", true);
+        });
+      }
 
       // Step 3 — team invitations
       if (teamInvites.length > 0) {
@@ -345,7 +518,7 @@ export default function OnboardingPage() {
   }
 
   /* ── aside pane key ── */
-  const pane = step <= 1 ? 'invoice' : step === 2 ? 'team' : step === 3 ? 'clients' : 'summary';
+  const pane = cur === 'team' ? 'team' : cur === 'clients' ? 'clients' : cur === 'finish' ? 'summary' : 'invoice';
 
   /* ── render ── */
   return (
@@ -366,26 +539,28 @@ export default function OnboardingPage() {
 
           <div className="ob-progress-wrap">
             <div className="ob-seg-track">
-              {STEPS.map((s, i) => (
+              {steps.map((k, i) => (
                 <div
-                  key={s.label}
+                  key={k}
                   className={`ob-seg${i === step ? ' active' : ''}${i < step ? ' done' : ''}${i > maxReached ? ' locked' : ''}`}
                   onClick={() => i <= maxReached && goTo(i)}
-                  title={s.label}
+                  title={STEP_INFO[k].label}
                 >
                   <span className="ob-seg-fill" />
                 </div>
               ))}
             </div>
             <div className="ob-progress-label">
-              Étape <b>{step + 1}</b> sur {STEPS.length} · <span className="pl-name">{STEPS[step].label}</span>
+              Étape <b>{step + 1}</b> sur {steps.length} · <span className="pl-name">{cur ? STEP_INFO[cur].label : ''}</span>
             </div>
           </div>
 
           <div className="ob-head-right">
-            <button className="ob-skip-link" onClick={() => navigate('/dashboard')}>
-              Passer la config <Ico name="arrow-right" />
-            </button>
+            {complete
+              ? <button className="ob-skip-link" onClick={postpone}>Plus tard <Ico name="arrow-right" /></button>
+              : <button className="ob-skip-link" onClick={() => navigate('/dashboard')}>
+                  Passer la config <Ico name="arrow-right" />
+                </button>}
           </div>
         </header>
 
@@ -397,15 +572,17 @@ export default function OnboardingPage() {
             <div className="ob-main-inner">
 
               {/* STEP 1 — Business details */}
-              <section className={`ob-step${step === 0 ? ' active' : ''}`}>
+              <section className={`ob-step${cur === 'business' ? ' active' : ''}`}>
                 <div className="ob-eyebrow">
                   <span className="pellet"><Ico name="building" /></span> Votre entreprise
                 </div>
-                <h2 className="ob-step-title">Parlez-nous de votre entreprise</h2>
-                <p className="ob-step-sub">Ces informations apparaissent sur chaque facture et devis envoyé. Vous pouvez les modifier à tout moment dans les Paramètres.</p>
+                <h2 className="ob-step-title">{complete ? 'Complétez les informations de votre entreprise' : 'Parlez-nous de votre entreprise'}</h2>
+                <p className="ob-step-sub">{complete
+                  ? "Une facture doit porter ces mentions (facture normalisée). Sans elles, votre client professionnel risque de ne pas pouvoir déduire la TVA et de refuser la facture."
+                  : 'Ces informations apparaissent sur chaque facture et devis envoyé. Vous pouvez les modifier à tout moment dans les Paramètres.'}</p>
 
                 <div className="ob-step-form">
-                  <div className="ob-field">
+                  {!complete && <div className="ob-field">
                     <div className="ob-field-label">Logo de l'entreprise <span className="opt">· facultatif</span></div>
                     <div className="ob-logo-upload">
                       <div
@@ -434,7 +611,7 @@ export default function OnboardingPage() {
                         <div className="ob-field-hint">PNG ou SVG, au moins 200×200 px.</div>
                       </div>
                     </div>
-                  </div>
+                  </div>}
 
                   <div className="ob-field">
                     <label className="ob-field-label">Nom de l'entreprise</label>
@@ -448,12 +625,27 @@ export default function OnboardingPage() {
 
                   <div className="ob-row">
                     <div className="ob-field">
-                      <label className="ob-field-label">Identifiant fiscal (IFU)</label>
-                      <input className="ob-input" type="text" value={taxId} placeholder="00012345 B" onChange={e => setTaxId(e.target.value)} />
+                      <label className="ob-field-label" htmlFor="ob-ifu">Identifiant fiscal (IFU)</label>
+                      <input id="ob-ifu" className={`ob-input${errCls('ifu')}`} type="text" value={taxId} placeholder="00012345 B" onChange={e => setTaxId(e.target.value)} />
                     </div>
                     <div className="ob-field">
-                      <label className="ob-field-label">RCCM <span className="opt">· facultatif</span></label>
-                      <input className="ob-input" type="text" value={rccm} placeholder="BF-OUA-2021-B-1234" onChange={e => setRccm(e.target.value)} />
+                      <label className="ob-field-label" htmlFor="ob-rccm">RCCM</label>
+                      <input id="ob-rccm" className={`ob-input${errCls('rccm')}`} type="text" value={rccm} placeholder="BF-OUA-2021-B-1234" onChange={e => setRccm(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="ob-row">
+                    <div className="ob-field">
+                      <label className="ob-field-label" htmlFor="ob-regime">Régime fiscal</label>
+                      <select id="ob-regime" className={`ob-input${errCls('regime')}`} value={taxRegime} onChange={e => setTaxRegime(e.target.value)}>
+                        <option value="">— Sélectionner —</option>
+                        {TAX_REGIMES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                    <div className={`ob-field${fieldErr.has('division') ? ' ob-field-err' : ''}`}>
+                      <div className="ob-field-label">Division fiscale</div>
+                      <FiscalDivisionSelect value={divisionFiscale} onChange={setDivisionFiscale} />
+                      {fieldErr.has('division') && <div className="ob-field-hint" role="alert">Choisissez votre service des impôts.</div>}
                     </div>
                   </div>
 
@@ -464,8 +656,8 @@ export default function OnboardingPage() {
 
                   <div className="ob-row-3">
                     <div className="ob-field">
-                      <label className="ob-field-label">Ville</label>
-                      <input className="ob-input" type="text" value={city} placeholder="ex. Ouagadougou" onChange={e => setCity(e.target.value)} />
+                      <label className="ob-field-label" htmlFor="ob-city">Ville</label>
+                      <input id="ob-city" className={`ob-input${errCls('city')}`} type="text" value={city} placeholder="ex. Ouagadougou" onChange={e => setCity(e.target.value)} />
                     </div>
                     <div className="ob-field">
                       <label className="ob-field-label">Pays</label>
@@ -489,7 +681,7 @@ export default function OnboardingPage() {
               </section>
 
               {/* STEP 2 — Invoice defaults */}
-              <section className={`ob-step${step === 1 ? ' active' : ''}`}>
+              <section className={`ob-step${cur === 'invoicing' ? ' active' : ''}`}>
                 <div className="ob-eyebrow">
                   <span className="pellet"><Ico name="file-invoice" /></span> Paramètres factures
                 </div>
@@ -545,14 +737,67 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-iban-setup">RIB / IBAN pour les virements</label>
+                    <input id="ob-iban-setup" className="ob-input" type="text" value={iban} placeholder="BF00 0000 0000 0000 0000 0000 000" onChange={e => setIban(e.target.value)} />
+                    <div className="ob-field-hint">Mention obligatoire sur vos factures (coordonnées bancaires).</div>
+                  </div>
+
+                  <div className="ob-field">
                     <label className="ob-field-label">Note de bas de facture <span className="opt">· facultatif</span></label>
                     <textarea className="ob-input" rows={2} value={footer} onChange={e => setFooter(e.target.value)} />
                   </div>
                 </div>
               </section>
 
+              {/* COMPLETION — bank details */}
+              <section className={`ob-step${cur === 'bank' ? ' active' : ''}`}>
+                <div className="ob-eyebrow">
+                  <span className="pellet"><Ico name="building-bank" /></span> Coordonnées bancaires
+                </div>
+                <h2 className="ob-step-title">Ajoutez vos coordonnées bancaires</h2>
+                <p className="ob-step-sub">Elles font partie des mentions obligatoires d'une facture et permettent à vos clients de payer par virement.</p>
+                <div className="ob-step-form">
+                  <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-iban">RIB / IBAN</label>
+                    <input id="ob-iban" className={`ob-input${errCls('iban')}`} type="text" value={iban} placeholder="BF00 0000 0000 0000 0000 0000 000" onChange={e => setIban(e.target.value)} />
+                    <div className="ob-field-hint">Le virement bancaire sera activé dans Paramètres → Moyens de paiement.</div>
+                  </div>
+                </div>
+              </section>
+
+              {/* COMPLETION — the client being invoiced */}
+              <section className={`ob-step${cur === 'client' ? ' active' : ''}`}>
+                <div className="ob-eyebrow">
+                  <span className="pellet"><Ico name="users" /></span> Client
+                </div>
+                <h2 className="ob-step-title">Complétez la fiche de {targetClient?.name ?? 'votre client'}</h2>
+                <p className="ob-step-sub">Un client professionnel a besoin que son IFU figure sur la facture pour déduire la TVA. Laissez-le vide pour un particulier.</p>
+                <div className="ob-step-form">
+                  <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-cli-city">Adresse ou ville</label>
+                    <input id="ob-cli-city" className={`ob-input${errCls('cliCity')}`} type="text" value={cliCity} placeholder="ex. Ouagadougou" onChange={e => setCliCity(e.target.value)} />
+                  </div>
+                  <div className="ob-row">
+                    <div className="ob-field">
+                      <label className="ob-field-label" htmlFor="ob-cli-ifu">IFU du client</label>
+                      <input id="ob-cli-ifu" className="ob-input" type="text" value={cliIfu} placeholder="00067890 C" onChange={e => setCliIfu(e.target.value)} />
+                    </div>
+                    <div className="ob-field">
+                      <label className="ob-field-label" htmlFor="ob-cli-rccm">RCCM du client <span className="opt">· facultatif</span></label>
+                      <input id="ob-cli-rccm" className="ob-input" type="text" value={cliRccm} placeholder="BF-OUA-2020-B-5678" onChange={e => setCliRccm(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {complete && !completeLoaded && (
+                <section className="ob-step active" aria-busy="true">
+                  <p className="ob-step-sub">Chargement de vos informations…</p>
+                </section>
+              )}
+
               {/* STEP 3 — Invite team */}
-              <section className={`ob-step${step === 2 ? ' active' : ''}`}>
+              <section className={`ob-step${cur === 'team' ? ' active' : ''}`}>
                 <div className="ob-eyebrow">
                   <span className="pellet"><Ico name="users" /></span> Votre équipe
                 </div>
@@ -615,7 +860,7 @@ export default function OnboardingPage() {
               </section>
 
               {/* STEP 4 — Add clients */}
-              <section className={`ob-step${step === 3 ? ' active' : ''}`}>
+              <section className={`ob-step${cur === 'clients' ? ' active' : ''}`}>
                 <div className="ob-eyebrow">
                   <span className="pellet"><Ico name="briefcase" /></span> Vos clients
                 </div>
@@ -677,7 +922,7 @@ export default function OnboardingPage() {
               </section>
 
               {/* STEP 5 — Finish */}
-              <section className={`ob-step${step === 4 ? ' active' : ''}`}>
+              <section className={`ob-step${cur === 'finish' ? ' active' : ''}`}>
                 <div className="ob-finish-wrap">
                   <div className="ob-finish-badge">
                     <Ico name="circle-check" />
@@ -905,20 +1150,26 @@ export default function OnboardingPage() {
           }
 
           <div className="ob-foot-hint">
-            {step === STEPS.length - 1
-              ? <><Ico name="circle-check" /> Configuration terminée</>
-              : <><Ico name="clock" /> {STEPS.length - 1 - step > 1 ? `${STEPS.length - 1 - step} étapes rapides restantes` : 'Dernière étape avant la fin'}</>
+            {complete
+              ? <><Ico name="file-invoice" /> Mentions obligatoires de la facture</>
+              : step === steps.length - 1
+                ? <><Ico name="circle-check" /> Configuration terminée</>
+                : <><Ico name="clock" /> {steps.length - 1 - step > 1 ? `${steps.length - 1 - step} étapes rapides restantes` : 'Dernière étape avant la fin'}</>
             }
           </div>
 
           <div className="ob-foot-actions">
-            {STEPS[step].skippable && (
+            {cur && STEP_INFO[cur].skippable && (
               <button className="ob-btn" onClick={() => goTo(step + 1)}>Passer pour l'instant</button>
             )}
-            {step < STEPS.length - 1
+            {step < steps.length - 1
               ? <button className="ob-btn ob-btn-primary" onClick={onNext}>
                   Continuer <Ico name="arrow-right" />
                 </button>
+              : complete
+                ? <button className="ob-btn ob-btn-primary" onClick={handleCompleteSave} disabled={saving || !completeLoaded}>
+                    {saving ? <><Ico name="loader-2" /> Enregistrement…</> : <>Enregistrer et revenir à la facture <Ico name="arrow-right" /></>}
+                  </button>
               : <button className="ob-btn ob-btn-primary" onClick={handleFinish} disabled={saving}>
                   {saving
                     ? <><Ico name="loader-2" /> Enregistrement…</>

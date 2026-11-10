@@ -239,7 +239,7 @@ export default function InvoicePage() {
   const requestIssue = () => {
     if (busyAction || linesLoading) return;
     if (linesError || lineItemsError(lines)) { void handleIssue(); return; }
-    void compliance.guard(invoice.client, () => void handleIssue());
+    void compliance.guard(invoice.client, () => void handleIssue(), { returnTo: `/invoices/${invoice.id}` });
   };
 
   // Draft → pending: the invoice becomes payable and gets its sales journal entry
@@ -1068,7 +1068,6 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
-      {compliance.dialog}
     </>
   );
 }
