@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
@@ -16,7 +17,7 @@ import { createActivity } from '@/lib/api/activities';
 import { filledLines, lineItemsError } from '@/lib/line-validation';
 import { confirmDiscard } from '@/lib/confirm-discard';
 import { contactValue } from '@/lib/share-links';
-import { convertQuoteToInvoice } from '@/lib/api/quote-conversion';
+import { convertQuoteToInvoice, ConversionOutcomeUnknownError } from '@/lib/api/quote-conversion';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-items';
@@ -199,11 +200,15 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
       setInvoices(prev => prev.some(i => i.id === invoice.id) ? prev : [invoice, ...prev]);
       setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced' } : q));
       posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invoice.id });
-      showToast(`Devis ${id} → Facture #${invoice.id} créée`);
+      showToast(`Devis ${id} → Facture #${invoiceRef(invoice)} créée`);
       if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
     } catch (err) {
       console.error('[convertToInvoice] failed:', err);
       if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
+      if (err instanceof ConversionOutcomeUnknownError) {
+        showToast('La conversion n\'a pas pu être confirmée. Rechargez la page et vérifiez vos factures avant de réessayer.', true);
+        return;
+      }
       showToast('Erreur lors de la conversion. Aucune facture n\'a été créée — veuillez réessayer.', true);
     } finally {
       convertingRef.current.delete(id);

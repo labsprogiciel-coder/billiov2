@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import type { ReactNode } from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { calculateServiceWithholding } from '@/lib/tax-bf';
@@ -466,7 +467,7 @@ export function InvoicePDFDocument({
             </View>
             <View>
               <Text style={s.bandTitle}>{title}</Text>
-              <Text style={s.bandNum}>#{invoice.id}</Text>
+              <Text style={s.bandNum}>#{invoiceRef(invoice)}</Text>
             </View>
           </View>
           {parties}
@@ -478,7 +479,7 @@ export function InvoicePDFDocument({
         <>
           <View style={s.minTop}>
             <Text style={s.minTitle}>{title}</Text>
-            <Text style={s.minNum}>#{invoice.id}</Text>
+            <Text style={s.minNum}>#{invoiceRef(invoice)}</Text>
           </View>
           <View style={s.minRule} />
           <View style={s.parties}>
@@ -497,7 +498,7 @@ export function InvoicePDFDocument({
         <>
           <View style={[s.header, { alignItems: 'flex-end' }]}>
             <Text style={[s.docTitle, { textAlign: 'left' }]}>{title}</Text>
-            <Text style={s.docNum}>#{invoice.id}</Text>
+            <Text style={s.docNum}>#{invoiceRef(invoice)}</Text>
           </View>
           {parties}
         </>
@@ -512,7 +513,7 @@ export function InvoicePDFDocument({
           </View>
           <View style={s.rcptRule} />
           <View style={s.rcptRow}>
-            <Text style={{ fontSize: 9, fontWeight: 700 }}>{title} #{invoice.id}</Text>
+            <Text style={{ fontSize: 9, fontWeight: 700 }}>{title} #{invoiceRef(invoice)}</Text>
           </View>
           <View style={{ marginTop: 6 }}>{clientBlock}</View>
           <View style={{ marginTop: 8 }}>{detailsBlock}</View>
@@ -527,7 +528,7 @@ export function InvoicePDFDocument({
             <View style={{ flex: 1, paddingRight: 16 }}>{sellerBlock}</View>
             <View>
               <Text style={s.docTitle}>{title}</Text>
-              <Text style={s.docNum}>#{invoice.id}</Text>
+              <Text style={s.docNum}>#{invoiceRef(invoice)}</Text>
             </View>
           </View>
           <View style={s.strip}>
@@ -570,7 +571,7 @@ export function InvoicePDFDocument({
           pageNumber === 1 ? null : (
             <View style={s.fixedHeaderRow}>
               <Text style={s.fixedHeaderBiz}>{bizName}</Text>
-              <Text style={s.fixedHeaderRef}>{title} #{invoice.id}</Text>
+              <Text style={s.fixedHeaderRef}>{title} #{invoiceRef(invoice)}</Text>
             </View>
           )
         } />

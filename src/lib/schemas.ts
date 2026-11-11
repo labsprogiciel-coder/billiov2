@@ -37,6 +37,8 @@ export const invoiceSchema = z.object({
   discountPct: z.number().min(0).max(100).default(0),
   /** When the invoice was first issued (set by the database); counts toward the Solo limit */
   firstIssuedAt: z.string().optional(),
+  /** Legal number (FACT-2026-0001), given by the database when the invoice is issued; none for drafts */
+  number:      z.string().optional(),
 });
 
 export const serviceWithholdingScenarioSchema = z.enum([
@@ -117,6 +119,8 @@ export const creditNoteSchema = z.object({
   issued:    z.string(),
   amount:    z.number().min(0),
   reason:    z.string(),
+  /** Legal number (AV-2026-0001), given by the database */
+  number:    z.string().optional(),
 });
 
 export const quoteSchema = z.object({
