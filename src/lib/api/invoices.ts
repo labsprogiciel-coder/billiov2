@@ -79,7 +79,9 @@ export async function updateInvoice(orgId: string, id: string, patch: Partial<Pi
   const { data, error } = await supabase.from('invoices').update(dbPatch).eq('org_id', orgId).eq('id', id)
     .select('first_issued_at').maybeSingle();
   if (error) throw error;
-  const stamped = (data as { first_issued_at?: string | null } | null)?.first_issued_at;
+  // No row: the invoice was deleted meanwhile, or this user can't change it
+  if (!data) throw new Error(`invoice ${id} not found or not writable`);
+  const stamped = (data as { first_issued_at?: string | null }).first_issued_at;
   return { firstIssuedAt: stamped ? String(stamped) : undefined };
 }
 
