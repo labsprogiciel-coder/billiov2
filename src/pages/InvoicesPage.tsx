@@ -121,6 +121,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const closePanel = () => { setPanelOpen(false); setShowPicker(false); };
   // Scrim, ✕ and Annuler ask first when something was typed
   const requestClosePanel = () => {
+    // The issue checks and the save use this form: wait for them rather than discard it midway
+    if (submitting || compliance.checking) return;
     const dirty = fClient !== '' || fSubject.trim() !== '' || fNotes.trim() !== '' || fDiscount !== 0 || filledLines(lineItems).length > 0
       || fDate !== panelDefaults.current.date || fDue !== panelDefaults.current.due;
     if (confirmDiscard(dirty)) closePanel();
