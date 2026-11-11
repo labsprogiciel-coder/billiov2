@@ -23,6 +23,7 @@ echo "== Numbering rules: all checks pass"
 # transaction per invoice, a quarter of them rolled back after taking a number
 org='00000000-0000-0000-0000-0000000000c3'
 psql_ -c "insert into organizations values ('$org', 'C')"
+pids=()
 for s in 1 2 3 4; do
   (
     for i in $(seq 1 50); do
@@ -30,8 +31,10 @@ for s in 1 2 3 4; do
       echo "begin; insert into invoices (id, org_id, status) values ('P$s-$i', '$org', 'pending'); $end;"
     done | psql_ >/dev/null
   ) &
+  pids+=("$!")
 done
-wait
+# Wait for each session, so one that failed fails the run
+for pid in "${pids[@]}"; do wait "$pid"; done
 psql_ -At -c "
   with n as (select split_part(number, '-', 3)::int as k from invoices where org_id = '$org')
   select count(*), count(distinct k), min(k), max(k) from n" | {

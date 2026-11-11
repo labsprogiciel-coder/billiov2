@@ -57,17 +57,17 @@ begin
   update invoices set status = 'pending' where id = 'BR-2';
   insert into invoices (id, org_id, status, number) values ('BR-3', a, 'pending', 'FACT-1999-0099');
   insert into invoices (id, org_id, status) values ('BR-4', b, 'pending');
-  if (select number from invoices where id = 'BR-2') <> 'FACT-' || y || '-0001'
-     or (select number from invoices where id = 'BR-3') <> 'FACT-' || y || '-0002' then
+  if (select number from invoices where id = 'BR-2') is distinct from 'FACT-' || y || '-0001'
+     or (select number from invoices where id = 'BR-3') is distinct from 'FACT-' || y || '-0002' then
     failures := failures + 1; raise warning 'unexpected numbers: %', (select string_agg(id || '=' || coalesce(number, '-'), ', ') from invoices);
   end if;
   -- Each organisation has its own series
-  if (select number from invoices where id = 'BR-4') <> 'FACT-' || y || '-0001' then
+  if (select number from invoices where id = 'BR-4') is distinct from 'FACT-' || y || '-0001' then
     failures := failures + 1; raise warning 'series is not per organisation';
   end if;
   -- A later status change keeps the number; it can't be rewritten
   update invoices set status = 'paid', number = 'X' where id = 'BR-2';
-  if (select number from invoices where id = 'BR-2') <> 'FACT-' || y || '-0001' then
+  if (select number from invoices where id = 'BR-2') is distinct from 'FACT-' || y || '-0001' then
     failures := failures + 1; raise warning 'number was rewritten';
   end if;
 
@@ -77,7 +77,7 @@ begin
     raise exception 'simulated failure after numbering';
   exception when raise_exception then null; end;
   insert into invoices (id, org_id, status) values ('BR-6', a, 'pending');
-  if (select number from invoices where id = 'BR-6') <> 'FACT-' || y || '-0003' then
+  if (select number from invoices where id = 'BR-6') is distinct from 'FACT-' || y || '-0003' then
     failures := failures + 1; raise warning 'a rolled-back issue skipped a number: %', (select number from invoices where id = 'BR-6');
   end if;
 
@@ -97,13 +97,22 @@ begin
 
   -- Credit notes: own yearly series, not deletable
   insert into credit_notes (id, org_id, invoice_id) values ('AV-0002', a, 'BR-2');
-  if (select number from credit_notes where id = 'AV-0002') <> 'AV-' || y || '-0001' then
+  if (select number from credit_notes where id = 'AV-0002') is distinct from 'AV-' || y || '-0001' then
     failures := failures + 1; raise warning 'credit note number: %', (select number from credit_notes where id = 'AV-0002');
   end if;
   begin
     delete from credit_notes where id = 'AV-0002';
     failures := failures + 1; raise warning 'credit note deleted';
   exception when sqlstate 'BL002' then null; end;
+
+  -- Past 9999 the number grows a digit instead of being truncated
+  perform set_config('request.jwt.claim.role', '', true);
+  update invoice_number_series set last_number = 9999 where org_id = b;
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  insert into invoices (id, org_id, status) values ('BR-7', b, 'pending');
+  if (select number from invoices where id = 'BR-7') is distinct from 'FACT-' || y || '-10000' then
+    failures := failures + 1; raise warning 'number above 9999: %', (select number from invoices where id = 'BR-7');
+  end if;
 
   -- Billio (no user token) can still delete
   perform set_config('request.jwt.claim.role', '', true);

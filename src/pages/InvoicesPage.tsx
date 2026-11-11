@@ -9,7 +9,7 @@ import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { InvoicesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { createInvoice, newDraftId, removeInvoice, updateInvoice } from '@/lib/api/invoices';
+import { createInvoice, fetchInvoiceIssue, newDraftId, removeInvoice, updateInvoice } from '@/lib/api/invoices';
 import { invoiceRef } from '@/lib/invoice-number';
 import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import { fetchLineItems, saveLineItems } from '@/lib/api/line-items';
@@ -20,7 +20,7 @@ import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
 import {
-  STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, nextId, newLineItem, clientInitials,
+  STATUS_LABEL, fmt, fmtCompact, fmtDate, fmtDue, newLineItem, clientInitials,
 } from '@/data';
 import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity, Invoice } from '@/lib/schemas';
@@ -90,7 +90,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     const q = search.trim().toLowerCase();
     return invoices.filter(i =>
       (filter === 'all' || i.status === filter) &&
-      (!q || invoiceRef(i).toLowerCase().includes(q) || i.subject.toLowerCase().includes(q)
+      (!q || invoiceRef(i).toLowerCase().includes(q) || i.id.toLowerCase().includes(q) || i.subject.toLowerCase().includes(q)
           || (clientsMap[i.client]?.name ?? i.client).toLowerCase().includes(q)));
   }, [invoices, filter, search, clientsMap],
   );
@@ -223,7 +223,15 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       let newInv: Invoice = draft;
       if (status === 'pending') {
         try {
-          const issued = await updateInvoice(orgId, id, { status: 'pending' });
+          let issued: { number?: string; firstIssuedAt?: string };
+          try {
+            issued = await updateInvoice(orgId, id, { status: 'pending' });
+          } catch (e) {
+            // The issue may have committed even though its response was lost
+            const stored = await fetchInvoiceIssue(orgId, id).catch(() => null);
+            if (!stored || stored.status === 'draft') throw e;
+            issued = stored;
+          }
           // Keep the database's issue time (the Solo limit counts it) and number
           newInv = { ...draft, status: 'pending', number: issued.number, firstIssuedAt: issued.firstIssuedAt ?? new Date().toISOString() };
         } catch (issueErr) {
@@ -452,7 +460,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         <div className="panel-slide-head">
           <div>
             <div className="panel-slide-title">Nouvelle facture</div>
-            <div className="panel-slide-sub">#{nextId(invoices)}</div>
+            <div className="panel-slide-sub">Numéro attribué à l'émission</div>
           </div>
           <button className="icon-btn" onClick={requestClosePanel} aria-label="Fermer">
             <Icon name="x" size={15} ariaHidden />

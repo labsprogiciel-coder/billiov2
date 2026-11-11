@@ -1,4 +1,4 @@
-import { createInvoice, newDraftId, removeInvoice, updateInvoice } from '@/lib/api/invoices';
+import { createInvoice, fetchInvoiceIssue, newDraftId, removeInvoice, updateInvoice } from '@/lib/api/invoices';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { updateQuote } from '@/lib/api/quotes';
 import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
@@ -33,21 +33,28 @@ export async function convertQuoteToInvoice(
 
   await createInvoice(orgId, draft);
   let quoteMarked = false;
-  let issued: { firstIssuedAt?: string; number?: string };
+  let issued: { firstIssuedAt?: string; number?: string } | null = null;
   try {
     await saveLineItems(orgId, quoteLines, { invoiceId: invId });
     await updateQuote(orgId, quote.id, { status: 'invoiced' });
     quoteMarked = true;
     issued = await updateInvoice(orgId, invId, { status: 'pending' });
   } catch (err) {
-    if (quoteMarked) await updateQuote(orgId, quote.id, { status: quote.status }).catch(e => console.error('[rollback] updateQuote failed:', e));
-    await deleteLineItems(orgId, { invoiceId: invId }).catch(() => {});
-    await removeInvoice(orgId, invId).catch(e => console.error('[rollback] removeInvoice failed:', e));
-    throw err;
+    // The issue may have committed even though its response was lost. An
+    // issued invoice can't be removed, so keep it (and the quote marked).
+    const stored = quoteMarked ? await fetchInvoiceIssue(orgId, invId).catch(() => null) : null;
+    if (stored && stored.status !== 'draft') {
+      issued = stored;
+    } else {
+      if (quoteMarked) await updateQuote(orgId, quote.id, { status: quote.status }).catch(e => console.error('[rollback] updateQuote failed:', e));
+      await deleteLineItems(orgId, { invoiceId: invId }).catch(() => {});
+      await removeInvoice(orgId, invId).catch(e => console.error('[rollback] removeInvoice failed:', e));
+      throw err;
+    }
   }
   const invoice: Invoice = {
-    ...draft, status: 'pending', number: issued.number,
-    firstIssuedAt: issued.firstIssuedAt ?? new Date().toISOString(),
+    ...draft, status: 'pending', number: issued?.number,
+    firstIssuedAt: issued?.firstIssuedAt ?? new Date().toISOString(),
   };
 
   const { ht: htAmount, tva: tvaAmount } = splitTtc(quote.amount, opts.canInvoiceTVA);

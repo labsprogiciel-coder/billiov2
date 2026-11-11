@@ -15,7 +15,8 @@ export function newDraftId(): string {
   const rand = typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID().replace(/-/g, '')
     : Math.random().toString(16).slice(2) + Date.now().toString(16);
-  return 'BR-' + rand.slice(0, 8).toUpperCase();
+  // 16 hex digits (64 bits): no realistic collision between an organisation's drafts
+  return 'BR-' + rand.slice(0, 16).toUpperCase().padEnd(16, '0');
 }
 
 /** What to show for an invoice: its legal number, or its draft reference. */

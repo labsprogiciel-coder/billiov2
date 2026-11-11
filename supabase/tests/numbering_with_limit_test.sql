@@ -33,7 +33,8 @@ begin
   update organizations set plan = 'business' where id = a;
   perform set_config('request.jwt.claim.role', 'authenticated', true);
   insert into invoices (id, org_id, status) values ('X7', a, 'pending');
-  if (select number from invoices where id = 'X7') not like '%-0006' then
+  if (select number from invoices where id = 'X7') is distinct from
+     'FACT-' || extract(year from now() at time zone 'UTC')::int || '-0006' then
     raise exception 'the refused invoice used a number: %', (select number from invoices where id = 'X7');
   end if;
 end $$;

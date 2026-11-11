@@ -82,6 +82,16 @@ export async function updateInvoice(orgId: string, id: string, patch: Partial<Pi
   return { firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined, number: row.number ?? undefined };
 }
 
+/** The invoice's stored status and legal number, or null if it doesn't exist. */
+export async function fetchInvoiceIssue(orgId: string, id: string): Promise<{ status: string; number?: string; firstIssuedAt?: string } | null> {
+  if (MOCK) return null;
+  const { data, error } = await supabase.from('invoices').select('status, number, first_issued_at').eq('org_id', orgId).eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as { status: string; number?: string | null; first_issued_at?: string | null };
+  return { status: row.status, number: row.number ?? undefined, firstIssuedAt: row.first_issued_at ?? undefined };
+}
+
 export async function removeInvoice(orgId: string, id: string): Promise<void> {
   if (MOCK) return;
   const { error } = await supabase.from('invoices').delete().eq('org_id', orgId).eq('id', id);

@@ -95,6 +95,12 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     pending: payments.filter(p => p.status === 'pending').length,
   };
 
+  // Payments point to the invoice's internal id; show its legal number
+  const invRef = useMemo(() => {
+    const byId = new Map(invoices.map(i => [i.id, invoiceRef(i)]));
+    return (id: string) => byId.get(id) ?? id;
+  }, [invoices]);
+
   const filtered = useMemo(() => {
     if (filter === 'pending') return payments.filter(p => p.status === 'pending');
     if (filter === 'online')  return payments.filter(p => p.source === 'online');
@@ -108,7 +114,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
   function exportStatement() {
     if (filtered.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
     const rows = filtered.map(p => [
-      p.date, p.inv, clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status],
+      p.date, invRef(p.inv), clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status],
     ]);
     downloadBlob(
       csvBlob(['Date', 'Facture', 'Client', 'Méthode', 'Référence', 'Montant (F CFA)', 'Statut'], rows),
@@ -320,7 +326,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
                       <div>
                         <div className="cell-text">{cl?.name ?? p.client}</div>
                         <div className="cell-sub">
-                          pour <span className="lnk">#{p.inv}</span>
+                          pour <span className="lnk">#{invRef(p.inv)}</span>
                         </div>
                       </div>
                     </div>

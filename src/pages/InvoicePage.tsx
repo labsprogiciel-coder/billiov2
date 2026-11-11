@@ -729,7 +729,7 @@ export default function InvoicePage() {
 
     {sendKind && paymentMethodsReady && (() => {
       const msg = invoiceMessage(sendKind, {
-        invoiceId: invoice.id, clientName: client.name, orgName: orgSettings.name,
+        invoiceId: invoiceRef(invoice), clientName: client.name, orgName: orgSettings.name,
         amountDue, due: invoice.due, methods: paymentMethods,
         overdueDays: daysOverdue(invoice.due),
       });

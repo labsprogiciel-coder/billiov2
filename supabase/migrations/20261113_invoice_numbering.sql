@@ -75,7 +75,8 @@ begin
   on conflict (org_id, year) do update set last_number = s.last_number + 1
   returning last_number into v_next;
 
-  new.number := format('FACT-%s-%s', v_year, lpad(v_next::text, 4, '0'));
+  -- At least 4 digits; lpad would truncate 10000 to 1000
+  new.number := format('FACT-%s-%s', v_year, case when v_next > 9999 then v_next::text else lpad(v_next::text, 4, '0') end);
   return new;
 end;
 $$;
@@ -123,7 +124,7 @@ begin
   on conflict (org_id, year) do update set last_number = s.last_number + 1
   returning last_number into v_next;
 
-  new.number := format('AV-%s-%s', v_year, lpad(v_next::text, 4, '0'));
+  new.number := format('AV-%s-%s', v_year, case when v_next > 9999 then v_next::text else lpad(v_next::text, 4, '0') end);
   return new;
 end;
 $$;
