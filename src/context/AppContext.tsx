@@ -121,7 +121,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Derived client lookup
   const clientsMap = useMemo<Record<string, Client>>(
-    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, country: c.country, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario }])),
+    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, country: c.country, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario, clientType: c.clientType }])),
     [clients],
   );
 

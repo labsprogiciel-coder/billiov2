@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
+import InvoiceClientSelect from '@/components/InvoiceClientSelect';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
 import { tabPanelId, tabId } from '@/lib/tab-ids';
@@ -440,12 +441,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <select className="form-input" value={fClient} onChange={e => setFClient(e.target.value)}>
-              <option value="">Sélectionner un client…</option>
-              {Object.entries(clientsMap).map(([code, c]) => (
-                <option key={code} value={code}>{c.name}</option>
-              ))}
-            </select>
+            <InvoiceClientSelect value={fClient} onChange={setFClient} />
           </div>
 
           <div className="form-row">

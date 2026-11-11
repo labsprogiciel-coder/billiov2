@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { calculateServiceWithholding } from '@/lib/tax-bf';
+import { clientTypeDef, clientTypeOf } from '@/lib/client-type';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import type { Invoice, LineItem, ServiceWithholdingScenario } from '@/lib/schemas';
 import type { BizInfo, PaperConfig } from '@/components/InvoicePaper';
@@ -36,6 +37,8 @@ type ClientInfo = {
   taxRegime?: string;
   fiscalDivision?: string;
   withholdingScenario?: string;
+  /** DGI client type (CC / PM / PP / PC), printed under the name */
+  clientType?: string;
 };
 
 export interface InvoicePDFProps {
@@ -288,6 +291,7 @@ export function InvoicePDFDocument({
     <>
       <Text style={s.blockLabel}>{clientLabel}</Text>
       <Text style={s.clientName}>{client.name}</Text>
+      <Text style={s.smallText}>{clientTypeDef(clientTypeOf(client)).mention}</Text>
       {client.city    ? <Text style={s.smallText}>{client.city}</Text> : null}
       {client.contact ? <Text style={[s.smallText, { marginTop: 2 }]}>Contact : {client.contact}</Text> : null}
       {client.phone   ? <Text style={s.smallText}>Tél : {client.phone}</Text> : null}
