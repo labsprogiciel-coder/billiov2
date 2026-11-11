@@ -1,4 +1,4 @@
-import { formatCadastralRef, parseCadastralRef } from '@/lib/cadastral';
+import { cadastralRequired, formatCadastralRef, parseCadastralRef } from '@/lib/cadastral';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { canManageOrg } from '@/lib/permissions';
@@ -194,6 +194,7 @@ function ComplianceChecklist({ seller, orgId }: { seller: SellerInfo; orgId: str
     { key: 'seller-rccm', label: 'RCCM' },
     { key: 'seller-regime', label: 'Régime fiscal' },
     { key: 'seller-division', label: 'Division fiscale' },
+    ...(cadastralRequired(seller.country) ? [{ key: 'seller-cadastre', label: 'Référence cadastrale' }] : []),
     { key: 'seller-bank', label: 'Coordonnées bancaires', hint: 'onglet Moyens de paiement' },
   ];
   const count = rows.filter(r => missing.has(r.key)).length;

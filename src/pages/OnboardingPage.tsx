@@ -321,8 +321,23 @@ export default function OnboardingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complete, orgId, targetClientCode, targetClient, orgClients.length, completeLoaded]);
 
+  /**
+   * A cadastral reference typed in must be complete before anything is saved:
+   * the progress bar can skip the business step's own check. Sends the user
+   * back to that step if not.
+   */
+  function cadastralBlocksSave(): boolean {
+    if (!cadastralRef.trim() || parseCadastralRef(cadastralRef)) return false;
+    const i = steps.indexOf('business');
+    if (i >= 0) goTo(i);
+    setFieldErr(new Set(['cadastre']));
+    showToast('Référence cadastrale : 11 chiffres (section, îlot, parcelle), ex. 0123 456 7890.', true);
+    return true;
+  }
+
   async function handleCompleteSave() {
     if (saving || !validateCurrentStep()) return;
+    if (steps.includes('business') && cadastralBlocksSave()) return;
     setSaving(true);
     try {
       if (steps.includes('business')) {
@@ -425,7 +440,7 @@ export default function OnboardingPage() {
 
   /* ── finish: save to Supabase ── */
   async function handleFinish() {
-    if (saving) return;
+    if (saving || cadastralBlocksSave()) return;
     setSaving(true);
     const orgName = bizName.trim() || 'Mon entreprise';
     try {

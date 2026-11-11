@@ -51,6 +51,21 @@ begin
     failures := failures + 1; raise warning 'fallback name: %', (select issued_by_name from invoices where id = 'I-2');
   end if;
 
+  -- Clearing issued_by by hand is reverted while the user exists…
+  update invoices set issued_by = null where id = 'D-1';
+  if (select issued_by from invoices where id = 'D-1') is null then
+    failures := failures + 1; raise warning 'issued_by cleared while the user exists';
+  end if;
+  -- …but deleting the user clears it (on delete set null), and the name stays
+  perform set_config('request.jwt.claim.role', '', true);
+  delete from auth.users where id = '00000000-0000-0000-0000-00000000aaaa';
+  if (select issued_by from invoices where id = 'D-1') is not null
+     or (select issued_by_name from invoices where id = 'D-1') is distinct from 'Awa Ouédraogo' then
+    failures := failures + 1; raise warning 'user deletion: issued_by=%, name=%',
+      (select issued_by from invoices where id = 'D-1'), (select issued_by_name from invoices where id = 'D-1');
+  end if;
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
   -- Cadastral reference: 11 digits or nothing
   update organizations set cadastral_ref = '01234567890' where id = a;
   update organizations set cadastral_ref = null where id = a;

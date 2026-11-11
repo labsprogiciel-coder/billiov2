@@ -31,7 +31,12 @@ declare
 begin
   -- Set once, by the database: keep what is stored, never the client's values
   if tg_op = 'UPDATE' then
-    new.issued_by      := old.issued_by;
+    -- Deleting the user clears issued_by (on delete set null); let that through,
+    -- the name stays. Any other change of issued_by is reverted.
+    if not (new.issued_by is null and old.issued_by is not null
+            and not exists (select 1 from auth.users u where u.id = old.issued_by)) then
+      new.issued_by := old.issued_by;
+    end if;
     new.issued_by_name := old.issued_by_name;
     if old.status <> 'draft' then return new; end if;
   else

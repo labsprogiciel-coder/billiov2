@@ -52,6 +52,8 @@ export interface InvoicePDFProps {
   /** The organisation's invoice template (Modèles); the standard one when omitted. */
   template?: PaperConfig;
   title?: string;
+  /** Which wording the total in words uses; from the title when omitted */
+  documentKind?: 'facture' | 'devis';
   clientLabel?: string;
   paymentTerms?: string;
   deliveryTerms?: string;
@@ -238,7 +240,7 @@ const pdfFmtDateTime = (iso: string): string => {
 };
 
 export function InvoicePDFDocument({
-  invoice, lines, client, biz, template, title = 'Facture', clientLabel = 'Facturé à',
+  invoice, lines, client, biz, template, title = 'Facture', documentKind, clientLabel = 'Facturé à',
   paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [], certification,
 }: InvoicePDFProps) {
   registerPdfFonts();
@@ -426,7 +428,7 @@ export function InvoicePDFDocument({
 
   // DGI mention t: the total in words, in every layout
   const totalInWords = (
-    <Text style={s.totalWords}>{invoiceTotalMention(total, title === 'Devis' ? 'devis' : 'facture')}</Text>
+    <Text style={s.totalWords}>{invoiceTotalMention(total, documentKind ?? (title === 'Devis' ? 'devis' : 'facture'))}</Text>
   );
 
   const payment = (
