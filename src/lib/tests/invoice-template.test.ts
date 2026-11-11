@@ -69,10 +69,10 @@ describe('invoice PDF', () => {
   });
 
   const props: InvoicePDFProps = {
-    invoice: { id: 'FACT-12-26', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 118000, status: 'pending', discountPct: 0 },
+    invoice: { id: 'BR-1A2B3C4D5E6F7A8B', number: 'FACT-2026-0012', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 118000, status: 'pending', discountPct: 0, firstIssuedAt: '2026-11-10T09:30:00Z', issuedByName: 'Awa Ouédraogo' },
     lines: Array.from({ length: 40 }, (_, i) => ({ id: String(i), desc: `Prestation ${i + 1}`, unit: 'u', qty: 1, price: 2950 })),
     client: { name: 'TechKonsult', city: 'Ouagadougou', ifu: '00067890C', rccm: 'BF-OUA-2020-B-5678' },
-    biz: { name: 'Studio Wend', address: 'Av. Kwame Nkrumah', city: 'Ouagadougou', country: 'Burkina Faso', email: 'a@b.bf', phone: '70', ifu: '00012345B', rccm: 'BF-OUA-2021-B-1234', taxRegime: 'RNI', divisionFiscale: 'DME Centre' },
+    biz: { name: 'Studio Wend', address: 'Av. Kwame Nkrumah', city: 'Ouagadougou', country: 'Burkina Faso', email: 'a@b.bf', phone: '70', ifu: '00012345B', rccm: 'BF-OUA-2021-B-1234', taxRegime: 'RNI', divisionFiscale: 'DME Centre', cadastralRef: '01234567890' },
     paymentMethods: [{ label: 'Virement bancaire', value: 'BF00 0000' }],
   };
 

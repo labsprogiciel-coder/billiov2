@@ -39,6 +39,8 @@ export const invoiceSchema = z.object({
   firstIssuedAt: z.string().optional(),
   /** Legal number (FACT-2026-0001), given by the database when the invoice is issued; none for drafts */
   number:      z.string().optional(),
+  /** Who issued it (set by the database at first issue): the operator mention */
+  issuedByName: z.string().optional(),
 });
 
 export const serviceWithholdingScenarioSchema = z.enum([

@@ -8,6 +8,7 @@
 
 import { getFiscalIdLabel } from '@/lib/ohada';
 import { clientTypeDef, clientTypeOf } from '@/lib/client-type';
+import { cadastralRequired, parseCadastralRef } from '@/lib/cadastral';
 import type { PaymentSettings } from '@/lib/api/payment-settings';
 
 export type ComplianceFix = 'business' | 'payments' | 'client';
@@ -23,6 +24,8 @@ export interface ComplianceIssue {
 export interface SellerInfo {
   name: string; address: string; city: string; country: string;
   ifu: string; rccm: string; taxRegime: string; divisionFiscale: string;
+  /** Cadastral reference of the place of sale, 11 digits (DGI spec v2.0, 3 c) */
+  cadastralRef?: string;
 }
 
 export interface ClientInfo {
@@ -47,6 +50,7 @@ export function sellerIssues(org: SellerInfo, payments: PaymentSettings | null):
   add(blank(org.rccm), 'seller-rccm', 'RCCM');
   add(blank(org.taxRegime), 'seller-regime', "Régime d'imposition");
   add(blank(org.divisionFiscale), 'seller-division', 'Service des impôts de rattachement');
+  add(cadastralRequired(org.country) && !parseCadastralRef(org.cadastralRef ?? ''), 'seller-cadastre', 'Référence cadastrale du lieu de vente (section, îlot, parcelle)');
   // null: the payment settings couldn't be loaded, so don't claim they're missing
   if (payments) {
     add(!payments.methodBankEnabled || blank(payments.methodBankIban), 'seller-bank', 'Coordonnées bancaires (RIB / IBAN)', 'payments');

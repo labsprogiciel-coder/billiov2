@@ -39,7 +39,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 /** Rendered by SalesPage, which passes the Factures | Devis tab switcher. */
 export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const { writable } = usePermissions();
-  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading } = useApp();
+  const { invoices, setInvoices, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userLabel } = useApp();
 
   const navigate = useNavigate();
 
@@ -223,7 +223,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       let newInv: Invoice = draft;
       if (status === 'pending') {
         try {
-          let issued: { number?: string; firstIssuedAt?: string };
+          let issued: { number?: string; firstIssuedAt?: string; issuedByName?: string };
           try {
             issued = await updateInvoice(orgId, id, { status: 'pending' });
           } catch (e) {
@@ -233,7 +233,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
             issued = stored;
           }
           // Keep the database's issue time (the Solo limit counts it) and number
-          newInv = { ...draft, status: 'pending', number: issued.number, firstIssuedAt: issued.firstIssuedAt ?? new Date().toISOString() };
+          newInv = { ...draft, status: 'pending', number: issued.number, firstIssuedAt: issued.firstIssuedAt ?? new Date().toISOString(), issuedByName: issued.issuedByName ?? userLabel };
         } catch (issueErr) {
           // The draft is saved: show it, so a retry issues it rather than creating another
           setInvoices(prev => [draft, ...prev]);

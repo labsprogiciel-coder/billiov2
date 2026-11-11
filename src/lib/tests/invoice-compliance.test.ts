@@ -5,6 +5,7 @@ import type { PaymentSettings } from '@/lib/api/payment-settings';
 const complete: SellerInfo = {
   name: 'Studio Wend', address: 'Av. Kwame Nkrumah', city: 'Ouagadougou', country: 'Burkina Faso',
   ifu: '00012345B', rccm: 'BF-OUA-2021-B-1234', taxRegime: 'RNI', divisionFiscale: 'DME Centre',
+  cadastralRef: '01234567890',
 };
 // Only the bank fields matter here (importing the real defaults loads the Supabase client)
 const noBank = { methodBankEnabled: false, methodBankIban: '' } as PaymentSettings;
@@ -21,6 +22,12 @@ describe('sellerIssues', () => {
     expect(keys(issues)).toEqual(['seller-ifu', 'seller-rccm', 'seller-regime', 'seller-division']);
     expect(issues.every(i => i.fix === 'business')).toBe(true);
     expect(issues[0].label).toBe("IFU de l'entreprise");
+  });
+
+  it('asks for the cadastral reference in Burkina Faso, complete (11 digits)', () => {
+    expect(keys(sellerIssues({ ...complete, cadastralRef: '' }, bank))).toEqual(['seller-cadastre']);
+    expect(keys(sellerIssues({ ...complete, cadastralRef: '0123 456' }, bank))).toEqual(['seller-cadastre']);
+    expect(sellerIssues({ ...complete, cadastralRef: '' , country: 'Sénégal' }, bank)).toEqual([]);
   });
 
   it('uses the country fiscal ID label', () => {
