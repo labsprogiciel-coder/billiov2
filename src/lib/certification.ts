@@ -1,9 +1,9 @@
-// Elements a certified electronic invoice (FEC, through SECeF) must carry:
-// the SECeF identification number, a unique transaction code and a QR code
-// (Arrêté n°2025-0049/MEF/SG/DGI). They are returned by the DGI's system when
-// the invoice is certified (PRO-137) and printed in a fixed area of every
-// invoice template (PRO-135). The exact list is still to be checked against
-// the official texts (PRO-132).
+// Security elements a certified electronic invoice must carry (Arrêté
+// n°2025-0047/MEF/SG/DGI; DGI spec v2.0, note n°2025-0889): the SECeF/DGI
+// code, the SECeF identifier, counters, the control module's (MCF) date and
+// time, and the QR code. The MCF returns them when the invoice is certified
+// (PRO-137); they are printed in a fixed area of every invoice template
+// (PRO-135). The QR code's content follows the MCF protocol (spec 2.30).
 
 import QRCode from 'qrcode';
 
