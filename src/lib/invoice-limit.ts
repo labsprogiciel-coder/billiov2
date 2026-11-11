@@ -24,6 +24,9 @@ export function invoiceLimitReached(plan: PlanId, invoices: Parameters<typeof is
 
 /** The database refused an invoice because the Solo limit is reached. */
 export function isInvoiceLimitError(err: unknown): boolean {
-  const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : '';
+  if (!err || typeof err !== 'object') return false;
+  // The trigger raises SQLSTATE BL001 (the message is checked too, for older deployments)
+  if ('code' in err && (err as { code: unknown }).code === 'BL001') return true;
+  const msg = 'message' in err ? String((err as { message: unknown }).message) : '';
   return msg.includes('solo_invoice_limit');
 }

@@ -60,16 +60,16 @@ begin
   begin
     insert into invoices (id, org_id, status) values ('S-6', solo, 'pending');
     failures := failures + 1; raise warning '6th issued invoice accepted (insert)';
-  exception when raise_exception then null; end;
+  exception when sqlstate 'BL001' then null; end;
   begin
     update invoices set status = 'pending' where org_id = solo and id = 'D-3';
     failures := failures + 1; raise warning '6th issued invoice accepted (draft issued)';
-  exception when raise_exception then null; end;
+  exception when sqlstate 'BL001' then null; end;
   -- a client-supplied timestamp is ignored
   begin
     insert into invoices (id, org_id, status, first_issued_at) values ('S-7', solo, 'pending', now() - interval '1 year');
     failures := failures + 1; raise warning 'backdated first_issued_at dodged the limit';
-  exception when raise_exception then null; end;
+  exception when sqlstate 'BL001' then null; end;
   -- rewriting first_issued_at on an issued invoice doesn't free quota
   update invoices set first_issued_at = now() - interval '1 year' where org_id = solo and id = 'S-1';
   if (select first_issued_at from invoices where org_id = solo and id = 'S-1') < now() - interval '1 day' then
@@ -86,7 +86,7 @@ begin
   begin
     insert into invoices (id, org_id, status) values ('S-8', solo, 'pending');
     failures := failures + 1; raise warning 'deleting an issued invoice freed a slot';
-  exception when raise_exception then null; end;
+  exception when sqlstate 'BL001' then null; end;
   -- an issued invoice can't move to another organisation
   begin
     update invoices set org_id = biz where org_id = solo and id = 'S-1';

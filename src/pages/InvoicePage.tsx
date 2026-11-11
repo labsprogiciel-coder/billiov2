@@ -253,9 +253,9 @@ export default function InvoicePage() {
     if (linesProblem) { showToast(`${linesProblem} Modifiez la facture avant de l'émettre.`, true); return; }
     setBusyAction('issue');
     try {
-      await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
-      // The database stamps the first issue now; the Solo limit counts it this month
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, firstIssuedAt: i.firstIssuedAt ?? new Date().toISOString() } : i));
+      const { firstIssuedAt } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
+      // Keep the database's first issue time, which the Solo limit counts (now in demo mode)
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString() } : i));
       try {
         await recordInvoiceIssuanceEntry(orgId, { invoiceId: invoice.id, htAmount: discountedSub, tvaAmount: tax, date: invoice.issued, clientName: client.name });
         showToast(`Facture #${invoice.id} émise`);
@@ -894,7 +894,7 @@ export default function InvoicePage() {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <InvoiceClientSelect value={eClient} onChange={setEClient} open={editOpen} />
+            <InvoiceClientSelect value={eClient} onChange={setEClient} open={editOpen} disabled={saving} />
           </div>
 
           <div className="form-row">

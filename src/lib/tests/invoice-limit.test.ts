@@ -42,6 +42,8 @@ describe('isInvoiceLimitError', () => {
   it('recognises the database error', () => {
     expect(isInvoiceLimitError({ message: 'solo_invoice_limit', code: 'P0001' })).toBe(true);
     expect(isInvoiceLimitError(new Error('network'))).toBe(false);
+    expect(isInvoiceLimitError({ code: 'BL001', message: 'anything' })).toBe(true);
+    expect(isInvoiceLimitError({ code: 'P0001', message: 'other error' })).toBe(false);
     expect(isInvoiceLimitError(null)).toBe(false);
   });
 });

@@ -107,7 +107,7 @@ begin
        and issued_at >= v_month;
     if v_count >= c_limit then
       raise exception 'solo_invoice_limit'
-        using errcode = 'P0001',
+        using errcode = 'BL001',  -- Billio: Solo limit (the app matches this code)
               detail  = format('The Solo plan allows %s issued invoices per month.', c_limit),
               hint    = 'Upgrade to Business for unlimited invoices.';
     end if;

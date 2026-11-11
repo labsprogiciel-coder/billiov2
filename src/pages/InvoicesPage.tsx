@@ -443,7 +443,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <InvoiceClientSelect value={fClient} onChange={setFClient} open={panelOpen} />
+            {/* Locked while issuing: the checks run with the client chosen when it started */}
+            <InvoiceClientSelect value={fClient} onChange={setFClient} open={panelOpen} disabled={submitting || compliance.checking} />
           </div>
 
           <div className="form-row">
