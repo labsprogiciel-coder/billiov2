@@ -572,7 +572,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         </div>
 
         <div className="panel-footer">
-          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('draft')}>
+          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting || compliance.checking} onClick={() => submitInvoice('draft')}>
             {submitting ? 'Enregistrement…' : 'Enregistrer brouillon'}
           </button>
           <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting || compliance.checking} onClick={issueInvoice}>
