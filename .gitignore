@@ -23,3 +23,8 @@ dev-dist
 *.njsproj
 *.sln
 *.sw?
+
+# Wrangler local secrets and build output
+.dev.vars
+.dev.vars.*
+.wrangler

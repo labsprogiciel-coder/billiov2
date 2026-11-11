@@ -68,6 +68,9 @@ export default defineConfig({
 
     workbox: {
       globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+      // The assistant's optional diagram renderer (mermaid, from CopilotKit) is
+      // large and only loads when a chat draws a diagram: don't precache it
+      globIgnores: ['**/mermaid-*.js'],
       cleanupOutdatedCaches: true,
       clientsClaim: true,
       navigateFallback: 'index.html',
