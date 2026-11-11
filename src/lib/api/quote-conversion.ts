@@ -47,7 +47,7 @@ export async function convertQuoteToInvoice(
 
   await createInvoice(orgId, draft);
   let quoteMarked = false;
-  let issued: { firstIssuedAt?: string; number?: string } | null = null;
+  let issued: { firstIssuedAt?: string; number?: string; issuedByName?: string } | null = null;
   try {
     await saveLineItems(orgId, quoteLines, { invoiceId: invId });
     await updateQuote(orgId, quote.id, { status: 'invoiced' });
@@ -75,7 +75,7 @@ export async function convertQuoteToInvoice(
     }
   }
   const invoice: Invoice = {
-    ...draft, status: 'pending', number: issued?.number,
+    ...draft, status: 'pending', number: issued?.number, issuedByName: issued?.issuedByName,
     firstIssuedAt: issued?.firstIssuedAt ?? new Date().toISOString(),
   };
 

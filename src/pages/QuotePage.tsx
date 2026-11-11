@@ -194,6 +194,7 @@ export default function QuotePage() {
         client,
         biz: orgSettings,
         title: 'Facture Proforma',
+        documentKind: 'devis',
         clientLabel: 'Adressé à',
         paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
         paymentMethods,

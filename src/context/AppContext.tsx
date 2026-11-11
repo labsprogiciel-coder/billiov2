@@ -31,6 +31,8 @@ export interface OrgSettings {
   rccm:                 string;
   taxRegime:            string;
   divisionFiscale:      string;
+  /** Cadastral reference of the place of sale (11 digits) */
+  cadastralRef:         string;
   /** ISO date string (YYYY-MM-DD) — used for first-year IS exemption and threshold prorating */
   businessCreationDate: string;
   paymentTerms:         string;
@@ -39,7 +41,7 @@ export interface OrgSettings {
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
-const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', businessCreationDate: '', paymentTerms: 'Net 14 jours', deliveryTerms: 'À convenir' };
+const EMPTY_ORG: OrgSettings = { name: '', address: '', city: '', country: '', email: '', phone: '', ifu: '', rccm: '', taxRegime: '', divisionFiscale: '', cadastralRef: '', businessCreationDate: '', paymentTerms: 'Net 14 jours', deliveryTerms: 'À convenir' };
 
 interface AppContextValue {
   // Entities
@@ -175,7 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         const { data: org, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, business_creation_date, payment_terms, delivery_terms, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
+          .select('name, address, city, country, email, phone, ifu, rccm, tax_regime, division_fiscale, cadastral_ref, business_creation_date, payment_terms, delivery_terms, onboarding_completed_at, plan, plan_status, plan_renews_at, trial_ends_at')
           .eq('id', resolvedOrgId)
           .single();
         if (orgErr) {
@@ -198,6 +200,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             rccm:           org.rccm            ?? '',
             taxRegime:            org.tax_regime            ?? '',
             divisionFiscale:      org.division_fiscale      ?? '',
+            cadastralRef:         org.cadastral_ref         ?? '',
             businessCreationDate: org.business_creation_date ?? '',
             paymentTerms:         org.payment_terms         ?? 'Net 14 jours',
             deliveryTerms:        org.delivery_terms        ?? 'À convenir',

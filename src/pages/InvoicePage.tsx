@@ -73,7 +73,7 @@ const BillioLogoSvg = () => (
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
+  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
   const writable = canWrite(userRole);
   const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
@@ -254,9 +254,9 @@ export default function InvoicePage() {
     if (linesProblem) { showToast(`${linesProblem} Modifiez la facture avant de l'émettre.`, true); return; }
     setBusyAction('issue');
     try {
-      const { firstIssuedAt, number } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
+      const { firstIssuedAt, number, issuedByName } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
       // Keep the database's legal number and first issue time (the Solo limit counts it; now in demo mode)
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, number: number ?? i.number, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString() } : i));
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, number: number ?? i.number, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString(), issuedByName: issuedByName ?? i.issuedByName ?? userLabel } : i));
       try {
         await recordInvoiceIssuanceEntry(orgId, { invoiceId: invoice.id, htAmount: discountedSub, tvaAmount: tax, date: invoice.issued, clientName: client.name });
         showToast(`Facture #${number ?? invoiceRef(invoice)} émise`);

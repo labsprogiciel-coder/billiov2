@@ -1,4 +1,6 @@
 import { invoiceRef } from '@/lib/invoice-number';
+import { invoiceTotalMention } from '@/lib/amount-in-words';
+import { formatCadastralRef } from '@/lib/cadastral';
 import type { ReactNode } from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { calculateServiceWithholding } from '@/lib/tax-bf';
@@ -50,6 +52,8 @@ export interface InvoicePDFProps {
   /** The organisation's invoice template (Modèles); the standard one when omitted. */
   template?: PaperConfig;
   title?: string;
+  /** Which wording the total in words uses; from the title when omitted */
+  documentKind?: 'facture' | 'devis';
   clientLabel?: string;
   paymentTerms?: string;
   deliveryTerms?: string;
@@ -187,6 +191,7 @@ function makeStyles(t: PaperConfig) {
       payCol: isReceipt ? {} : { flex: 1 },
       payMethod: { fontSize: 8, color: '#444', marginBottom: 2 },
       notesText: { fontSize: 8, color: '#666', lineHeight: 1.5 },
+      totalWords: { fontSize: 8, color: '#444', marginTop: -sp(10), marginBottom: sp(14), textAlign: isReceipt ? 'left' : 'right' },
       certBox: {
         flexDirection: 'row', alignItems: 'center', gap: 12, padding: 8, marginBottom: sp(16),
         borderWidth: 1, borderColor: '#1C2733', borderRadius: 4,
@@ -230,11 +235,12 @@ function PdfQr({ text, size }: { text: string; size: number }) {
 const pdfFmtDateTime = (iso: string): string => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  // Burkina Faso time (UTC, no daylight saving), whatever the device's zone
+  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Ouagadougou' });
 };
 
 export function InvoicePDFDocument({
-  invoice, lines, client, biz, template, title = 'Facture', clientLabel = 'Facturé à',
+  invoice, lines, client, biz, template, title = 'Facture', documentKind, clientLabel = 'Facturé à',
   paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [], certification,
 }: InvoicePDFProps) {
   registerPdfFonts();
@@ -269,6 +275,7 @@ export function InvoicePDFDocument({
     biz.rccm && `RCCM ${biz.rccm}`,
     biz.taxRegime,
     biz.divisionFiscale,
+    biz.cadastralRef && `Réf. cadastrale ${formatCadastralRef(biz.cadastralRef)}`,
   ].filter(Boolean).join(' · ');
 
   const clientCompliance = [
@@ -306,6 +313,9 @@ export function InvoicePDFDocument({
       <Text style={s.blockLabel}>Détails</Text>
       {([
         ['Émis le', pdfFmtDate(invoice.issued)],
+        // DGI mentions w and y: when the invoice was issued, and by whom
+        ...(invoice.firstIssuedAt ? [['Émission', pdfFmtDateTime(invoice.firstIssuedAt)] as const] : []),
+        ...(invoice.issuedByName ? [['Émise par', invoice.issuedByName] as const] : []),
         ['Échéance', pdfFmtDate(invoice.due)],
         ['Paiement', paymentTerms],
         ['Livraison', deliveryTerms],
@@ -414,6 +424,11 @@ export function InvoicePDFDocument({
         </View>
       </View>
     </View>
+  );
+
+  // DGI mention t: the total in words, in every layout
+  const totalInWords = (
+    <Text style={s.totalWords}>{invoiceTotalMention(total, documentKind ?? (title === 'Devis' ? 'devis' : 'facture'))}</Text>
   );
 
   const payment = (
@@ -562,6 +577,7 @@ export function InvoicePDFDocument({
         {subject}
         {table}
         {totals}
+        {totalInWords}
         {certified}
         {payment}
         {signature}

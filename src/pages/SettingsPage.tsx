@@ -1,3 +1,4 @@
+import { cadastralRequired, formatCadastralRef, parseCadastralRef } from '@/lib/cadastral';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { canManageOrg } from '@/lib/permissions';
@@ -193,6 +194,7 @@ function ComplianceChecklist({ seller, orgId }: { seller: SellerInfo; orgId: str
     { key: 'seller-rccm', label: 'RCCM' },
     { key: 'seller-regime', label: 'Régime fiscal' },
     { key: 'seller-division', label: 'Division fiscale' },
+    ...(cadastralRequired(seller.country) ? [{ key: 'seller-cadastre', label: 'Référence cadastrale' }] : []),
     { key: 'seller-bank', label: 'Coordonnées bancaires', hint: 'onglet Moyens de paiement' },
   ];
   const count = rows.filter(r => missing.has(r.key)).length;
@@ -238,6 +240,7 @@ function BusinessSection() {
   const [rccm,            setRccm]           = useState('');
   const [taxRegime,            setTaxRegime]           = useState('');
   const [divisionFiscale,      setDivisionFiscale]     = useState('');
+  const [cadastralRef,         setCadastralRef]        = useState('');
   const [businessCreationDate, setBusinessCreationDate]= useState('');
   const [address,  setAddress] = useState('');
   const [city,     setCity]    = useState('');
@@ -252,7 +255,7 @@ function BusinessSection() {
     if (!orgId) return;
     supabase
       .from('organizations')
-      .select('name, ifu, rccm, tax_regime, division_fiscale, business_creation_date, address, city, country, currency, email, phone')
+      .select('name, ifu, rccm, tax_regime, division_fiscale, cadastral_ref, business_creation_date, address, city, country, currency, email, phone')
       .eq('id', orgId)
       .single()
       .then(({ data, error }) => {
@@ -263,6 +266,7 @@ function BusinessSection() {
         setRccm(data.rccm             ?? '');
         setTaxRegime(data.tax_regime             ?? '');
         setDivisionFiscale(data.division_fiscale ?? '');
+        setCadastralRef(formatCadastralRef(data.cadastral_ref));
         setBusinessCreationDate(data.business_creation_date ?? '');
         setAddress(data.address ?? '');
         setCity(data.city     ?? '');
@@ -276,14 +280,16 @@ function BusinessSection() {
 
   async function handleSave() {
     if (!orgId) return;
+    const cadastral = cadastralRef.trim() ? parseCadastralRef(cadastralRef) : '';
+    if (cadastral === null) { showToast('Référence cadastrale : 11 chiffres (section, îlot, parcelle), ex. 0123 456 7890.', true); return; }
     setSaving(true);
     const { error } = await supabase
       .from('organizations')
-      .update({ name, ifu, rccm, tax_regime: taxRegime, division_fiscale: divisionFiscale, business_creation_date: businessCreationDate || null, address, city, country, currency, email, phone })
+      .update({ name, ifu, rccm, tax_regime: taxRegime, division_fiscale: divisionFiscale, cadastral_ref: cadastral || null, business_creation_date: businessCreationDate || null, address, city, country, currency, email, phone })
       .eq('id', orgId);
     setSaving(false);
     if (error) { showToast(error.message, true); return; }
-    setOrgSettings(prev => ({ ...prev, name, ifu, rccm, taxRegime, divisionFiscale, businessCreationDate, address, city, country, email, phone }));
+    setOrgSettings(prev => ({ ...prev, name, ifu, rccm, taxRegime, divisionFiscale, cadastralRef: cadastral, businessCreationDate, address, city, country, email, phone }));
     posthog.capture('settings_saved', { section: 'business' });
     showToast('Entreprise enregistrée');
   }
@@ -292,7 +298,7 @@ function BusinessSection() {
     <>
     {!loading && (
       <ComplianceChecklist
-        seller={{ name, address, city, country, ifu, rccm, taxRegime, divisionFiscale }}
+        seller={{ name, address, city, country, ifu, rccm, taxRegime, divisionFiscale, cadastralRef }}
         orgId={orgId}
       />
     )}
@@ -329,6 +335,13 @@ function BusinessSection() {
           <div className="s-field">
             <label className="s-label">Division fiscale</label>
             <input className="form-input" value={divisionFiscale} onChange={e => setDivisionFiscale(e.target.value)} disabled={loading} placeholder="ex. Ouagadougou I" />
+          </div>
+        </div>
+        <div className="s-field">
+          <label className="s-label">Référence cadastrale du lieu de vente</label>
+          <input className="form-input" value={cadastralRef} onChange={e => setCadastralRef(e.target.value)} disabled={loading} placeholder="Section, îlot, parcelle : 0123 456 7890" inputMode="numeric" />
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+            Mention obligatoire sur les factures (11 chiffres : section 4, îlot 3, parcelle 4).
           </div>
         </div>
         <div className="s-field">

@@ -26,7 +26,7 @@ async function loadSeller(orgId: string, fallback: SellerInfo): Promise<{ seller
   // A failed read must not block issuing: fall back to what the app has loaded
   const [org, payments] = await Promise.all([
     supabase.from('organizations')
-      .select('name, address, city, country, ifu, rccm, tax_regime, division_fiscale')
+      .select('name, address, city, country, ifu, rccm, tax_regime, division_fiscale, cadastral_ref')
       .eq('id', orgId).single()
       .then(({ data, error }) => (error || !data ? null : data), () => null),
     fetchPaymentSettings(orgId).catch(() => null),
@@ -34,6 +34,7 @@ async function loadSeller(orgId: string, fallback: SellerInfo): Promise<{ seller
   const seller: SellerInfo = org ? {
     name: org.name ?? '', address: org.address ?? '', city: org.city ?? '', country: org.country ?? '',
     ifu: org.ifu ?? '', rccm: org.rccm ?? '', taxRegime: org.tax_regime ?? '', divisionFiscale: org.division_fiscale ?? '',
+    cadastralRef: org.cadastral_ref ?? '',
   } : fallback;
   return { seller, payments };
 }

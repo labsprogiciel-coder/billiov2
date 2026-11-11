@@ -16,6 +16,7 @@ export function dbToInvoice(row: Record<string, unknown>): Invoice {
     discountPct: Number(row.discount_pct ?? 0),
     firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined,
     number:      row.number ? String(row.number) : undefined,
+    issuedByName: row.issued_by_name ? String(row.issued_by_name) : undefined,
   };
 }
 
@@ -63,7 +64,7 @@ export async function createInvoice(
 }
 
 /** Returns the invoice's first issue time and legal number, as the database set them. */
-export async function updateInvoice(orgId: string, id: string, patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>>): Promise<{ firstIssuedAt?: string; number?: string }> {
+export async function updateInvoice(orgId: string, id: string, patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>>): Promise<{ firstIssuedAt?: string; number?: string; issuedByName?: string }> {
   if (MOCK) return patch.status && patch.status !== 'draft' ? { number: mockNumber() } : {};
   const dbPatch: Record<string, unknown> = {};
   if (patch.status      !== undefined) dbPatch.status       = patch.status;
@@ -74,22 +75,22 @@ export async function updateInvoice(orgId: string, id: string, patch: Partial<Pi
   if (patch.amount      !== undefined) dbPatch.amount       = patch.amount;
   if (patch.discountPct !== undefined) dbPatch.discount_pct = patch.discountPct;
   const { data, error } = await supabase.from('invoices').update(dbPatch).eq('org_id', orgId).eq('id', id)
-    .select('first_issued_at, number').maybeSingle();
+    .select('first_issued_at, number, issued_by_name').maybeSingle();
   if (error) throw error;
   // No row: the invoice was deleted meanwhile, or this user can't change it
   if (!data) throw new Error(`invoice ${id} not found or not writable`);
-  const row = data as { first_issued_at?: string | null; number?: string | null };
-  return { firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined, number: row.number ?? undefined };
+  const row = data as { first_issued_at?: string | null; number?: string | null; issued_by_name?: string | null };
+  return { firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined, number: row.number ?? undefined, issuedByName: row.issued_by_name ?? undefined };
 }
 
 /** The invoice's stored status and legal number, or null if it doesn't exist. */
-export async function fetchInvoiceIssue(orgId: string, id: string): Promise<{ status: string; number?: string; firstIssuedAt?: string } | null> {
+export async function fetchInvoiceIssue(orgId: string, id: string): Promise<{ status: string; number?: string; firstIssuedAt?: string; issuedByName?: string } | null> {
   if (MOCK) return null;
-  const { data, error } = await supabase.from('invoices').select('status, number, first_issued_at').eq('org_id', orgId).eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('invoices').select('status, number, first_issued_at, issued_by_name').eq('org_id', orgId).eq('id', id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  const row = data as { status: string; number?: string | null; first_issued_at?: string | null };
-  return { status: row.status, number: row.number ?? undefined, firstIssuedAt: row.first_issued_at ?? undefined };
+  const row = data as { status: string; number?: string | null; first_issued_at?: string | null; issued_by_name?: string | null };
+  return { status: row.status, number: row.number ?? undefined, firstIssuedAt: row.first_issued_at ?? undefined, issuedByName: row.issued_by_name ?? undefined };
 }
 
 export async function removeInvoice(orgId: string, id: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { formatCadastralRef } from '@/lib/cadastral';
 import { createContext, useContext } from 'react';
 import { fmt } from '@/data';
 import { getFiscalIdLabel } from '@/lib/ohada';
@@ -39,6 +40,8 @@ export interface BizInfo {
   rccm:            string;
   taxRegime?:      string;
   divisionFiscale?: string;
+  /** Cadastral reference of the place of sale (11 digits) */
+  cadastralRef?:   string;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +59,7 @@ const MOCK_BIZ: BizInfo = {
   rccm:            'BF-OUA-2021-B-1234',
   taxRegime:       'RNI',
   divisionFiscale: 'Ouagadougou I',
+  cadastralRef:    '01234567890',
 };
 const MOCK_PAYMENT: PaymentMethodLine[] = [
   { label: 'Orange Money', value: '70 00 00 00' },
@@ -93,7 +97,8 @@ function bizLines(biz: BizInfo) {
   return {
     addr: [biz.address, biz.city, biz.country].filter(Boolean).join(', '),
     contact: [biz.email, biz.phone].filter(Boolean).join(' · '),
-    compliance: [biz.ifu && `${fiscalLabel} ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`, biz.taxRegime, biz.divisionFiscale]
+    compliance: [biz.ifu && `${fiscalLabel} ${biz.ifu}`, biz.rccm && `RCCM ${biz.rccm}`, biz.taxRegime, biz.divisionFiscale,
+      biz.cadastralRef && `Réf. cadastrale ${formatCadastralRef(biz.cadastralRef)}`]
       .filter(Boolean).join(' · '),
   };
 }
