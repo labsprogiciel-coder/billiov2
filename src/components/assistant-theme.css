@@ -1,0 +1,48 @@
+/* Billio's look for the assistant panel (CopilotKit). CopilotKit styles itself
+   with shadcn-style variables on [data-copilotkit]; these point them at the
+   app's own tokens (src/index.css), so the panel follows the brand colours,
+   font, radius and the high-contrast greys. The doubled attribute outranks
+   CopilotKit's own [data-copilotkit] rule whichever stylesheet loads last. */
+[data-copilotkit][data-copilotkit] {
+  --cpk-default-font-family: var(--font-sans);
+
+  --background: var(--color-background-primary);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-background-primary);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-background-primary);
+  --popover-foreground: var(--color-text-primary);
+
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-tint);
+  --secondary-foreground: var(--brand-dark);
+  --muted: var(--color-background-secondary);
+  --muted-foreground: var(--color-text-secondary);
+  --accent: var(--brand-tint);
+  --accent-foreground: var(--brand-dark);
+
+  --border: var(--color-border-tertiary);
+  --input: var(--color-border-input);
+  --ring: var(--brand);
+  --radius: var(--border-radius-md);
+
+  --sidebar: var(--color-background-secondary);
+  --sidebar-foreground: var(--color-text-primary);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-tint);
+  --sidebar-accent-foreground: var(--brand-dark);
+  --sidebar-border: var(--color-border-tertiary);
+  --sidebar-ring: var(--brand);
+}
+
+/* The send button is hard-coded black in CopilotKit, not themed */
+[data-copilotkit] button.cpk\:bg-black:not(:disabled) {
+  background-color: var(--brand);
+  color: #ffffff;
+}
+[data-copilotkit] button.cpk\:bg-black:not(:disabled):hover {
+  background-color: var(--brand-dark);
+  opacity: 1;
+}

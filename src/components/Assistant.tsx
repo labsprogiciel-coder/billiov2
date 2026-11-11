@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { CopilotKit, CopilotSidebar, useAgentContext, useFrontendTool } from '@copilotkit/react-core/v2';
 import '@copilotkit/react-core/v2/styles.css';
+import './assistant-theme.css';
 import { useApp } from '@/context/AppContext';
 import { supabase, SUPABASE_ANON_KEY } from '@/lib/supabase';
 import { businessSnapshot } from '@/lib/assistant-context';
