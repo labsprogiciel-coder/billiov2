@@ -6,6 +6,20 @@ import type { Invoice, Quote } from '@/lib/schemas';
 import { splitTtc } from '@/lib/vat';
 
 /**
+ * The invoice may or may not have been issued (the request failed and its
+ * state couldn't be read back). Nothing was rolled back: the user should
+ * reload and check before converting again.
+ */
+export class ConversionOutcomeUnknownError extends Error {
+  readonly invoiceId: string;
+  constructor(invoiceId: string, cause: unknown) {
+    super(`quote conversion outcome unknown for invoice ${invoiceId}`, { cause });
+    this.name = 'ConversionOutcomeUnknownError';
+    this.invoiceId = invoiceId;
+  }
+}
+
+/**
  * Turns a quote into a pending invoice with the same lines, then marks the
  * quote invoiced. The invoice is saved as a draft with its lines, the quote is
  * marked, and only then is the invoice issued: the database gives the legal
@@ -42,7 +56,15 @@ export async function convertQuoteToInvoice(
   } catch (err) {
     // The issue may have committed even though its response was lost. An
     // issued invoice can't be removed, so keep it (and the quote marked).
-    const stored = quoteMarked ? await fetchInvoiceIssue(orgId, invId).catch(() => null) : null;
+    let stored: Awaited<ReturnType<typeof fetchInvoiceIssue>> = null;
+    if (quoteMarked) {
+      try {
+        stored = await fetchInvoiceIssue(orgId, invId);
+      } catch {
+        // Can't tell whether it was issued: leave everything as it is
+        throw new ConversionOutcomeUnknownError(invId, err);
+      }
+    }
     if (stored && stored.status !== 'draft') {
       issued = stored;
     } else {
