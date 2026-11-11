@@ -18,7 +18,7 @@ const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 /* ── types ── */
 interface TeamInvite { id: string; email: string; role: string }
-interface ClientDraft { name: string; email: string; av: string }
+interface ClientDraft { name: string; email: string; av: string; type: ClientType }
 
 const AV = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e', 'av-f'] as const;
 const TERMS_OPTIONS = ['À réception', 'Net 7 jours', 'Net 14 jours', 'Net 30 jours'];
@@ -172,6 +172,7 @@ export default function OnboardingPage() {
   const [divisionFiscale, setDivisionFiscale] = useState('');
   const [iban,     setIban]     = useState('');
   /* ── completion mode: the client being invoiced ── */
+  const [cliName,  setCliName]  = useState('');
   const [cliCity,  setCliCity]  = useState('');
   const [cliIfu,   setCliIfu]   = useState('');
   const [cliRccm,  setCliRccm]  = useState('');
@@ -197,6 +198,7 @@ export default function OnboardingPage() {
 
   /* ── step 4: clients ── */
   const [clientName,    setClientName]    = useState('');
+  const [clientType,    setClientType]    = useState<ClientType>('PM');
   const [clientEmail,   setClientEmail]   = useState('');
   const [clients,       setClients]       = useState<ClientDraft[]>([]);
   const [clientNameErr, setClientNameErr] = useState(false);
@@ -241,7 +243,8 @@ export default function OnboardingPage() {
       if (cur === 'bank' && empty(iban)) errs.add('iban');
       if (cur === 'client') {
         // Re-check with the type chosen here: PM and PC need their IFU, PP and CC don't
-        const left = clientIssues({ ...targetClient, name: targetClient?.name ?? '', ifu: cliIfu, clientType: cliType });
+        const left = clientIssues({ ...targetClient, name: cliName, ifu: cliIfu, clientType: cliType });
+        if (left.some(i => i.key === 'client-name')) errs.add('cliName');
         if (left.some(i => i.key === 'client-ifu')) errs.add('cliIfu');
       }
       setFieldErr(errs);
@@ -283,6 +286,7 @@ export default function OnboardingPage() {
       setCurrency(org.currency || 'F CFA'); setTaxRegime(org.tax_regime ?? ''); setDivisionFiscale(org.division_fiscale ?? '');
       setIban(payments?.methodBankIban ?? '');
       if (targetClient) {
+        setCliName(targetClient.name);
         setCliCity(targetClient.city === '—' ? '' : targetClient.city);
         setCliIfu(targetClient.ifu ?? ''); setCliRccm(targetClient.rccm ?? '');
         setCliType(clientTypeOf(targetClient));
@@ -331,7 +335,7 @@ export default function OnboardingPage() {
       // Demo payment settings aren't stored: don't send the user back here this session
       if (MOCK) snoozeCompliance();
       if (steps.includes('client') && targetClient) {
-        const patch = { city: cliCity.trim() || '—', ifu: cliIfu.trim(), rccm: cliRccm.trim(), clientType: cliType };
+        const patch = { name: cliName.trim(), city: cliCity.trim() || '—', ifu: cliIfu.trim(), rccm: cliRccm.trim(), clientType: cliType };
         await updateClient(orgId, targetClient.code, patch);
         setOrgClients(prev => prev.map(c => c.code === targetClient.code ? { ...c, ...patch } : c));
       }
@@ -391,7 +395,7 @@ export default function OnboardingPage() {
   /* ── clients ── */
   function addClient() {
     if (!clientName.trim()) { setClientNameErr(true); return; }
-    setClients(prev => [...prev, { name: clientName.trim(), email: clientEmail.trim(), av: AV[prev.length % AV.length] }]);
+    setClients(prev => [...prev, { name: clientName.trim(), email: clientEmail.trim(), av: AV[prev.length % AV.length], type: clientType }]);
     setClientName(''); setClientEmail('');
     setClientNameErr(false);
   }
@@ -404,9 +408,9 @@ export default function OnboardingPage() {
     if (clients.some(c => c.name === 'Sahel Banque')) return;
     setClients(prev => [
       ...prev,
-      { name: 'Sahel Banque',    email: 'finance@sahel.bf',        av: AV[prev.length     % AV.length] },
-      { name: 'Faso Textiles',   email: 'compta@fasotextiles.bf',  av: AV[(prev.length+1) % AV.length] },
-      { name: 'Ouaga Catering',  email: '',                         av: AV[(prev.length+2) % AV.length] },
+      { name: 'Sahel Banque',    email: 'finance@sahel.bf',        av: AV[prev.length     % AV.length], type: 'PM' },
+      { name: 'Faso Textiles',   email: 'compta@fasotextiles.bf',  av: AV[(prev.length+1) % AV.length], type: 'PM' },
+      { name: 'Ouaga Catering',  email: '',                         av: AV[(prev.length+2) % AV.length], type: 'PM' },
     ]);
   }
 
@@ -501,7 +505,7 @@ export default function OnboardingPage() {
             phone:      '—',
             city:       '—',
             ifu:        '',
-            client_type: 'PP',
+            client_type: c.type,
             status:     'active',
           }))
         );
@@ -776,9 +780,13 @@ export default function OnboardingPage() {
                 <div className="ob-eyebrow">
                   <span className="pellet"><Ico name="users" /></span> Client
                 </div>
-                <h2 className="ob-step-title">Complétez la fiche de {targetClient?.name ?? 'votre client'}</h2>
+                <h2 className="ob-step-title">Complétez la fiche de {targetClient?.name.trim() || 'votre client'}</h2>
                 <p className="ob-step-sub">La facture indique le type du client. L'IFU est obligatoire pour une entreprise ou un commerçant, facultatif pour un particulier.</p>
                 <div className="ob-step-form">
+                  <div className="ob-field">
+                    <label className="ob-field-label" htmlFor="ob-cli-name">Nom ou raison sociale</label>
+                    <input id="ob-cli-name" className={`ob-input${errCls('cliName')}`} type="text" value={cliName} onChange={e => setCliName(e.target.value)} />
+                  </div>
                   <div className="ob-field">
                     <label className="ob-field-label" htmlFor="ob-cli-type">Type de client</label>
                     <select id="ob-cli-type" className="ob-input" value={cliType} onChange={e => setCliType(e.target.value as ClientType)}>
@@ -899,6 +907,12 @@ export default function OnboardingPage() {
                       />
                     </div>
                   </div>
+                  <div className="ob-field" style={{ marginBottom: 10 }}>
+                    <label className="ob-field-label" htmlFor="ob-new-cli-type">Type de client</label>
+                    <select id="ob-new-cli-type" className="ob-input" value={clientType} onChange={e => setClientType(e.target.value as ClientType)}>
+                      {CLIENT_TYPES.filter(t => t.code !== 'CC').map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
+                    </select>
+                  </div>
                   <button className="ob-btn-sm" type="button" onClick={addClient}>
                     <Ico name="plus" /> Ajouter le client
                   </button>
@@ -921,7 +935,7 @@ export default function OnboardingPage() {
                           <div className={`ob-entry-av ${c.av}`}>{initials(c.name)}</div>
                           <div className="ob-entry-main">
                             <div className="ob-entry-name">{c.name}</div>
-                            <div className="ob-entry-sub">{c.email || 'Pas d\'e-mail'}</div>
+                            <div className="ob-entry-sub">{clientTypeDef(c.type).label} · {c.email || 'Pas d\'e-mail'}</div>
                           </div>
                           <button className="ob-entry-del" onClick={() => removeClient(i)}>
                             <Ico name="trash" />

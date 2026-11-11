@@ -18,7 +18,11 @@ describe('issuedThisMonth', () => {
     expect(issuedThisMonth([inv('pending', '2026-10-05T09:00:00Z', '2026-11-20')], now)).toBe(0);
   });
 
-  it('falls back to the invoice date for invoices issued in this session', () => {
+  it('still counts an issued invoice that went back to draft', () => {
+    expect(issuedThisMonth([inv('draft', '2026-11-05T09:00:00Z')], now)).toBe(1);
+  });
+
+  it('falls back to the invoice date for invoices without a database timestamp', () => {
     expect(issuedThisMonth([inv('pending', undefined, '2026-11-15')], now)).toBe(1);
   });
 });

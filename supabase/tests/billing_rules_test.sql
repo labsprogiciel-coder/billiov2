@@ -78,6 +78,22 @@ begin
   -- status changes of already-issued invoices still work (paid, overdue)
   update invoices set status = 'paid' where org_id = solo and id = 'S-1';
   update invoices set status = 'overdue' where org_id = solo and id = 'S-2';
+  -- an issued invoice returned to draft still counts
+  update invoices set status = 'draft' where org_id = solo and id = 'S-3';
+  update invoices set status = 'pending' where org_id = solo and id = 'S-3';
+  -- deleting an issued invoice doesn't free its slot
+  delete from invoices where org_id = solo and id = 'S-2';
+  begin
+    insert into invoices (id, org_id, status) values ('S-8', solo, 'pending');
+    failures := failures + 1; raise warning 'deleting an issued invoice freed a slot';
+  exception when raise_exception then null; end;
+  -- an issued invoice can't move to another organisation
+  begin
+    update invoices set org_id = biz where org_id = solo and id = 'S-1';
+    failures := failures + 1; raise warning 'issued invoice moved to another organisation';
+  exception when insufficient_privilege then null; end;
+  -- a draft can still be moved
+  update invoices set org_id = biz where org_id = solo and id = 'D-8';
 
   -- 3. Paid plans are unlimited
   for i in 1..12 loop

@@ -205,7 +205,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     try {
       id = await nextInvoiceId(orgId);
       const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status, discountPct: fDiscount };
-      await createInvoice(orgId, newInv);
+      const saved = await createInvoice(orgId, newInv);
       invoiceCreated = true;
       // Don't leave an invoice without lines behind if saving them fails
       try {
@@ -220,7 +220,9 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       if (status === 'pending') posthog.capture('invoice_sent', { invoice_id: id, delivery_method: fPay });
       if (isFirstInvoice) posthog.capture('first_invoice_created');
 
-      setInvoices(prev => [newInv, ...prev]);
+      // Keep the database's issue time, which the Solo limit counts (now, when it isn't returned)
+      const firstIssuedAt = status === 'pending' ? (saved.firstIssuedAt ?? new Date().toISOString()) : undefined;
+      setInvoices(prev => [{ ...newInv, firstIssuedAt }, ...prev]);
 
       const actPayload = status === 'pending'
         ? { kind: 'sent'   as const, parts: [{ text: 'Facture ' }, { text: `#${id}`, bold: true as const }, { text: ' émise pour ' }, { text: cName, bold: true as const }] }
@@ -441,7 +443,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <InvoiceClientSelect value={fClient} onChange={setFClient} />
+            <InvoiceClientSelect value={fClient} onChange={setFClient} open={panelOpen} />
           </div>
 
           <div className="form-row">

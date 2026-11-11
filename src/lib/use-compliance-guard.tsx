@@ -61,7 +61,7 @@ export interface GuardOptions {
  */
 export function useComplianceGuard() {
   const navigate = useNavigate();
-  const { orgId, orgSettings, clients, invoices, plan, showToast } = useApp();
+  const { orgId, orgSettings, clients, invoices, plan, refreshPlan, showToast } = useApp();
   const { managesOrg } = usePermissions();
   const [checking, setChecking] = useState(false);
   const [limitHit, setLimitHit] = useState(false);
@@ -69,12 +69,13 @@ export function useComplianceGuard() {
 
   const guard = useCallback(async (clientCode: string, action: () => void, opts: GuardOptions) => {
     if (checkingRef.current) return;
-    // Solo plan: the monthly limit comes first (the database refuses the invoice anyway)
-    if (invoiceLimitReached(plan, invoices)) { setLimitHit(true); return; }
-    if (complianceSnoozed()) { action(); return; }
     checkingRef.current = true;
     setChecking(true);
     try {
+      // Solo plan: the monthly limit comes first (the database refuses the invoice anyway).
+      // Re-read the plan before blocking: the organisation may have been upgraded meanwhile.
+      if (invoiceLimitReached(plan, invoices) && invoiceLimitReached(await refreshPlan(), invoices)) { setLimitHit(true); return; }
+      if (complianceSnoozed()) { action(); return; }
       const { seller, payments } = await loadSeller(orgId, orgSettings);
       const sellerMissing = sellerIssues(seller, payments).length > 0;
       // The client type says whether an IFU is required (PM, PC) or not (PP, CC)
@@ -94,7 +95,7 @@ export function useComplianceGuard() {
       checkingRef.current = false;
       setChecking(false);
     }
-  }, [orgId, orgSettings, clients, invoices, plan, managesOrg, navigate, showToast]);
+  }, [orgId, orgSettings, clients, invoices, plan, refreshPlan, managesOrg, navigate, showToast]);
 
   const closeLimit = useCallback(() => setLimitHit(false), []);
   /** Shows the upgrade offer, e.g. when the database refused an invoice for the Solo limit. */

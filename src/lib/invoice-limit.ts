@@ -1,6 +1,7 @@
 // The free Solo plan's monthly invoice limit, as the database counts it
 // (supabase/migrations/20261111_solo_limit_and_plan_protection.sql): an
-// invoice counts in the UTC month it was first issued; drafts don't count.
+// invoice counts in the UTC month it was first issued, even if it went back to
+// draft since; drafts that were never issued don't count.
 
 import { SOLO_INVOICE_LIMIT, type PlanId } from '@/lib/plans';
 import type { Invoice } from '@/lib/schemas';
@@ -9,9 +10,10 @@ import type { Invoice } from '@/lib/schemas';
 export function issuedThisMonth(invoices: Pick<Invoice, 'status' | 'issued' | 'firstIssuedAt'>[], now = new Date()): number {
   const month = now.toISOString().slice(0, 7);
   return invoices.filter(inv =>
-    inv.status !== 'draft'
-    // Invoices issued in this session have no database timestamp yet: use their date
-    && (inv.firstIssuedAt ? new Date(inv.firstIssuedAt).toISOString() : inv.issued).startsWith(month),
+    inv.firstIssuedAt
+      ? new Date(inv.firstIssuedAt).toISOString().startsWith(month)
+      // No database timestamp (e.g. demo data): an issued invoice counts by its date
+      : inv.status !== 'draft' && inv.issued.startsWith(month),
   ).length;
 }
 

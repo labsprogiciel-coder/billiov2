@@ -85,7 +85,7 @@ export const PLANS: PlanDef[] = [
       'Brouillons illimités',
       'Clients & produits',
       'Suivi TVA de base',
-      'Comptabilité SYSCOHADA',
+      'Factures aux mentions DGI',
     ],
   },
   {

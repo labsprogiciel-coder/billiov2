@@ -1,3 +1,4 @@
+import posthog from 'posthog-js';
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CERTIFIED_OFFER, PLANS, formatPrice, planPrice, type BillingPeriod, type PlanDef } from '@/lib/plans';
@@ -500,7 +501,7 @@ function PricingSection() {
           <ul className="lp-certified-points">
             {CERTIFIED_OFFER.points.map(pt => <li key={pt}><i className="ti ti-circle-check-filled" />{pt}</li>)}
           </ul>
-          <Link to="/login" className="lp-btn lp-btn--ghost">{CERTIFIED_OFFER.ctaLabel}</Link>
+          <Link to="/login" className="lp-btn lp-btn--ghost" onClick={() => posthog.capture('certified_invoicing_interest', { source: 'landing_page' })}>{CERTIFIED_OFFER.ctaLabel}</Link>
         </div>
         <p className="lp-price-foot">
           Tous les plans incluent clients illimités, sécurité bancaire et export libre de vos données.
