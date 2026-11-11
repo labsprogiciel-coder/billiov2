@@ -121,6 +121,7 @@ function ClientBlock() {
     <>
       <div className="tp-block-label">Facturé à</div>
       <div className="tp-client-name">{CLI.name}</div>
+      <div className="tp-client-meta">[PM] Personne morale</div>
       <div className="tp-client-meta">{CLI.city}</div>
       <ClientIds />
     </>

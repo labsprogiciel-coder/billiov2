@@ -76,6 +76,8 @@ interface AppContextValue {
   planRenewsAt:  string | null;
   trialEndsAt:   string | null;
   hasFeature:    (feature: Feature) => boolean;
+  /** Re-reads the plan (Billio changes it in Supabase while the app is open). */
+  refreshPlan:   () => Promise<PlanId>;
   // UI
   loading:   boolean;
   showToast: (msg: string, isError?: boolean) => void;
@@ -121,7 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Derived client lookup
   const clientsMap = useMemo<Record<string, Client>>(
-    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, country: c.country, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario }])),
+    () => Object.fromEntries(clients.map(c => [c.code, { name: c.name, city: c.city, av: c.av, country: c.country, contact: c.contact !== '—' ? c.contact : undefined, email: c.email !== '—' ? c.email : undefined, phone: c.phone !== '—' ? c.phone : undefined, ifu: c.ifu, rccm: c.rccm, taxRegime: c.taxRegime, fiscalDivision: c.fiscalDivision, withholdingScenario: c.withholdingScenario, clientType: c.clientType }])),
     [clients],
   );
 
@@ -371,6 +373,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const hasFeature = useCallback((feature: Feature) => checkFeature(plan, feature), [plan]);
 
+  const refreshPlan = useCallback(async (): Promise<PlanId> => {
+    if (MOCK || !orgId) return plan;
+    const { data, error } = await supabase.from('organizations').select('plan, plan_status').eq('id', orgId).single();
+    if (error || !data) return plan;
+    const validPlans: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
+    const next: PlanId = validPlans.includes(data.plan as PlanId) ? (data.plan as PlanId) : 'solo';
+    setPlan(next);
+    const validStatuses: PlanStatus[] = ['free', 'trialing', 'active', 'canceled', 'past_due'];
+    if (validStatuses.includes(data.plan_status as PlanStatus)) setPlanStatus(data.plan_status as PlanStatus);
+    return next;
+  }, [orgId, plan]);
+
   return (
     <AppContext.Provider value={{
       invoices: invoicesView, setInvoices,
@@ -387,7 +401,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userLabel, userInitials, userRole,
       needsOnboarding, completeOnboarding,
       openingBalancesAdopted, setOpeningBalancesAdopted,
-      plan, planStatus, planRenewsAt, trialEndsAt, hasFeature,
+      plan, planStatus, planRenewsAt, trialEndsAt, hasFeature, refreshPlan,
       loading,
       showToast,
     }}>

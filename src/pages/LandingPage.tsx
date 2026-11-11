@@ -1,6 +1,8 @@
+import posthog from 'posthog-js';
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { PLANS, formatPrice, type PlanDef } from '@/lib/plans';
+import { CERTIFIED_OFFER, PLANS, formatPrice, planPrice, type BillingPeriod, type PlanDef } from '@/lib/plans';
+import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
 import BillioMark from '@/components/BillioMark';
 import './LandingPage.css';
 
@@ -430,8 +432,9 @@ function Testimonial() {
 }
 
 /* ── Pricing ─────────────────────────────────────────────── */
-function PricingCard({ plan }: { plan: PlanDef }) {
+function PricingCard({ plan, period }: { plan: PlanDef; period: BillingPeriod }) {
   const isQuote = plan.price === null;
+  const price = planPrice(plan, period);
   return (
     <div className={`lp-plan${plan.popular ? ' lp-plan--pop' : ''}`}>
       {plan.popular && <div className="lp-plan-badge">Le plus populaire</div>}
@@ -446,8 +449,8 @@ function PricingCard({ plan }: { plan: PlanDef }) {
         ) : (
           <>
             <span className="lp-cur">XOF</span>
-            <span className="lp-amt">{plan.price === 0 ? '0' : formatPrice(plan.price!)}</span>
-            <span className="lp-per">/ mois</span>
+            <span className="lp-amt">{price.amount === 0 ? '0' : formatPrice(price.amount!)}</span>
+            <span className="lp-per">{price.per}</span>
           </>
         )}
       </div>
@@ -459,7 +462,7 @@ function PricingCard({ plan }: { plan: PlanDef }) {
       </Link>
       <ul className="lp-plan-feats">
         {plan.perks.map(perk => (
-          <li key={perk}>
+          <li key={perk} title={perk}>
             <i className="ti ti-circle-check-filled" />
             <span>{perk}</span>
           </li>
@@ -470,6 +473,7 @@ function PricingCard({ plan }: { plan: PlanDef }) {
 }
 
 function PricingSection() {
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
   return (
     <section className="lp-section lp-section--alt" id="pricing">
       <div className="lp-wrap">
@@ -478,8 +482,26 @@ function PricingSection() {
           <h2>Des prix clairs, une valeur réelle.</h2>
           <p>Pour les entrepreneurs, PME et cabinets comptables en zone UEMOA.</p>
         </div>
+        <BillingPeriodSwitch value={period} onChange={setPeriod} className="lp-period" />
         <div className="lp-price-grid">
-          {PLANS.map(p => <PricingCard key={p.id} plan={p} />)}
+          {PLANS.map(p => <PricingCard key={p.id} plan={p} period={period} />)}
+        </div>
+        {/* Certified e-invoicing (PRO-137): announced, not sold yet */}
+        <div className="lp-certified">
+          <div className="lp-certified-main">
+            <div className="lp-certified-head">
+              <i className="ti ti-shield-check" />
+              <span className="lp-certified-name">{CERTIFIED_OFFER.name}</span>
+              <span className="lp-certified-badge">{CERTIFIED_OFFER.badge}</span>
+            </div>
+            <div className="lp-certified-price">
+              À partir de <strong>{formatPrice(CERTIFIED_OFFER.annualPrice)} XOF</strong> / an
+            </div>
+          </div>
+          <ul className="lp-certified-points">
+            {CERTIFIED_OFFER.points.map(pt => <li key={pt}><i className="ti ti-circle-check-filled" />{pt}</li>)}
+          </ul>
+          <Link to="/login" className="lp-btn lp-btn--ghost" onClick={() => posthog.capture('certified_invoicing_interest', { source: 'landing_page' })}>{CERTIFIED_OFFER.ctaLabel}</Link>
         </div>
         <p className="lp-price-foot">
           Tous les plans incluent clients illimités, sécurité bancaire et export libre de vos données.
@@ -492,10 +514,10 @@ function PricingSection() {
 /* ── FAQ ─────────────────────────────────────────────────── */
 const FAQ_ITEMS = [
   { q: 'Faut-il des connaissances en comptabilité ?', a: 'Non. Vous facturez et enregistrez vos paiements comme dans n\'importe quelle application moderne. Billio tient la comptabilité SYSCOHADA en partie double en coulisses — tout est déjà dans les bons journaux, prêt pour la DGI.' },
-  { q: 'Billio est-il conforme à la DGI et au SYSCOHADA ?', a: 'Oui. Billio s\'appuie sur le plan comptable et les journaux SYSCOHADA révisé, suit la TVA à 18 % et génère le bilan et le compte de résultat attendus par l\'administration, dans les 8 pays OHADA couverts.' },
+  { q: 'Billio est-il conforme à la DGI et au SYSCOHADA ?', a: 'Oui. Vos factures portent les mentions obligatoires de la facture normalisée (IFU, RCCM, régime fiscal, TVA…). Billio s\'appuie sur le plan comptable et les journaux SYSCOHADA révisé, suit la TVA à 18 % et génère le bilan et le compte de résultat attendus par l\'administration, dans les 8 pays OHADA couverts. La facture électronique certifiée (SECeF) arrive bientôt, à partir de 450 000 XOF par an.' },
   { q: 'Et si je viens d\'une autre plateforme ?', a: 'Reprenez vos soldes de clôture en une seule écriture d\'à-nouveaux datée du début de l\'exercice : Billio l\'adopte comme position d\'ouverture, et votre balance démarre de là.' },
   { q: 'Quels moyens de paiement pour mes clients ?', a: 'Mobile Money (MTN, Orange, Wave), virement bancaire et paiement à la livraison. Les paiements Mobile Money et bancaires sont rapprochés automatiquement de la facture correspondante.' },
-  { q: "Que se passe-t-il après l'offre gratuite ou l'essai ?", a: "Rien ne se bloque. L'offre Solo reste gratuite jusqu'à 10 factures par mois. Si vous grandissez, passez à Business quand vous voulez — et exportez vos données à tout moment." },
+  { q: "Que se passe-t-il après l'offre gratuite ou l'essai ?", a: "L'offre Solo reste gratuite jusqu'à 5 factures émises par mois ; les brouillons sont illimités. Au-delà, passez à Business quand vous voulez — et exportez vos données à tout moment." },
 ];
 
 function FAQSection() {

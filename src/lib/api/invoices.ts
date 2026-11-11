@@ -14,6 +14,7 @@ export function dbToInvoice(row: Record<string, unknown>): Invoice {
     amount:      Number(row.amount),
     status:      row.status as Invoice['status'],
     discountPct: Number(row.discount_pct ?? 0),
+    firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined,
   };
 }
 
@@ -64,8 +65,9 @@ export async function createInvoice(
   return dbToInvoice(data as Record<string, unknown>);
 }
 
-export async function updateInvoice(orgId: string, id: string, patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>>): Promise<void> {
-  if (MOCK) return;
+/** Returns the invoice's first issue time as the database stamped it (for the Solo limit). */
+export async function updateInvoice(orgId: string, id: string, patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>>): Promise<{ firstIssuedAt?: string }> {
+  if (MOCK) return {};
   const dbPatch: Record<string, unknown> = {};
   if (patch.status      !== undefined) dbPatch.status       = patch.status;
   if (patch.subject     !== undefined) dbPatch.subject      = patch.subject;
@@ -74,8 +76,13 @@ export async function updateInvoice(orgId: string, id: string, patch: Partial<Pi
   if (patch.due         !== undefined) dbPatch.due_at       = patch.due;
   if (patch.amount      !== undefined) dbPatch.amount       = patch.amount;
   if (patch.discountPct !== undefined) dbPatch.discount_pct = patch.discountPct;
-  const { error } = await supabase.from('invoices').update(dbPatch).eq('org_id', orgId).eq('id', id);
+  const { data, error } = await supabase.from('invoices').update(dbPatch).eq('org_id', orgId).eq('id', id)
+    .select('first_issued_at').maybeSingle();
   if (error) throw error;
+  // No row: the invoice was deleted meanwhile, or this user can't change it
+  if (!data) throw new Error(`invoice ${id} not found or not writable`);
+  const stamped = (data as { first_issued_at?: string | null }).first_issued_at;
+  return { firstIssuedAt: stamped ? String(stamped) : undefined };
 }
 
 export async function removeInvoice(orgId: string, id: string): Promise<void> {

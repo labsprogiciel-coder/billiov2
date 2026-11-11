@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import { useNavigate } from 'react-router-dom';
+import InvoiceClientSelect from '@/components/InvoiceClientSelect';
 import Icon from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
 import { tabPanelId, tabId } from '@/lib/tab-ids';
@@ -24,6 +25,7 @@ import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -119,6 +121,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   const closePanel = () => { setPanelOpen(false); setShowPicker(false); };
   // Scrim, ✕ and Annuler ask first when something was typed
   const requestClosePanel = () => {
+    // The issue checks and the save use this form: wait for them rather than discard it midway
+    if (submitting || compliance.checking) return;
     const dirty = fClient !== '' || fSubject.trim() !== '' || fNotes.trim() !== '' || fDiscount !== 0 || filledLines(lineItems).length > 0
       || fDate !== panelDefaults.current.date || fDue !== panelDefaults.current.due;
     if (confirmDiscard(dirty)) closePanel();
@@ -203,7 +207,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     try {
       id = await nextInvoiceId(orgId);
       const newInv = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status, discountPct: fDiscount };
-      await createInvoice(orgId, newInv);
+      const saved = await createInvoice(orgId, newInv);
       invoiceCreated = true;
       // Don't leave an invoice without lines behind if saving them fails
       try {
@@ -218,7 +222,9 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       if (status === 'pending') posthog.capture('invoice_sent', { invoice_id: id, delivery_method: fPay });
       if (isFirstInvoice) posthog.capture('first_invoice_created');
 
-      setInvoices(prev => [newInv, ...prev]);
+      // Keep the database's issue time, which the Solo limit counts (now, when it isn't returned)
+      const firstIssuedAt = status === 'pending' ? (saved.firstIssuedAt ?? new Date().toISOString()) : undefined;
+      setInvoices(prev => [{ ...newInv, firstIssuedAt }, ...prev]);
 
       const actPayload = status === 'pending'
         ? { kind: 'sent'   as const, parts: [{ text: 'Facture ' }, { text: `#${id}`, bold: true as const }, { text: ' émise pour ' }, { text: cName, bold: true as const }] }
@@ -245,6 +251,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
       return id;
     } catch (err) {
       console.error('[submitInvoice] error:', err);
+      // Solo limit reached (the database refused the invoice): offer the upgrade
+      if (!invoiceCreated && isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast(invoiceCreated
         ? `La facture #${id} a été créée, mais une erreur est survenue ensuite. Vérifiez-la avant de réessayer.`
         : 'Une erreur est survenue. La facture n\'a pas été enregistrée — veuillez réessayer.', true);
@@ -437,12 +445,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <select className="form-input" value={fClient} onChange={e => setFClient(e.target.value)}>
-              <option value="">Sélectionner un client…</option>
-              {Object.entries(clientsMap).map(([code, c]) => (
-                <option key={code} value={code}>{c.name}</option>
-              ))}
-            </select>
+            {/* Locked while issuing: the checks run with the client chosen when it started */}
+            <InvoiceClientSelect value={fClient} onChange={setFClient} open={panelOpen} disabled={submitting || compliance.checking} />
           </div>
 
           <div className="form-row">
@@ -568,7 +572,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
         </div>
 
         <div className="panel-footer">
-          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting} onClick={() => submitInvoice('draft')}>
+          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting || compliance.checking} onClick={() => submitInvoice('draft')}>
             {submitting ? 'Enregistrement…' : 'Enregistrer brouillon'}
           </button>
           <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={submitting || compliance.checking} onClick={issueInvoice}>
@@ -576,6 +580,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           </button>
         </div>
       </div>
+      {compliance.dialog}
     </>
   );
 }

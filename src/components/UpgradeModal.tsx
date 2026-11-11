@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
-import { PLANS, formatPrice, minPlanForFeature, type Feature, type PlanId } from '@/lib/plans';
+import { CERTIFIED_OFFER, PLANS, formatPrice, minPlanForFeature, planPrice, type BillingPeriod, type Feature, type PlanId } from '@/lib/plans';
+import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
 import { useApp } from '@/context/AppContext';
 
 // Re-export so consumers don't have to import plans separately
@@ -17,6 +18,7 @@ const PLAN_ORDER_ARR: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
 export default function UpgradeModal({ feature, onClose }: Props) {
   const { plan: currentPlan } = useApp();
   const requiredPlan = minPlanForFeature(feature);
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -37,8 +39,11 @@ export default function UpgradeModal({ feature, onClose }: Props) {
           </button>
         </div>
 
+        <BillingPeriodSwitch value={period} onChange={setPeriod} className="upg-period" />
+
         <div className="upg-plans">
           {PLANS.map((p, i) => {
+            const price = planPrice(p, period);
             const isCurrent  = p.id === currentPlan;
             const isRequired = p.id === requiredPlan;
             const isDisabled = i < PLAN_ORDER_ARR.indexOf(currentPlan);
@@ -70,26 +75,20 @@ export default function UpgradeModal({ feature, onClose }: Props) {
                       <span className="upg-price-amount">Sur devis</span>
                       <span className="upg-price-note">Contrat annuel</span>
                     </>
-                  ) : p.price === 0 ? (
-                    <>
-                      <span className="upg-price-currency">{p.currency}</span>
-                      <span className="upg-price-amount">0</span>
-                      <span className="upg-price-note">/ mois</span>
-                    </>
                   ) : (
                     <>
                       <span className="upg-price-currency">{p.currency}</span>
-                      <span className="upg-price-amount">{formatPrice(p.price)}</span>
-                      <span className="upg-price-note">/ mois</span>
+                      <span className="upg-price-amount">{price.amount === 0 ? '0' : formatPrice(price.amount!)}</span>
+                      <span className="upg-price-note">{price.per}</span>
                     </>
                   )}
                 </div>
 
                 <ul className="upg-perk-list">
                   {p.perks.map(perk => (
-                    <li key={perk} className="upg-perk">
+                    <li key={perk} className="upg-perk" title={perk}>
                       <Icon name="check" size={13} className="upg-perk-icon" />
-                      {perk}
+                      <span className="upg-perk-text">{perk}</span>
                     </li>
                   ))}
                 </ul>
@@ -108,6 +107,32 @@ export default function UpgradeModal({ feature, onClose }: Props) {
               </div>
             );
           })}
+        </div>
+
+        {/* Certified e-invoicing (PRO-137): announced, not sold yet */}
+        <div className="upg-certified">
+          <div className="upg-certified-head">
+            <Icon name="shield-check" size={16} className="upg-certified-icon" />
+            <span className="upg-certified-name">{CERTIFIED_OFFER.name}</span>
+            <span className="upg-certified-badge">{CERTIFIED_OFFER.badge}</span>
+          </div>
+          <div className="upg-certified-price">
+            À partir de <strong>{formatPrice(CERTIFIED_OFFER.annualPrice)} {CERTIFIED_OFFER.currency}</strong> / an
+          </div>
+          <ul className="upg-certified-points">
+            {CERTIFIED_OFFER.points.map(pt => (
+              <li key={pt}><Icon name="check" size={12} className="upg-perk-icon" />{pt}</li>
+            ))}
+          </ul>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              posthog.capture('certified_invoicing_interest', { current_plan: currentPlan, feature, source: 'upgrade_modal' });
+              onClose();
+            }}
+          >
+            {CERTIFIED_OFFER.ctaLabel}
+          </button>
         </div>
       </div>
     </div>

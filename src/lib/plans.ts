@@ -1,7 +1,8 @@
 export type PlanId     = 'solo' | 'business' | 'cabinet' | 'enterprise';
 export type PlanStatus = 'free' | 'trialing' | 'active' | 'canceled' | 'past_due';
 
-export const SOLO_INVOICE_LIMIT = 10;
+/** Issued invoices per calendar month on the free Solo plan (drafts don't count). Enforced in the database: supabase/migrations/20261111_solo_limit_and_plan_protection.sql */
+export const SOLO_INVOICE_LIMIT = 5;
 
 export const PLAN_ORDER: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
 
@@ -14,7 +15,7 @@ export const PLAN_ORDER: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'
 // Enterprise: ERP integrations, unlimited team members.
 
 export type Feature =
-  | 'invoices_unlimited'    // Business+ (Solo capped at 10/month)
+  | 'invoices_unlimited'    // Business+ (Solo capped at 5 issued invoices/month)
   | 'quotes'                // Business+
   | 'ai_reminders'          // Business+ (moved from Solo in new pricing)
   | 'payments_mobilemoney'  // Business+
@@ -61,9 +62,12 @@ export interface PlanDef {
   name:     string;
   tagline:  string;
   price:    number | null; // null = on-quote
+  /** Price when paid yearly (the pricing switcher's "Annuel" view) */
+  annualPrice?: number;
   currency: string;
   ctaLabel: string;
   popular:  boolean;
+  /** One line each on the pricing cards: keep them short (≈ 24 characters) */
   perks:    string[];
 }
 
@@ -77,11 +81,11 @@ export const PLANS: PlanDef[] = [
     ctaLabel: 'Commencer gratuitement',
     popular:  false,
     perks: [
-      "Jusqu'à 10 factures / mois",
+      '5 factures émises / mois',
+      'Brouillons illimités',
       'Clients & produits',
-      'Suivi TVA de base (non certifié)',
-      'Comptabilité conforme DGI',
-      'États financiers & contrôle fiscal',
+      'Suivi TVA de base',
+      'Factures aux mentions DGI',
     ],
   },
   {
@@ -89,17 +93,18 @@ export const PLANS: PlanDef[] = [
     name:     'Business',
     tagline:  'Zéro stress à la clôture, serein face à la DGI.',
     price:    25_000,
+    annualPrice: 300_000,
     currency: 'XOF',
     ctaLabel: 'Essai 14 jours gratuit',
     popular:  true,
     perks: [
-      'Conforme SYSCOHADA ',
+      'Factures illimitées',
+      'Devis illimités',
+      'Conforme SYSCOHADA',
       'États financiers',
       'Déclarations TVA',
-      'Factures & devis illimités',
-      "Jusqu'à 3 membres d'équipe",
-      "Relance WhatsApp",
-      "Relance par email"
+      "3 membres d'équipe",
+      'Relances WhatsApp & email',
     ],
   },
   {
@@ -107,6 +112,7 @@ export const PLANS: PlanDef[] = [
     name:     'Cabinet',
     tagline:  'Pour les cabinets, serein sur tous vos dossiers clients.',
     price:    45_000,
+    annualPrice: 540_000,
     currency: 'XOF',
     ctaLabel: 'Contacter les ventes',
     popular:  false,
@@ -116,7 +122,7 @@ export const PLANS: PlanDef[] = [
       'Clôture de période',
       'Immobilisations',
       'Rappels de paiement IA',
-      'Accès par rôles pour le staff',
+      'Accès par rôles',
       'Support prioritaire',
     ],
   },
@@ -131,13 +137,29 @@ export const PLANS: PlanDef[] = [
     perks: [
       'Tout le plan Cabinet',
       'Intégration Odoo',
-      'Integration Sage 100',
-      'SLA garanti & support dédié',
-      'Onboarding & Formation',
-      "Membres d'équipe illimités",
+      'Intégration Sage 100',
+      'SLA & support dédié',
+      'Onboarding & formation',
+      'Équipe illimitée',
     ],
   },
 ];
+
+/**
+ * Certified electronic invoicing (FEC / SECeF), not available yet (PRO-137).
+ * Annual only, nothing up front; re-certification is Billio's cost, not the
+ * customer's. Shown on the pricing pages as "coming soon".
+ */
+export const CERTIFIED_OFFER = {
+  name:        'Facture certifiée DGI',
+  badge:       'Bientôt',
+  annualPrice: 450_000,
+  currency:    'XOF',
+  points: [
+    'QR code et n° SECeF sur chaque facture',
+  ],
+  ctaLabel:    'Être prévenu',
+} as const;
 
 export const PLAN_LABELS: Record<PlanId, string> = {
   solo:       'Solo',
@@ -147,6 +169,19 @@ export const PLAN_LABELS: Record<PlanId, string> = {
 };
 
 const FMT = new Intl.NumberFormat('fr-FR');
+
+export type BillingPeriod = 'monthly' | 'annual';
+
+/**
+ * The price a plan card shows for the period chosen in the pricing switcher.
+ * null amount = on quote. A plan without a yearly price keeps its monthly one.
+ */
+export function planPrice(plan: Pick<PlanDef, 'price' | 'annualPrice'>, period: BillingPeriod): { amount: number | null; per: '/ mois' | '/ an' } {
+  if (plan.price === null) return { amount: null, per: '/ an' };
+  if (period === 'annual' && plan.price === 0) return { amount: 0, per: '/ an' };
+  if (period === 'annual' && plan.annualPrice !== undefined) return { amount: plan.annualPrice, per: '/ an' };
+  return { amount: plan.price, per: '/ mois' };
+}
 export function formatPrice(price: number): string {
   return FMT.format(price);
 }

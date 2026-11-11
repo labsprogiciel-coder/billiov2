@@ -1,10 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { fetchPaymentSettings, type PaymentSettings } from '@/lib/api/payment-settings';
 import { clientIssues, sellerIssues, type SellerInfo } from '@/lib/invoice-compliance';
 import { usePermissions } from '@/lib/use-permissions';
+import { invoiceLimitReached } from '@/lib/invoice-limit';
+import UpgradeModal from '@/components/UpgradeModal';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -47,7 +49,8 @@ export interface GuardOptions {
 }
 
 /**
- * Checks the mandatory invoice mentions before an invoice is issued. When
+ * Checks the plan's invoice limit, then the mandatory invoice mentions, before
+ * an invoice is issued. At the Solo limit it shows the upgrade offer. When
  * nothing is missing, `guard` runs the action. Otherwise it opens the
  * onboarding wizard on the missing details (/onboarding?complete=1), which
  * saves them and brings the user back to issue the invoice.
@@ -58,23 +61,25 @@ export interface GuardOptions {
  */
 export function useComplianceGuard() {
   const navigate = useNavigate();
-  const { orgId, orgSettings, clients, showToast } = useApp();
+  const { orgId, orgSettings, clients, invoices, plan, refreshPlan, showToast } = useApp();
   const { managesOrg } = usePermissions();
   const [checking, setChecking] = useState(false);
+  const [limitHit, setLimitHit] = useState(false);
   const checkingRef = useRef(false);
 
   const guard = useCallback(async (clientCode: string, action: () => void, opts: GuardOptions) => {
     if (checkingRef.current) return;
-    if (complianceSnoozed()) { action(); return; }
     checkingRef.current = true;
     setChecking(true);
     try {
+      // Solo plan: the monthly limit comes first (the database refuses the invoice anyway).
+      // Re-read the plan before blocking: the organisation may have been upgraded meanwhile.
+      if (invoiceLimitReached(plan, invoices) && invoiceLimitReached(await refreshPlan(), invoices)) { setLimitHit(true); return; }
+      if (complianceSnoozed()) { action(); return; }
       const { seller, payments } = await loadSeller(orgId, orgSettings);
       const sellerMissing = sellerIssues(seller, payments).length > 0;
-      // A missing client IFU alone doesn't open the wizard: private individuals
-      // have none, and Billio can't tell them apart from businesses yet. The
-      // wizard still asks for it when it opens for another reason.
-      const clientMissing = clientIssues(clients.find(c => c.code === clientCode)).some(i => i.key !== 'client-ifu');
+      // The client type says whether an IFU is required (PM, PC) or not (PP, CC)
+      const clientMissing = clientIssues(clients.find(c => c.code === clientCode)).length > 0;
       if (!sellerMissing && !clientMissing) { action(); return; }
       if (!clientMissing && !managesOrg) {
         showToast("Les informations de l'entreprise sont incomplètes (IFU, RCCM, coordonnées bancaires…). Demandez à un administrateur de les compléter.", true);
@@ -90,8 +95,16 @@ export function useComplianceGuard() {
       checkingRef.current = false;
       setChecking(false);
     }
-  }, [orgId, orgSettings, clients, managesOrg, navigate, showToast]);
+  }, [orgId, orgSettings, clients, invoices, plan, refreshPlan, managesOrg, navigate, showToast]);
 
-  /** `checking` is true while the settings are read: disable the issue button meanwhile. */
-  return { guard, checking };
+  const closeLimit = useCallback(() => setLimitHit(false), []);
+  /** Shows the upgrade offer, e.g. when the database refused an invoice for the Solo limit. */
+  const showLimit = useCallback(() => setLimitHit(true), []);
+  const dialog: ReactNode = limitHit ? <UpgradeModal feature="invoices_unlimited" onClose={closeLimit} /> : null;
+
+  /**
+   * `checking` is true while the settings are read: disable the issue button
+   * meanwhile. Render `dialog` (the upgrade offer when the Solo limit is hit).
+   */
+  return { guard, checking, dialog, showLimit };
 }

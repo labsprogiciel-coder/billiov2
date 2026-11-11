@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { INITIAL_CLIENTS } from '@/data';
 import type { ClientRecord } from '@/lib/schemas';
+import { clientTypeOf } from '@/lib/client-type';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -19,6 +20,7 @@ export function dbToClient(row: Record<string, unknown>): ClientRecord {
     taxRegime:           String(row.tax_regime ?? ''),
     fiscalDivision:      String(row.fiscal_division ?? ''),
     withholdingScenario: (row.withholding_scenario ?? undefined) as ClientRecord['withholdingScenario'],
+    clientType: clientTypeOf({ clientType: row.client_type as string | null, ifu: String(row.ifu ?? '') }),
     invoices: Number(row.invoices_count ?? 0),
     billed:   Number(row.billed ?? 0),
     balance:  Number(row.balance ?? 0),
@@ -69,6 +71,7 @@ export async function createClient(
       tax_regime:            payload.taxRegime ?? '',
       fiscal_division:       payload.fiscalDivision ?? '',
       withholding_scenario:  payload.withholdingScenario ?? null,
+      client_type:           clientTypeOf(payload),
       status:         payload.status,
       invoices_count: 0,
       billed:         0,
@@ -95,6 +98,7 @@ export async function updateClient(orgId: string, code: string, patch: Partial<C
   if (patch.taxRegime            !== undefined) dbPatch.tax_regime            = patch.taxRegime;
   if (patch.fiscalDivision       !== undefined) dbPatch.fiscal_division       = patch.fiscalDivision;
   if (patch.withholdingScenario  !== undefined) dbPatch.withholding_scenario  = patch.withholdingScenario ?? null;
+  if (patch.clientType           !== undefined) dbPatch.client_type           = patch.clientType;
   if (patch.status    !== undefined) dbPatch.status         = patch.status;
   if (Object.keys(dbPatch).length === 0) return;
   const { error } = await supabase.from('clients').update(dbPatch).eq('org_id', orgId).eq('code', code);

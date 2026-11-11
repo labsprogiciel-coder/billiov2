@@ -1,0 +1,32 @@
+// The free Solo plan's monthly invoice limit, as the database counts it
+// (supabase/migrations/20261111_solo_limit_and_plan_protection.sql): an
+// invoice counts in the UTC month it was first issued, even if it went back to
+// draft since; drafts that were never issued don't count.
+
+import { SOLO_INVOICE_LIMIT, type PlanId } from '@/lib/plans';
+import type { Invoice } from '@/lib/schemas';
+
+/** Invoices first issued in the current UTC month. */
+export function issuedThisMonth(invoices: Pick<Invoice, 'status' | 'issued' | 'firstIssuedAt'>[], now = new Date()): number {
+  const month = now.toISOString().slice(0, 7);
+  return invoices.filter(inv =>
+    inv.firstIssuedAt
+      ? new Date(inv.firstIssuedAt).toISOString().startsWith(month)
+      // No database timestamp (e.g. demo data): an issued invoice counts by its date
+      : inv.status !== 'draft' && inv.issued.startsWith(month),
+  ).length;
+}
+
+/** Whether issuing one more invoice would go over the plan's limit. */
+export function invoiceLimitReached(plan: PlanId, invoices: Parameters<typeof issuedThisMonth>[0], now = new Date()): boolean {
+  return plan === 'solo' && issuedThisMonth(invoices, now) >= SOLO_INVOICE_LIMIT;
+}
+
+/** The database refused an invoice because the Solo limit is reached. */
+export function isInvoiceLimitError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  // The trigger raises SQLSTATE BL001 (the message is checked too, for older deployments)
+  if ('code' in err && (err as { code: unknown }).code === 'BL001') return true;
+  const msg = 'message' in err ? String((err as { message: unknown }).message) : '';
+  return msg.includes('solo_invoice_limit');
+}

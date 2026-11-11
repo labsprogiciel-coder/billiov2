@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { canWrite, canDelete } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import InvoiceClientSelect from '@/components/InvoiceClientSelect';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
 import SendDocumentDialog, { type SendChannel } from '@/components/SendDocumentDialog';
@@ -19,6 +20,7 @@ import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId } from '@/lib/api/credit-notes';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
+import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
@@ -251,8 +253,9 @@ export default function InvoicePage() {
     if (linesProblem) { showToast(`${linesProblem} Modifiez la facture avant de l'émettre.`, true); return; }
     setBusyAction('issue');
     try {
-      await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total } : i));
+      const { firstIssuedAt } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
+      // Keep the database's first issue time, which the Solo limit counts (now in demo mode)
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString() } : i));
       try {
         await recordInvoiceIssuanceEntry(orgId, { invoiceId: invoice.id, htAmount: discountedSub, tvaAmount: tax, date: invoice.issued, clientName: client.name });
         showToast(`Facture #${invoice.id} émise`);
@@ -263,6 +266,7 @@ export default function InvoicePage() {
       setSendKind('send');
     } catch (err) {
       console.error('[handleIssue] failed:', err);
+      if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
       showToast('Impossible d\'émettre la facture. Veuillez réessayer.', true);
     } finally {
       setBusyAction(null);
@@ -890,12 +894,7 @@ export default function InvoicePage() {
         <div className="panel-body">
           <div className="form-group">
             <label className="form-label">Client</label>
-            <select className="form-input" value={eClient} onChange={e => setEClient(e.target.value)}>
-              <option value="">Sélectionner un client…</option>
-              {Object.entries(clientsMap).map(([code, c]) => (
-                <option key={code} value={code}>{c.name}</option>
-              ))}
-            </select>
+            <InvoiceClientSelect value={eClient} onChange={setEClient} open={editOpen} disabled={saving} />
           </div>
 
           <div className="form-row">
@@ -1068,6 +1067,7 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+      {compliance.dialog}
     </>
   );
 }

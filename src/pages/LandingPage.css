@@ -443,7 +443,27 @@
 .lp-plan .lp-btn { width: 100%; }
 
 .lp-plan-feats { display: flex; flex-direction: column; gap: 10px; }
-.lp-plan-feats li { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--lp-txt-2); line-height: 1.45; }
+.lp-plan-feats li { display: flex; gap: 9px; align-items: center; font-size: 13px; color: var(--lp-txt-2); line-height: 1.45; min-width: 0; }
+/* One line per included item; the full text stays in the title */
+.lp-plan-feats li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.lp-period { display: flex; width: max-content; margin: 0 auto 28px; }
+
+/* Certified e-invoicing teaser (PRO-137) */
+.lp-certified {
+  display: flex; align-items: center; gap: 14px 28px; flex-wrap: wrap;
+  padding: 20px 24px; margin-bottom: 24px;
+  border: 1px dashed var(--lp-border); border-radius: var(--lp-r-lg); background: var(--lp-bg);
+}
+.lp-certified-main { display: flex; flex-direction: column; gap: 4px; }
+.lp-certified-head { display: flex; align-items: center; gap: 8px; }
+.lp-certified-head i { font-size: 18px; color: var(--lp-brand); }
+.lp-certified-name { font-size: 16px; font-weight: 800; color: var(--lp-txt); white-space: nowrap; }
+.lp-certified-badge { font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: var(--lp-brand); color: #fff; }
+.lp-certified-price { font-size: 13px; color: var(--lp-txt-3); }
+.lp-certified-price strong { color: var(--lp-txt); }
+.lp-certified-points { display: flex; gap: 8px 18px; flex-wrap: wrap; flex: 1; min-width: 260px; }
+.lp-certified-points li { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--lp-txt-2); white-space: nowrap; }
+.lp-certified-points li i { color: var(--lp-brand); }
 .lp-plan-feats li i { font-size: 14px; color: var(--lp-brand); flex-shrink: 0; margin-top: 1px; }
 .lp-plan-feats li.lp-off { opacity: .45; }
 .lp-plan-feats li.lp-off i { color: var(--lp-txt-4); }
