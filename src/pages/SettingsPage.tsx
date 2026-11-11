@@ -7,7 +7,7 @@ import Icon from '@/components/Icon';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import {
-  PLANS, PLAN_LABELS, PLAN_ORDER, formatPrice,
+  PLANS, PLAN_LABELS, PLAN_ORDER, formatPrice, planPrice, type BillingPeriod,
   SOLO_INVOICE_LIMIT,
   type PlanStatus,
 } from '@/lib/plans';
@@ -18,6 +18,7 @@ import {
 import { getFiscalIdLabel } from '@/lib/ohada';
 import { sellerIssues, type SellerInfo } from '@/lib/invoice-compliance';
 import { issuedThisMonth } from '@/lib/invoice-limit';
+import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -1527,6 +1528,7 @@ function fmtDate(iso: string) {
 
 function PlanSection() {
   const { plan, planStatus, planRenewsAt, trialEndsAt, invoices } = useApp();
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
 
   // Counted like the database enforces it: issued (not draft) this UTC month
   const monthlyCount = issuedThisMonth(invoices);
@@ -1630,6 +1632,7 @@ function PlanSection() {
             <div className="s-card-desc">Débloquez plus de fonctionnalités pour votre entreprise.</div>
           </div>
           <div className="s-card-body" style={{ gap: 10 }}>
+            <BillingPeriodSwitch value={period} onChange={setPeriod} className="s-period" />
             {upgradePlans.map(p => (
               <div key={p.id} className={`s-upgrade-row${p.popular ? ' s-upgrade-row--popular' : ''}`}>
                 <div style={{ flex: 1 }}>
@@ -1650,12 +1653,11 @@ function PlanSection() {
                       ? <span className="s-upgrade-price-main">Sur devis</span>
                       : <>
                           <span className="s-upgrade-price-cur">{p.currency}</span>
-                          <span className="s-upgrade-price-main">{formatPrice(p.price)}</span>
-                          <span className="s-upgrade-price-period">/mois</span>
+                          <span className="s-upgrade-price-main">{formatPrice(planPrice(p, period).amount!)}</span>
+                          <span className="s-upgrade-price-period">{planPrice(p, period).per}</span>
                         </>
                     }
                   </div>
-                  {p.annualPrice && <div className="s-upgrade-price-period">ou {formatPrice(p.annualPrice)} {p.currency} / an</div>}
                   <button className={`btn btn-sm${p.popular ? ' btn-primary' : ''}`}>
                     {p.ctaLabel}
                   </button>

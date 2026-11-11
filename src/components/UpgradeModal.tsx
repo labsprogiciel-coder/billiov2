@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
-import { CERTIFIED_OFFER, PLANS, formatPrice, minPlanForFeature, type Feature, type PlanId } from '@/lib/plans';
+import { CERTIFIED_OFFER, PLANS, formatPrice, minPlanForFeature, planPrice, type BillingPeriod, type Feature, type PlanId } from '@/lib/plans';
+import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
 import { useApp } from '@/context/AppContext';
 
 // Re-export so consumers don't have to import plans separately
@@ -17,6 +18,7 @@ const PLAN_ORDER_ARR: PlanId[] = ['solo', 'business', 'cabinet', 'enterprise'];
 export default function UpgradeModal({ feature, onClose }: Props) {
   const { plan: currentPlan } = useApp();
   const requiredPlan = minPlanForFeature(feature);
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -37,8 +39,11 @@ export default function UpgradeModal({ feature, onClose }: Props) {
           </button>
         </div>
 
+        <BillingPeriodSwitch value={period} onChange={setPeriod} className="upg-period" />
+
         <div className="upg-plans">
           {PLANS.map((p, i) => {
+            const price = planPrice(p, period);
             const isCurrent  = p.id === currentPlan;
             const isRequired = p.id === requiredPlan;
             const isDisabled = i < PLAN_ORDER_ARR.indexOf(currentPlan);
@@ -70,20 +75,11 @@ export default function UpgradeModal({ feature, onClose }: Props) {
                       <span className="upg-price-amount">Sur devis</span>
                       <span className="upg-price-note">Contrat annuel</span>
                     </>
-                  ) : p.price === 0 ? (
-                    <>
-                      <span className="upg-price-currency">{p.currency}</span>
-                      <span className="upg-price-amount">0</span>
-                      <span className="upg-price-note">/ mois</span>
-                    </>
                   ) : (
                     <>
                       <span className="upg-price-currency">{p.currency}</span>
-                      <span className="upg-price-amount">{formatPrice(p.price)}</span>
-                      <span className="upg-price-note">/ mois</span>
-                      {p.annualPrice && (
-                        <span className="upg-price-annual">ou {formatPrice(p.annualPrice)} {p.currency} / an</span>
-                      )}
+                      <span className="upg-price-amount">{price.amount === 0 ? '0' : formatPrice(price.amount!)}</span>
+                      <span className="upg-price-note">{price.per}</span>
                     </>
                   )}
                 </div>

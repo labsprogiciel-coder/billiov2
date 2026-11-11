@@ -446,7 +446,7 @@
 .lp-plan-feats li { display: flex; gap: 9px; align-items: center; font-size: 13px; color: var(--lp-txt-2); line-height: 1.45; min-width: 0; }
 /* One line per included item; the full text stays in the title */
 .lp-plan-feats li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.lp-plan-price .lp-annual { width: 100%; font-size: 12px; font-weight: 600; color: var(--lp-txt-3); margin-top: 4px; }
+.lp-period { display: flex; width: max-content; margin: 0 auto 28px; }
 
 /* Certified e-invoicing teaser (PRO-137) */
 .lp-certified {

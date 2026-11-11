@@ -62,7 +62,7 @@ export interface PlanDef {
   name:     string;
   tagline:  string;
   price:    number | null; // null = on-quote
-  /** Price when paid yearly, shown next to the monthly price */
+  /** Price when paid yearly (the pricing switcher's "Annuel" view) */
   annualPrice?: number;
   currency: string;
   ctaLabel: string;
@@ -112,6 +112,7 @@ export const PLANS: PlanDef[] = [
     name:     'Cabinet',
     tagline:  'Pour les cabinets, serein sur tous vos dossiers clients.',
     price:    45_000,
+    annualPrice: 540_000,
     currency: 'XOF',
     ctaLabel: 'Contacter les ventes',
     popular:  false,
@@ -156,8 +157,6 @@ export const CERTIFIED_OFFER = {
   currency:    'XOF',
   points: [
     'QR code et n° SECeF sur chaque facture',
-    "Aucun frais d'installation",
-    'Mises à jour DGI incluses',
   ],
   ctaLabel:    'Être prévenu',
 } as const;
@@ -170,6 +169,19 @@ export const PLAN_LABELS: Record<PlanId, string> = {
 };
 
 const FMT = new Intl.NumberFormat('fr-FR');
+
+export type BillingPeriod = 'monthly' | 'annual';
+
+/**
+ * The price a plan card shows for the period chosen in the pricing switcher.
+ * null amount = on quote. A plan without a yearly price keeps its monthly one.
+ */
+export function planPrice(plan: Pick<PlanDef, 'price' | 'annualPrice'>, period: BillingPeriod): { amount: number | null; per: '/ mois' | '/ an' } {
+  if (plan.price === null) return { amount: null, per: '/ an' };
+  if (period === 'annual' && plan.price === 0) return { amount: 0, per: '/ an' };
+  if (period === 'annual' && plan.annualPrice !== undefined) return { amount: plan.annualPrice, per: '/ an' };
+  return { amount: plan.price, per: '/ mois' };
+}
 export function formatPrice(price: number): string {
   return FMT.format(price);
 }
