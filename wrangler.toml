@@ -2,12 +2,22 @@ name = "billio"
 account_id = "b387ad0edb069857cdf76793aa0855cc"
 compatibility_date = "2025-06-09"
 
-# Pure SPA — no custom Worker entry needed.
-# All routing is handled by the static-assets not_found_handling below.
+# The app is served as static files. Only /api/* runs the Worker code in
+# worker/index.ts (the in-app assistant's CopilotKit runtime).
+main = "worker/index.ts"
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Public values the Worker reads (not secrets). ANTHROPIC_API_KEY is a secret:
+# set it in the dashboard (Settings → Variables and Secrets) or with
+# `npx wrangler secret put ANTHROPIC_API_KEY`; locally, in .dev.vars.
+[vars]
+SUPABASE_URL = "https://kqywszzcivoxxxsljlzw.supabase.co"
 
 [observability]
 enabled = true

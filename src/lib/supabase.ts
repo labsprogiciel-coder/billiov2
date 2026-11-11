@@ -8,3 +8,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+/** The public anon key (already in the bundle); sent to the Worker so it can check a session. */
+export const SUPABASE_ANON_KEY = supabaseAnonKey;

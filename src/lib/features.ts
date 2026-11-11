@@ -8,3 +8,9 @@
  * switched back on.
  */
 export const ACCOUNTING_ENABLED = import.meta.env.VITE_ENABLE_ACCOUNTING === 'true';
+
+/**
+ * The in-app assistant (CopilotKit + Claude, served by the Worker at
+ * /api/copilotkit) is off unless VITE_ENABLE_ASSISTANT=true at build time.
+ */
+export const ASSISTANT_ENABLED = import.meta.env.VITE_ENABLE_ASSISTANT === 'true';
