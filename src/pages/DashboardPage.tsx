@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import { useEffect, useMemo, useState } from 'react';
 import { canWrite, type UserRole } from '@/lib/permissions';
 import { useNavigate } from 'react-router-dom';
@@ -202,7 +203,7 @@ export default function DashboardPage() {
                 onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && navigate(`/invoices/${inv.id}`)}
               >
                 <div>
-                  <div className="inv-id">#{inv.id}</div>
+                  <div className="inv-id">#{invoiceRef(inv)}</div>
                   <div className="inv-subject">{inv.subject}</div>
                 </div>
                 <div className="client-cell">

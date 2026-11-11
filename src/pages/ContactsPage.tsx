@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import { useSearchParams } from 'react-router-dom';
@@ -108,7 +109,7 @@ function AgingStrip({ bills }: { bills: SupplierBill[] }) {
 // ─── Clients sub-components ───────────────────────────────────────────────────
 
 type ClientFilterKey = 'all' | 'active' | 'lead' | 'balance';
-type MiniInv = { id: string; sub: string; amt: number; status: InvoiceStatus };
+type MiniInv = { id: string; ref: string; sub: string; amt: number; status: InvoiceStatus };
 
 const CLIENT_STATUS_LABEL: Record<ClientStatus, string> = { active: 'Actif', lead: 'Prospect', inactive: 'Inactif' };
 const INV_STATUS_LABEL: Record<MiniInv['status'], string> = { paid: 'Payée', pending: 'En attente', overdue: 'En retard', draft: 'Brouillon' };
@@ -1059,12 +1060,12 @@ export default function ContactsPage() {
               <div className="detail-block">
                 <div className="detail-block-title">Factures récentes</div>
                 {(() => {
-                  const recentInvs: MiniInv[] = invoices.filter(i => i.client === detailClient.code).slice(0, 5).map(i => ({ id: i.id, sub: i.subject, amt: i.amount, status: i.status }));
+                  const recentInvs: MiniInv[] = invoices.filter(i => i.client === detailClient.code).slice(0, 5).map(i => ({ id: i.id, ref: invoiceRef(i), sub: i.subject, amt: i.amount, status: i.status }));
                   return recentInvs.length === 0 ? (
                     <EmptyInline message="Aucune facture pour ce client." />
                   ) : recentInvs.map(inv => (
                     <div key={inv.id} className="mini-inv">
-                      <div><div className="mini-id">#{inv.id}</div><div className="mini-sub">{inv.sub}</div></div>
+                      <div><div className="mini-id">#{inv.ref}</div><div className="mini-sub">{inv.sub}</div></div>
                       <div className="mini-amt">{fmt(inv.amt)} F CFA</div>
                       <span className={`mini-status st-${inv.status}`}>{INV_STATUS_LABEL[inv.status]}</span>
                     </div>

@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
@@ -415,7 +416,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
               <option value="">Sélectionner une facture ouverte…</option>
               {openInvoices.map(inv => (
                 <option key={inv.id} value={inv.id}>
-                  #{inv.id} — {clientsMap[inv.client]?.name ?? inv.client} (reste {fmt(balanceOf(inv.id))} F CFA)
+                  #{invoiceRef(inv)} — {clientsMap[inv.client]?.name ?? inv.client} (reste {fmt(balanceOf(inv.id))} F CFA)
                 </option>
               ))}
             </select>

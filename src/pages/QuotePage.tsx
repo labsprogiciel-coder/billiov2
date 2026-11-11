@@ -1,3 +1,4 @@
+import { invoiceRef } from '@/lib/invoice-number';
 import { useState, useEffect, useRef } from 'react';
 import { canWrite } from '@/lib/permissions';
 import posthog from 'posthog-js';
@@ -221,7 +222,7 @@ export default function QuotePage() {
       setInvoices(prev => prev.some(i => i.id === invoice.id) ? prev : [invoice, ...prev]);
       setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced' } : q));
       posthog.capture('quote_converted_to_invoice', { quote_id: quote.id, invoice_id: invoice.id });
-      showToast(`Devis ${quote.id} → Facture #${invoice.id} créée`);
+      showToast(`Devis ${quote.id} → Facture #${invoiceRef(invoice)} créée`);
       if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
       navigate(`/invoices/${invoice.id}`);
     } catch (err) {

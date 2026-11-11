@@ -70,7 +70,7 @@ function sampleInvoice() {
   const issued = new Date();
   const due = new Date(issued);
   due.setDate(due.getDate() + 14);
-  return { id: 'FACT-0041', issued: longDate(issued), due: longDate(due), subject: 'Refonte web — phase 2' };
+  return { id: `FACT-${issued.getFullYear()}-0041`, issued: longDate(issued), due: longDate(due), subject: 'Refonte web — phase 2' };
 }
 const LINES = [
   { desc: 'UI/UX design — phase 2', note: 'Wireframes, hi-fi screens', qty: 1, price: 300_000 },
