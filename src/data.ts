@@ -201,3 +201,11 @@ INITIAL_PRODUCTS.forEach((p, i) => {
   p.updatedAt = new Date(Date.UTC(2026, 4, 2 + i * 3, 9)).toISOString();
   p.updatedByName = MOCK_TEAM[(i + 1) % MOCK_TEAM.length].name;
 });
+
+// Some demo clients are companies with their tax identifiers (PRO-169 record, KYB file)
+const DEMO_COMPANIES: Record<string, { ifu: string; rccm: string; taxRegime: string }> = {
+  OT: { ifu: '00012345A', rccm: 'BF-OUA-2015-B-1201', taxRegime: 'RNI' },
+  SB: { ifu: '00023456B', rccm: 'BF-BBD-2012-B-0457', taxRegime: 'RNI' },
+  AM: { ifu: '00034567C', rccm: 'ML-BKO-2018-B-2210', taxRegime: 'RSI' },
+};
+INITIAL_CLIENTS.forEach(c => { const d = DEMO_COMPANIES[c.code]; if (d) Object.assign(c, d, { clientType: 'PM' }); });

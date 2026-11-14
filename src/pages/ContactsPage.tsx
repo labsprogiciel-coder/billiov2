@@ -29,6 +29,12 @@ import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 import Page from '@/components/Page';
 import { OwnerLine } from '@/components/owner/OwnerControls';
 import { useCommandIntent } from '@/lib/command-intent';
+import ClientList from '@/components/contacts/ClientList';
+import ClientRecordPanel from '@/components/contacts/ClientRecordPanel';
+import { useCreditNotes } from '@/lib/use-credit-notes';
+import { invoiceRows } from '@/lib/sales-tables';
+import { clientDocuments, clientRows } from '@/lib/client-table';
+import { UI_V2 } from '@/lib/features';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -552,12 +558,19 @@ export default function ContactsPage() {
   const [form, setForm] = useState<NewClientForm>(EMPTY_FORM);
   // From the command box (PRO-162): a new client, or one found by the search
   useCommandIntent(intent => {
-    if (intent.command === 'open-client') { setTab('clients'); setClientPanel({ kind: 'detail', code: intent.client }); return; }
+    if (intent.command === 'open-client') {
+      setTab('clients');
+      // ERP look: the record opens beside the list (PRO-169)
+      if (UI_V2) setSelectedCode(intent.client); else setClientPanel({ kind: 'detail', code: intent.client });
+      return;
+    }
     if (intent.command !== 'new-client' || !writable) return false;
     setTab('clients');
     setClientPanel({ kind: 'new' });
   }, !clientsLoading);
   const [editMode, setEditMode] = useState(false);
+  // ERP look (PRO-169): the client whose record shows beside the list
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
   const [deleteClient, setDeleteClient] = useState<ClientRecord | null>(null);
 
@@ -627,6 +640,21 @@ export default function ContactsPage() {
     }
     return list;
   }, [supplierContacts, supplierFilter, supplierSearch]);
+
+  // ERP look: each client's figures from the invoices' real balances
+  const creditNotes = useCreditNotes();
+  const year = new Date().getFullYear();
+  const invRows = useMemo(() => invoiceRows(invoices, payments, creditNotes), [invoices, payments, creditNotes]);
+  const cRows = useMemo(() => clientRows(clients, invRows, year), [clients, invRows, year]);
+  const selectedRow = cRows.find(c => c.code === selectedCode) ?? null;
+  const selectedDocs = useMemo(() => clientDocuments(selectedCode ?? '', invRows, quotes), [selectedCode, invRows, quotes]);
+  // In the ERP look the side panel is only the edit form: when editing ends,
+  // close it and show that client's record beside the list
+  useEffect(() => {
+    if (!UI_V2 || clientPanel?.kind !== 'detail' || editMode) return;
+    setSelectedCode(clientPanel.code);
+    setClientPanel(null);
+  }, [clientPanel, editMode]);
 
   const loading = tab === 'clients' ? clientsLoading : suppLoading;
   // Opens the linked client's form once it is loaded (writers only)
@@ -790,7 +818,7 @@ export default function ContactsPage() {
         mainStyle={{ position: 'relative' }}
       >
           {/* ── Contextual KPI strip ──────────────────────────────────────── */}
-          <div className="metrics" style={{ marginBottom: 20 }}>
+          {!(UI_V2 && tab === 'clients') && <div className="metrics" style={{ marginBottom: 20 }}>
             {kpis.map(k => (
               <div key={k.label} className="metric-card">
                 <div className="metric-top">
@@ -801,10 +829,28 @@ export default function ContactsPage() {
                 <div className="metric-change neutral">{k.sub}</div>
               </div>
             ))}
-          </div>
+          </div>}
+
+          {/* ── Clients tab, ERP look (PRO-169): list with the record beside it ── */}
+          {tab === 'clients' && UI_V2 && (
+            <>
+              {ACCOUNTING_ENABLED && <div className="section-header">{tabSwitcher}</div>}
+              <div className="cr-split" {...(ACCOUNTING_ENABLED ? { role: 'tabpanel', id: tabPanelId('contacts'), 'aria-labelledby': tabId('contacts', tab) } : {})}>
+                <ClientList rows={cRows} year={year} selected={selectedCode} onSelect={setSelectedCode} />
+                <ClientRecordPanel
+                  client={selectedRow}
+                  year={year}
+                  docs={selectedDocs}
+                  onClose={() => setSelectedCode(null)}
+                  onEdit={code => { const cl = clients.find(c => c.code === code) ?? null; setClientPanel({ kind: 'detail', code }); openDetailEdit(cl); }}
+                  onDelete={code => handleDeleteClient(clients.find(c => c.code === code) ?? null)}
+                />
+              </div>
+            </>
+          )}
 
           {/* ── Clients tab ──────────────────────────────────────────────── */}
-          {tab === 'clients' && (
+          {tab === 'clients' && !UI_V2 && (
             <>
               <div className="section-header">
                 {tabSwitcher}

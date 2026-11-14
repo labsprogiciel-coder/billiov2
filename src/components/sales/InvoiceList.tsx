@@ -2,7 +2,7 @@
 // InvoicesPage renders this instead of its cards and list when VITE_UI_V2 is on;
 // the actions (open, send, remind, PDF) stay in the page.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import DataTable, { SummaryStrip, type Column, type RowAction, type StatusFilter } from '@/components/DataTable';
 import { useApp } from '@/context/AppContext';
 import { OwnerFilter, ReassignControl } from '@/components/owner/OwnerControls';
@@ -10,11 +10,10 @@ import { usePermissions } from '@/lib/use-permissions';
 import { useTeam } from '@/lib/use-team';
 import { useReassign } from '@/lib/use-reassign';
 
-import { fetchCreditNotes } from '@/lib/api/credit-notes';
+import { useCreditNotes } from '@/lib/use-credit-notes';
 import { invoiceRef } from '@/lib/invoice-number';
 import { invoiceFigures, invoiceRowStatus, invoiceRows, ownerKey, ownerOptions, type InvoiceRow } from '@/lib/sales-tables';
 import { fmt, fmtCompact, fmtDate } from '@/data';
-import type { CreditNote } from '@/lib/schemas';
 import StatusPill from '@/components/sales/StatusPill';
 
 const FILTERS: StatusFilter<InvoiceRow>[] = [
@@ -35,11 +34,8 @@ export interface InvoiceListProps {
 }
 
 export default function InvoiceList({ writable, onOpen, onSend, onDownload, downloading, showLate = 0 }: InvoiceListProps) {
-  const { invoices, payments, clientsMap, orgId, userId, userRole } = useApp();
-  const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
-  useEffect(() => {
-    if (orgId) fetchCreditNotes(orgId).then(setCreditNotes).catch(err => console.error('[fetchCreditNotes]', err));
-  }, [orgId]);
+  const { invoices, payments, clientsMap, userId, userRole } = useApp();
+  const creditNotes = useCreditNotes();
 
   const rows = useMemo(() => invoiceRows(invoices, payments, creditNotes), [invoices, payments, creditNotes]);
   const figures = useMemo(() => invoiceFigures(rows), [rows]);
