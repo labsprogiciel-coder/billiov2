@@ -14,3 +14,10 @@ export const ACCOUNTING_ENABLED = import.meta.env.VITE_ENABLE_ACCOUNTING === 'tr
  * /api/copilotkit) is off unless VITE_ENABLE_ASSISTANT=true at build time.
  */
 export const ASSISTANT_ENABLED = import.meta.env.VITE_ENABLE_ASSISTANT === 'true';
+
+/**
+ * The ERP-style interface (PRO-160 and the "Billio — ERP redesign" project) is
+ * off unless VITE_UI_V2=true at build time. With it off the app looks exactly
+ * as before; pages move to the new look one at a time behind this flag.
+ */
+export const UI_V2 = import.meta.env.VITE_UI_V2 === 'true';
