@@ -13,6 +13,7 @@ import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustr
 import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 import { exerciseYear } from '@/lib/period';
 import { todayISO } from '@/lib/invoice-status';
+import Page from '@/components/Page';
 
 const AV_COLORS = [
   { bg: '#B5D4F4', color: '#0C447C' },
@@ -262,25 +263,24 @@ export default function SuppliersPage() {
     return m;
   }, [supplierBills]);
 
-  if (loading) return <PageSkeleton title="Fournisseurs" variant="accounting" rows={6} />;
+  if (loading) return <PageSkeleton section={{ icon: 'truck-delivery', label: 'Comptabilité' }} title="Fournisseurs" variant="accounting" rows={6} />;
 
   return (
-    <div className="main" style={{ position: 'relative' }}>
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="truck-delivery" size={13} /> Accounting
-          </div>
-          <div className="page-title">Fournisseurs</div>
-          <div className="page-sub">Gestion des dettes fournisseurs et factures d'achat</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          {writable && <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle facture</button>}
-        </div>
-      </div>
+    <Page
+      section={{ icon: 'truck-delivery', label: 'Comptabilité' }}
+      title="Fournisseurs"
+      subtitle="Gestion des dettes fournisseurs et factures d'achat"
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        {writable && <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle facture</button>}
+      </>}
+      mainStyle={{ position: 'relative' }}
+      after={<>
 
-      <div className="content">
+        {selected && <BillDrawer bill={selected} onMarkPaid={markPaid} onClose={() => setSelected(null)} />}
+        {showForm && <NewBillDrawer onSave={handleCreate} onClose={() => setShowForm(false)} />}
+      </>}
+    >
         <KPIStrip items={[
           { icon: 'truck-delivery', iconBg: '#FCEFE0', iconColor: '#8A5207', label: 'Total à payer', value: fmtCompact(totalPayable), unit: 'F CFA', sub: `${supplierBills.filter(b => b.status !== 'paid').length} factures ouvertes` },
           { icon: 'clock-pause', iconBg: '#FAEEDA', iconColor: '#8A5207', label: 'Échéances ≤ 7j', value: fmtCompact(dueSoon), unit: 'F CFA', sub: 'Règlements urgents' },
@@ -352,10 +352,6 @@ export default function SuppliersPage() {
               );
             })}
         </div>
-      </div>
-
-      {selected && <BillDrawer bill={selected} onMarkPaid={markPaid} onClose={() => setSelected(null)} />}
-      {showForm && <NewBillDrawer onSave={handleCreate} onClose={() => setShowForm(false)} />}
-    </div>
+    </Page>
   );
 }

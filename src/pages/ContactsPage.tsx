@@ -26,6 +26,7 @@ import { csvBlob } from '@/lib/csv';
 import { todayISO } from '@/lib/invoice-status';
 import { downloadBlob } from '@/lib/download';
 import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
+import Page from '@/components/Page';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -629,7 +630,7 @@ export default function ContactsPage() {
     openDetailEdit(cl);
   }, [linkedClient, clients, writable]);
 
-  if (loading) return <PageSkeleton title="Contacts" variant="accounting" rows={6} />;
+  if (loading) return <PageSkeleton title="Contacts" subtitle={ACCOUNTING_ENABLED ? 'Clients & fournisseurs' : 'Vos clients'} variant="accounting" rows={6} />;
 
   // ── Clients computed ──────────────────────────────────────────────────────
   const totalBilled  = Array.from(clientStatsMap.values()).reduce((s, v) => s + v.billed, 0);
@@ -767,22 +768,18 @@ export default function ContactsPage() {
 
   return (
     <>
-      <div className="main" style={{ position: 'relative' }}>
-        <div className="topbar">
-          <div>
-            <div className="page-title">Contacts</div>
-            <div className="page-sub">{ACCOUNTING_ENABLED ? 'Clients & fournisseurs' : 'Vos clients'}</div>
-          </div>
-          <div className="topbar-actions">
-            <button className="btn"><Icon name="download" size={15} />Exporter</button>
-            {writable && (tab === 'clients'
-              ? <button className="btn btn-primary" onClick={() => setClientPanel({ kind: 'new' })}><Icon name="user-plus" size={15} />Nouveau client</button>
-              : <button className="btn btn-primary" onClick={() => setShowBillForm(true)}><Icon name="plus" size={15} />Nouvelle facture</button>
-            )}
-          </div>
-        </div>
-
-        <div className="content">
+      <Page
+        title="Contacts"
+        subtitle={<>{ACCOUNTING_ENABLED ? 'Clients & fournisseurs' : 'Vos clients'}</>}
+        actions={<>
+          <button className="btn"><Icon name="download" size={15} />Exporter</button>
+          {writable && (tab === 'clients'
+            ? <button className="btn btn-primary" onClick={() => setClientPanel({ kind: 'new' })}><Icon name="user-plus" size={15} />Nouveau client</button>
+            : <button className="btn btn-primary" onClick={() => setShowBillForm(true)}><Icon name="plus" size={15} />Nouvelle facture</button>
+          )}
+        </>}
+        mainStyle={{ position: 'relative' }}
+      >
           {/* ── Contextual KPI strip ──────────────────────────────────────── */}
           <div className="metrics" style={{ marginBottom: 20 }}>
             {kpis.map(k => (
@@ -955,8 +952,7 @@ export default function ContactsPage() {
               </div>
             </>
           )}
-        </div>
-      </div>
+      </Page>
 
       {/* ── Client panels ────────────────────────────────────────────────── */}
       <div className={'scrim' + (clientPanel ? ' open' : '')} onClick={closeClientPanel} />

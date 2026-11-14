@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { EmptyState } from '@/components/EmptyState';
 import { ChartOfAccountsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 import { exerciseYear } from '@/lib/period';
+import Page from '@/components/Page';
 
 function SideTag({ signed }: { signed: number }) {
   if (Math.abs(signed) < 0.5) return null;
@@ -282,26 +283,25 @@ export default function ChartOfAccountsPage() {
   const toggleCollapse = (k: string) =>
     setCollapsed(prev => ({ ...prev, [k]: !prev[k] }));
 
-  if (loading) return <PageSkeleton title="Plan comptable" variant="accounting" rows={8} />;
+  if (loading) return <PageSkeleton section={{ icon: 'book', label: 'Comptabilité' }} title="Plan comptable" variant="accounting" rows={8} />;
 
   return (
-    <div className="main" style={{ position: 'relative' }}>
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="book" size={13} /> Accounting
-          </div>
-          <div className="page-title">Plan comptable</div>
-          <div className="page-sub">SYSCOHADA · Système Normal</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          <button className="btn"><Icon name="download" />Importer</button>
-          {writable && <button className="btn btn-primary" onClick={() => setShowNewAccount(true)}><Icon name="plus" />Nouveau compte</button>}
-        </div>
-      </div>
+    <Page
+      section={{ icon: 'book', label: 'Comptabilité' }}
+      title="Plan comptable"
+      subtitle="SYSCOHADA · Système Normal"
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        <button className="btn"><Icon name="download" />Importer</button>
+        {writable && <button className="btn btn-primary" onClick={() => setShowNewAccount(true)}><Icon name="plus" />Nouveau compte</button>}
+      </>}
+      mainStyle={{ position: 'relative' }}
+      after={<>
 
-      <div className="content">
+        {selected && <AccountDrawer account={selected} classes={classes} journals={journals} onClose={() => setSelected(null)} mvtOf={mvtOf} signedOf={signedOf} />}
+        {showNewAccount && <NewAccountModal classes={classes} onSave={addAccount} onClose={() => setShowNewAccount(false)} />}
+      </>}
+    >
         <KPIStrip items={[
           { icon: 'book', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'Comptes', value: accounts.length, sub: `${usedClassCount} classes utilisées` },
           { icon: 'building-bank', iconBg: '#E7F3E2', iconColor: '#276C2B', label: 'Trésorerie (5x)', value: fmtCompact(cash), unit: 'F CFA', sub: 'Banque + caisse' },
@@ -420,10 +420,6 @@ export default function ChartOfAccountsPage() {
             </div>
           )}
         </div>
-      </div>
-
-      {selected && <AccountDrawer account={selected} classes={classes} journals={journals} onClose={() => setSelected(null)} mvtOf={mvtOf} signedOf={signedOf} />}
-      {showNewAccount && <NewAccountModal classes={classes} onSave={addAccount} onClose={() => setShowNewAccount(false)} />}
-    </div>
+    </Page>
   );
 }

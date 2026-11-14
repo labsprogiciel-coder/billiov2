@@ -12,6 +12,7 @@ import { useTrialBalance, useBalanceFns } from '@/lib/accounting-hooks';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { exerciseYear, monthLabel } from '@/lib/period';
+import Page from '@/components/Page';
 
 function LedgerDrawer({
   account, classes, journals, onClose,
@@ -161,31 +162,29 @@ export default function TrialBalancePage() {
 
   const result = totalCreditClose - totalDebitClose;
 
-  if (loading) return <PageSkeleton title="Balance générale" variant="accounting" rows={8} />;
+  if (loading) return <PageSkeleton section={{ icon: 'book-2', label: 'Comptabilité' }} title="Balance générale" variant="accounting" rows={8} />;
 
   return (
-    <div className="main" style={{ position: 'relative' }}>
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="book-2" size={13} /> Accounting
-          </div>
-          <div className="page-title">Balance générale</div>
-          <div className="page-sub">Plan comptable SYSCOHADA · {monthLabel()}</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          <button
-            className={`btn${showDraft ? ' btn-primary' : ''}`}
-            onClick={() => setShowDraft(p => !p)}
-          >
-            <Icon name="edit" />Inclure brouillons
-          </button>
-          <button className="btn"><Icon name="download" />Exporter</button>
-        </div>
-      </div>
+    <Page
+      section={{ icon: 'book-2', label: 'Comptabilité' }}
+      title="Balance générale"
+      subtitle={<>Plan comptable SYSCOHADA · {monthLabel()}</>}
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        <button
+          className={`btn${showDraft ? ' btn-primary' : ''}`}
+          onClick={() => setShowDraft(p => !p)}
+        >
+          <Icon name="edit" />Inclure brouillons
+        </button>
+        <button className="btn"><Icon name="download" />Exporter</button>
+      </>}
+      mainStyle={{ position: 'relative' }}
+      after={<>
 
-      <div className="content">
+        {selected && <LedgerDrawer account={selected} classes={classes} journals={journals} onClose={() => setSelected(null)} />}
+      </>}
+    >
         <KPIStrip items={[
           { icon: 'trending-up', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'Mouvement total', value: fmtCompact(totalDebitMvt), unit: 'F CFA', sub: 'Débit = Crédit' },
           { icon: 'book-2', iconBg: '#E9F0FA', iconColor: 'var(--brand)', label: 'Comptes actifs', value: activeAccounts.length, sub: `${Object.keys(byClass).length} classes` },
@@ -285,9 +284,6 @@ export default function TrialBalancePage() {
             <span />
           </div>
         </div>
-      </div>
-
-      {selected && <LedgerDrawer account={selected} classes={classes} journals={journals} onClose={() => setSelected(null)} />}
-    </div>
+    </Page>
   );
 }

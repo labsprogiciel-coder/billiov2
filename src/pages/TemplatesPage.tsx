@@ -12,6 +12,7 @@ import { DEFAULT_CONFIG, FONT_FAMILIES, PRESETS } from '@/lib/invoice-template';
 import { createTemplate, fetchTemplates, setDefaultTemplate, updateTemplate, type SavedTemplate } from '@/lib/api/invoice-templates';
 import { fetchPaymentSettings } from '@/lib/api/payment-settings';
 import { paymentMethodLines, type PaymentMethodLine } from '@/lib/payment-methods';
+import Page from '@/components/Page';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -434,7 +435,7 @@ export default function TemplatesPage() {
 
   const templates = useMemo(() => galleryTemplates(saved ?? []), [saved]);
 
-  if (loading || saved === null) return <PageSkeleton title="Modèles de factures" subtitle="Personnalisez vos modèles" variant="table-only" rows={4} />;
+  if (loading || saved === null) return <PageSkeleton title="Modèles de facture" subtitle="Choisissez un design prêt à l'emploi ou créez le vôtre" variant="table-only" rows={4} />;
 
   function openEditor(id: string) {
     const tpl = id === 'new'
@@ -536,89 +537,11 @@ export default function TemplatesPage() {
   const editorId = view !== 'gallery' ? view.id : null;
   const editorTpl = editorId && editorId !== 'new' ? templates.find(t => t.id === editorId) : null;
 
-  return (
+  if (view !== 'gallery') return (
     <div className="main" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* ===== GALLERY VIEW ===== */}
-      {view === 'gallery' && (
-        <>
-          <div className="topbar">
-            <div>
-              <div className="page-title">Modèles de facture</div>
-              <div className="page-sub">Choisissez un design prêt à l'emploi ou créez le vôtre</div>
-            </div>
-            {managesOrg && (
-              <div className="topbar-actions">
-                <button className="btn btn-primary" onClick={() => openEditor('new')}>
-                  <Icon name="plus" size={16} ariaHidden />
-                  Créer un modèle
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="content">
-            <div className="gallery-wrap">
-              {/* Intro banner */}
-              <div className="gallery-intro">
-                <div className="gi-ico"><Icon name="sparkles" size={19} ariaHidden /></div>
-                <div>
-                  <div className="gi-title">Vos factures, à votre image</div>
-                  <div className="gi-sub">
-                    Le modèle utilisé s'applique à toutes vos factures et devis en PDF. Personnalisez la mise en page, les couleurs et la police : les mentions obligatoires (identifiants fiscaux, quantités, TVA, modes de paiement) restent toujours affichées.
-                  </div>
-                  {!managesOrg && <div className="gi-sub" style={{ marginTop: 6 }}>Seuls les administrateurs peuvent changer de modèle.</div>}
-                  {loadError && <div className="gi-sub" role="alert" style={{ marginTop: 6, color: 'var(--color-danger, #B42318)' }}>Vos modèles enregistrés n'ont pas pu être chargés. <button className="btn btn-sm" onClick={() => void load()}>Réessayer</button></div>}
-                </div>
-              </div>
-
-              {/* Grid */}
-              <div className="gallery-head">
-                <div className="gallery-title">
-                  Tous les modèles <span className="cnt">{templates.length}</span>
-                </div>
-              </div>
-
-              <div className="tpl-grid">
-                {templates.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <EmptyState
-                      illustration={<TemplatesEmptyIllustration />}
-                      title="Aucun modèle"
-                      description="Vous n'avez pas encore de modèles. Créez-en un pour gagner du temps."
-                    />
-                  </div>
-                )}
-                {templates.map(tpl => (
-                  <TemplateCard
-                    key={tpl.id}
-                    tpl={tpl}
-                    biz={orgSettings}
-                    payLines={payLines}
-                    paymentTerms={orgSettings.paymentTerms}
-                    canEdit={managesOrg}
-                    busy={busy}
-                    onEdit={() => openEditor(tpl.id)}
-                    onUse={() => applyTemplate(tpl.id)}
-                    onToggleStar={() => toggleStar(tpl.id)}
-                  />
-                ))}
-
-                {/* Create blank card */}
-                {managesOrg && <div className="tpl-card create" onClick={() => openEditor('new')}>
-                  <div className="create-inner">
-                    <div className="create-ico"><Icon name="plus" size={26} ariaHidden /></div>
-                    <div className="create-title">Modèle vierge</div>
-                    <div className="create-sub">Partez de zéro et configurez chaque détail</div>
-                  </div>
-                </div>}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* ===== EDITOR VIEW ===== */}
-      {view !== 'gallery' && (
+      {(
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           {/* Editor topbar */}
           <div className="topbar">
@@ -688,5 +611,76 @@ export default function TemplatesPage() {
         </div>
       )}
     </div>
+  );
+
+  return (
+    <Page
+      title="Modèles de facture"
+      subtitle="Choisissez un design prêt à l'emploi ou créez le vôtre"
+      actions={managesOrg && (
+        <button className="btn btn-primary" onClick={() => openEditor('new')}>
+          <Icon name="plus" size={16} ariaHidden />
+          Créer un modèle
+        </button>
+      )}
+      mainStyle={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
+            <div className="gallery-wrap">
+              {/* Intro banner */}
+              <div className="gallery-intro">
+                <div className="gi-ico"><Icon name="sparkles" size={19} ariaHidden /></div>
+                <div>
+                  <div className="gi-title">Vos factures, à votre image</div>
+                  <div className="gi-sub">
+                    Le modèle utilisé s'applique à toutes vos factures et devis en PDF. Personnalisez la mise en page, les couleurs et la police : les mentions obligatoires (identifiants fiscaux, quantités, TVA, modes de paiement) restent toujours affichées.
+                  </div>
+                  {!managesOrg && <div className="gi-sub" style={{ marginTop: 6 }}>Seuls les administrateurs peuvent changer de modèle.</div>}
+                  {loadError && <div className="gi-sub" role="alert" style={{ marginTop: 6, color: 'var(--color-danger, #B42318)' }}>Vos modèles enregistrés n'ont pas pu être chargés. <button className="btn btn-sm" onClick={() => void load()}>Réessayer</button></div>}
+                </div>
+              </div>
+
+              {/* Grid */}
+              <div className="gallery-head">
+                <div className="gallery-title">
+                  Tous les modèles <span className="cnt">{templates.length}</span>
+                </div>
+              </div>
+
+              <div className="tpl-grid">
+                {templates.length === 0 && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <EmptyState
+                      illustration={<TemplatesEmptyIllustration />}
+                      title="Aucun modèle"
+                      description="Vous n'avez pas encore de modèles. Créez-en un pour gagner du temps."
+                    />
+                  </div>
+                )}
+                {templates.map(tpl => (
+                  <TemplateCard
+                    key={tpl.id}
+                    tpl={tpl}
+                    biz={orgSettings}
+                    payLines={payLines}
+                    paymentTerms={orgSettings.paymentTerms}
+                    canEdit={managesOrg}
+                    busy={busy}
+                    onEdit={() => openEditor(tpl.id)}
+                    onUse={() => applyTemplate(tpl.id)}
+                    onToggleStar={() => toggleStar(tpl.id)}
+                  />
+                ))}
+
+                {/* Create blank card */}
+                {managesOrg && <div className="tpl-card create" onClick={() => openEditor('new')}>
+                  <div className="create-inner">
+                    <div className="create-ico"><Icon name="plus" size={26} ariaHidden /></div>
+                    <div className="create-title">Modèle vierge</div>
+                    <div className="create-sub">Partez de zéro et configurez chaque détail</div>
+                  </div>
+                </div>}
+              </div>
+            </div>
+    </Page>
   );
 }

@@ -3,6 +3,7 @@ import Icon from '@/components/Icon';
 import { fmt } from '@/lib/accounting-data';
 import { useFinancialStatements, useBalanceFns } from '@/lib/accounting-hooks';
 import { exerciseYear } from '@/lib/period';
+import Page from '@/components/Page';
 
 type Tab = 'bilan' | 'cr' | 'flux' | 'notes';
 
@@ -238,23 +239,16 @@ export default function FinancialStatementsPage() {
   const { signedOf, mvtOf } = useBalanceFns(data);
 
   return (
-    <div className="main">
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="report-money" size={13} /> Accounting
-          </div>
-          <div className="page-title">États financiers</div>
-          <div className="page-sub">Bilan · Compte de résultat · Flux · Notes · cumul à date</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          <button className="btn"><Icon name="printer" />Imprimer</button>
-          <button className="btn"><Icon name="download" />Exporter PDF</button>
-        </div>
-      </div>
-
-      <div className="content">
+    <Page
+      section={{ icon: 'report-money', label: 'Comptabilité' }}
+      title="États financiers"
+      subtitle="Bilan · Compte de résultat · Flux · Notes · cumul à date"
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        <button className="btn"><Icon name="printer" />Imprimer</button>
+        <button className="btn"><Icon name="download" />Exporter PDF</button>
+      </>}
+    >
         <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'var(--color-background-secondary)', padding: 4, borderRadius: 'var(--border-radius-lg)', border: '0.5px solid var(--color-border-tertiary)', width: 'fit-content' }}>
           {TABS.map(tab => (
             <button
@@ -278,7 +272,6 @@ export default function FinancialStatementsPage() {
         {activeTab === 'cr' && <IncomeStatement mvtOf={mvtOf} />}
         {activeTab === 'flux' && <CashFlow signedOf={signedOf} mvtOf={mvtOf} />}
         {activeTab === 'notes' && <Notes signedOf={signedOf} />}
-      </div>
-    </div>
+    </Page>
   );
 }

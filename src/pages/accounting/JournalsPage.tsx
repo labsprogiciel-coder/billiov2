@@ -12,6 +12,7 @@ import { fmt, fmtCompact, acctOf } from '@/lib/accounting-data';
 import { useJournalsData } from '@/lib/accounting-hooks';
 import { JournalsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 import { exerciseYear } from '@/lib/period';
+import Page from '@/components/Page';
 
 function entryTotal(e: JournalEntry) {
   return e.lines.reduce((s, l) => s + l.d, 0);
@@ -346,26 +347,25 @@ export default function JournalsPage() {
     return m;
   }, [entries]);
 
-  if (loading) return <PageSkeleton title="Journaux comptables" variant="accounting" rows={6} />;
+  if (loading) return <PageSkeleton section={{ icon: 'notebook', label: 'Comptabilité' }} title="Journaux comptables" variant="accounting" rows={6} />;
 
   return (
-    <div className="main" style={{ position: 'relative' }}>
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="notebook" size={13} /> Accounting
-          </div>
-          <div className="page-title">Journaux comptables</div>
-          <div className="page-sub">Saisie et consultation des écritures</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          <button className="btn"><Icon name="download" />Exporter</button>
-          {writable && <button className="btn btn-primary" onClick={() => setShowComposer(true)}><Icon name="plus" />Nouvelle écriture</button>}
-        </div>
-      </div>
+    <Page
+      section={{ icon: 'notebook', label: 'Comptabilité' }}
+      title="Journaux comptables"
+      subtitle="Saisie et consultation des écritures"
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        <button className="btn"><Icon name="download" />Exporter</button>
+        {writable && <button className="btn btn-primary" onClick={() => setShowComposer(true)}><Icon name="plus" />Nouvelle écriture</button>}
+      </>}
+      mainStyle={{ position: 'relative' }}
+      after={<>
 
-      <div className="content">
+        {selected  && <EntryDrawer entry={selected} journals={journals} onClose={() => setSelected(null)} onPost={postEntry} />}
+        {showComposer && <Composer journals={journals} accounts={data?.accounts ?? []} onClose={() => setShowComposer(false)} onSave={saveEntry} />}
+      </>}
+    >
         <KPIStrip items={[
           { icon: 'notebook', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'Écritures', value: entries.length, sub: `${postedCount} comptabilisées` },
           { icon: 'trending-up', iconBg: '#E7F3E2', iconColor: '#276C2B', label: 'Mouvement total', value: fmtCompact(totalMvt), unit: 'F CFA', sub: 'Débit total comptabilisé' },
@@ -424,10 +424,6 @@ export default function JournalsPage() {
               );
             })}
         </div>
-      </div>
-
-      {selected  && <EntryDrawer entry={selected} journals={journals} onClose={() => setSelected(null)} onPost={postEntry} />}
-      {showComposer && <Composer journals={journals} accounts={data?.accounts ?? []} onClose={() => setShowComposer(false)} onSave={saveEntry} />}
-    </div>
+    </Page>
   );
 }

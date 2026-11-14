@@ -24,6 +24,7 @@ import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-i
 import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import Page from '@/components/Page';
 
 type FilterKey = 'all' | QuoteStatus;
 
@@ -271,28 +272,22 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez vos devis" metrics={0} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Estimations envoyées avant facturation" metrics={0} rows={6} />;
 
   return (
     <>
-      <div className="main">
-        {/* Topbar */}
-        <div className="topbar">
-          <div>
-            <div className="page-title">Facturation</div>
-            <div className="page-sub">Estimations envoyées avant facturation</div>
-          </div>
-          <div className="topbar-actions">
-            {writable && (
-              <button className="btn btn-primary" onClick={openPanel}>
-                <Icon name="plus" size={16} />
-                Nouveau devis
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="content">
+      <Page
+        title="Facturation"
+        subtitle="Estimations envoyées avant facturation"
+        actions={<>
+          {writable && (
+            <button className="btn btn-primary" onClick={openPanel}>
+              <Icon name="plus" size={16} />
+              Nouveau devis
+            </button>
+          )}
+        </>}
+      >
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -461,8 +456,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
               })
             )}
           </div>
-        </div>
-      </div>
+      </Page>
 
       {/* Scrim */}
       <div className={'scrim' + (panelOpen ? ' open' : '')} onClick={requestClosePanel} />

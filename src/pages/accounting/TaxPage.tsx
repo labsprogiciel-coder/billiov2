@@ -9,6 +9,7 @@ import { useApp } from '@/context/AppContext';
 import { calculateTVA, calculateIS, isRegimeCaducite, isFirstFiscalYear } from '@/lib/tax-bf';
 import type { Regime } from '@/lib/tax-bf';
 import { exerciseYear, monthLabel } from '@/lib/period';
+import Page from '@/components/Page';
 
 // ─── Regime metadata ─────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ export default function TaxPage() {
   const { data, loading } = useTaxData();
   const { orgSettings }  = useApp();
 
-  if (loading) return <PageSkeleton title="Fiscalité" variant="accounting" rows={6} />;
+  if (loading) return <PageSkeleton section={{ icon: 'percentage', label: 'Comptabilité' }} title="Fiscalité" variant="accounting" rows={6} />;
 
   const allEntries = data?.entries ?? [];
   const journals = data?.journals ?? {};
@@ -291,35 +292,30 @@ export default function TaxPage() {
           ? `Prochain : ${deadlines.find(d => d.status === 'upcoming')!.date}` : 'Aucune échéance imminente' };
 
   return (
-    <div className="main">
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="percentage" size={13} /> Accounting
-          </div>
-          <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            Fiscalité
-            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: meta.isBg, color: meta.isColor, letterSpacing: 0.3 }}>
-              {meta.label}
-            </span>
-            {caduciteAlert && (
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: '#FCEBEB', color: '#A32D2D' }}>
-                ⚠ Seuil dépassé — notifier la DGI sous 30 j
-              </span>
-            )}
-          </div>
-          <div className="page-sub">
-            Obligations fiscales · {monthLabel()}
-            {declarations && <> · Déclarations <strong>{declarations === 'monthly' ? 'mensuelles' : 'trimestrielles'}</strong></>}
-          </div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          <button className="btn"><Icon name="download" />Exporter déclaration</button>
-        </div>
-      </div>
-
-      <div className="content">
+    <Page
+      section={{ icon: 'percentage', label: 'Comptabilité' }}
+      title={<>
+        Fiscalité
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: meta.isBg, color: meta.isColor, letterSpacing: 0.3 }}>
+          {meta.label}
+        </span>
+        {caduciteAlert && (
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: '#FCEBEB', color: '#A32D2D' }}>
+            ⚠ Seuil dépassé — notifier la DGI sous 30 j
+          </span>
+        )}
+      </>}
+      documentTitle="Fiscalité"
+      titleStyle={{ display: 'flex', alignItems: 'center', gap: 10 }}
+      subtitle={<>
+        Obligations fiscales · {monthLabel()}
+        {declarations && <> · Déclarations <strong>{declarations === 'monthly' ? 'mensuelles' : 'trimestrielles'}</strong></>}
+      </>}
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        <button className="btn"><Icon name="download" />Exporter déclaration</button>
+      </>}
+    >
 
         {/* KPI strip — adapts to regime */}
         <KPIStrip items={[
@@ -475,7 +471,6 @@ export default function TaxPage() {
           })}
         </div>
 
-      </div>
-    </div>
+    </Page>
   );
 }

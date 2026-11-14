@@ -4,6 +4,7 @@ import { PageSkeleton } from '@/components/SkeletonLoader';
 import { fmt } from '@/lib/accounting-data';
 import { usePeriodClosing, useBalanceFns } from '@/lib/accounting-hooks';
 import { currentMonth, exerciseYear, monthEndLabel, monthLabel } from '@/lib/period';
+import Page from '@/components/Page';
 
 const MONTH_LABELS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
 
@@ -109,7 +110,7 @@ export default function PeriodClosingPage() {
     return produits - charges;
   }, [data]);
 
-  if (loading) return <PageSkeleton title="Clôture de période" variant="accounting" rows={5} />;
+  if (loading) return <PageSkeleton section={{ icon: 'lock', label: 'Comptabilité' }} title="Clôture de période" variant="accounting" rows={5} />;
 
   const CARD = {
     background: 'var(--color-background-primary)',
@@ -119,36 +120,29 @@ export default function PeriodClosingPage() {
   };
 
   return (
-    <div className="main">
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="lock" size={13} /> Accounting
-          </div>
-          <div className="page-title">Clôture de période</div>
-          <div className="page-sub">Clôture · exercice {exerciseYear()} · arrêté au {monthEndLabel()}</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill">
-            <span className="dot" style={closed ? { background: '#276C2B' } : {}} />
-            {closed ? `Exercice ${exerciseYear()} · ${monthLabel().toLowerCase()} clôturé` : `Exercice ${exerciseYear()} · ouvert`}
-          </span>
-          <button
-            className="btn"
-            disabled={closed || !allDone || closing || !currentPeriod?.id}
-            onClick={async () => {
-              if (!currentPeriod?.id) return;
-              setClosing(true);
-              setJustClosed(true);
-              try { await closePeriod(currentPeriod.id); } finally { setClosing(false); }
-            }}
-          >
-            <Icon name="lock" />{closing ? 'Clôture…' : closed ? 'Clôturé' : `Clôturer ${currentPeriod?.m ?? ''}`}
-          </button>
-        </div>
-      </div>
-
-      <div className="content">
+    <Page
+      section={{ icon: 'lock', label: 'Comptabilité' }}
+      title="Clôture de période"
+      subtitle={<>Clôture · exercice {exerciseYear()} · arrêté au {monthEndLabel()}</>}
+      actions={<>
+        <span className="period-pill">
+          <span className="dot" style={closed ? { background: '#276C2B' } : {}} />
+          {closed ? `Exercice ${exerciseYear()} · ${monthLabel().toLowerCase()} clôturé` : `Exercice ${exerciseYear()} · ouvert`}
+        </span>
+        <button
+          className="btn"
+          disabled={closed || !allDone || closing || !currentPeriod?.id}
+          onClick={async () => {
+            if (!currentPeriod?.id) return;
+            setClosing(true);
+            setJustClosed(true);
+            try { await closePeriod(currentPeriod.id); } finally { setClosing(false); }
+          }}
+        >
+          <Icon name="lock" />{closing ? 'Clôture…' : closed ? 'Clôturé' : `Clôturer ${currentPeriod?.m ?? ''}`}
+        </button>
+      </>}
+    >
         {/* Period board */}
         <div style={{ ...CARD, marginBottom: 16 }}>
           <div style={{ padding: '16px 20px 13px', borderBottom: '0.5px solid var(--color-border-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -297,7 +291,6 @@ export default function PeriodClosingPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Page>
   );
 }
