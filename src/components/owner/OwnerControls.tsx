@@ -7,17 +7,19 @@ import { useTeam, type TeamMember } from '@/lib/use-team';
 import { useReassign } from '@/lib/use-reassign';
 import type { OwnedTable } from '@/lib/api/owners';
 
-/** « Responsable : Tous / Awa / … » above a table. */
-export function OwnerFilter({ options, value, onChange }: {
+/** « Responsable : Tous / Awa / … » (or « Saisi par ») above a table. */
+export function OwnerFilter({ options, value, onChange, label = 'Responsable' }: {
   options: { key: string; label: string }[];
   value: string;
   onChange: (key: string) => void;
+  /** « Saisi par » for payments. */
+  label?: string;
 }) {
   const id = useId();
   if (options.length < 2 && value === 'all') return null;
   return (
     <label className="dt-select" htmlFor={id}>
-      <span>Responsable</span>
+      <span>{label}</span>
       <select id={id} value={value} onChange={e => onChange(e.target.value)}>
         <option value="all">Tous</option>
         {options.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}

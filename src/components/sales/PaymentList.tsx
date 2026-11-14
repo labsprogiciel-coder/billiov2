@@ -2,13 +2,14 @@
 // PaymentsPage renders this instead of its cards and list when VITE_UI_V2 is on;
 // recording a payment and the « Relevé » export stay in the page.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable, { SummaryStrip, type Column, type StatusFilter } from '@/components/DataTable';
 import StatusPill from '@/components/sales/StatusPill';
 import { useApp } from '@/context/AppContext';
 import { invoiceRef } from '@/lib/invoice-number';
-import { PAYMENT_STATUS, PAY_METHOD_LABEL, paymentFigures } from '@/lib/sales-tables';
+import { PAYMENT_STATUS, PAY_METHOD_LABEL, paymentAuthor, paymentAuthorOptions, paymentFigures } from '@/lib/sales-tables';
+import { OwnerFilter } from '@/components/owner/OwnerControls';
 import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { Payment } from '@/lib/schemas';
 
@@ -25,6 +26,10 @@ export default function PaymentList({ onShownChange }: { onShownChange: (shown: 
   const { payments, invoices, clientsMap } = useApp();
   const navigate = useNavigate();
   const figures = useMemo(() => paymentFigures(payments), [payments]);
+  // « Saisi par » filter (PRO-173)
+  const [author, setAuthor] = useState('all');
+  const authorChoices = useMemo(() => paymentAuthorOptions(payments), [payments]);
+  const rows = useMemo(() => author === 'all' ? payments : payments.filter(p => paymentAuthor(p) === author), [payments, author]);
   // Payments point to the invoice's internal id; show its legal number
   const invRef = useMemo(() => {
     const byId = new Map(invoices.map(i => [i.id, invoiceRef(i)]));
@@ -52,8 +57,7 @@ export default function PaymentList({ onShownChange }: { onShownChange: (shown: 
       },
     },
     { key: 'method', header: 'Méthode', cell: p => PAY_METHOD_LABEL[p.method] },
-    // Who recorded each payment comes with PRO-173
-    { key: 'by', header: 'Saisi par', cell: () => null, hidden: true },
+    { key: 'by', header: 'Saisi par', cell: p => p.source === 'online' || !p.createdByName ? <span className="dt-muted">{paymentAuthor(p)}</span> : p.createdByName },
     { key: 'amount', header: 'Montant', align: 'right', cell: p => <b className={p.status === 'completed' ? undefined : 'dt-muted'}>{fmt(p.amount)}</b> },
     { key: 'status', header: 'Statut', cell: p => <StatusPill {...PAYMENT_STATUS[p.status]} /> },
   ];
@@ -68,7 +72,8 @@ export default function PaymentList({ onShownChange }: { onShownChange: (shown: 
       ]} />
       <DataTable
         caption="Paiements"
-        rows={payments}
+        rows={rows}
+        toolbarExtra={<OwnerFilter label="Saisi par" options={authorChoices} value={author} onChange={setAuthor} />}
         rowKey={p => p.id}
         rowLabel={p => `le paiement du ${fmtDate(p.date)}`}
         noun={{ one: 'paiement', many: 'paiements' }}

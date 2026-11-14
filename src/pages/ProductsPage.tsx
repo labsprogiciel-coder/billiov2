@@ -8,7 +8,8 @@ import { ProductsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { createProduct, updateProduct, removeProduct } from '@/lib/api/products';
-import { fmt, fmtCompact } from '@/data';
+import { lastChangeLabel } from '@/lib/change-label';
+import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { ProductType, Product } from '@/lib/schemas';
 import Page from '@/components/Page';
 
@@ -111,7 +112,8 @@ export default function ProductsPage() {
       const previous = products.find(p => p.id === editId);
       setProducts(prev => prev.map(p => p.id === editId ? { ...p, ...patch } : p));
       try {
-        await updateProduct(editId, patch);
+        const change = await updateProduct(editId, patch);
+        setProducts(prev => prev.map(p => p.id === editId ? { ...p, ...change } : p));
       } catch (err) {
         console.error('[updateProduct] failed:', err);
         if (previous) setProducts(prev => prev.map(p => p.id === editId ? previous : p));
@@ -136,7 +138,8 @@ export default function ProductsPage() {
       };
       setProducts(prev => [item, ...prev]);
       try {
-        await createProduct(orgId, item);
+        const stored = await createProduct(orgId, item);
+        setProducts(prev => prev.map(p => p.id === item.id ? { ...p, updatedAt: stored.updatedAt, updatedByName: stored.updatedByName } : p));
       } catch (err) {
         console.error('[createProduct] failed:', err);
         setProducts(prev => prev.filter(p => p.id !== item.id));
@@ -271,6 +274,7 @@ export default function ProductsPage() {
                     <div style={{ minWidth: 0 }}>
                       <div className="prod-name">{p.name}</div>
                       <div className="prod-sku">{p.sku}</div>
+                      {lastChangeLabel(p, fmtDate) && <div className="prod-changed">{lastChangeLabel(p, fmtDate)}</div>}
                     </div>
                   </div>
                   <div><TypePill type={p.type} /></div>
@@ -327,6 +331,7 @@ export default function ProductsPage() {
                   </div>
                   <div className="pc-name">{p.name}</div>
                   <div className="pc-sku">{p.sku}</div>
+                  {lastChangeLabel(p, fmtDate) && <div className="prod-changed">{lastChangeLabel(p, fmtDate)}</div>}
                   <div className="pc-price tnum">
                     {fmt(p.price)}<span className="cur">F CFA</span>
                     <span className="per"> / {p.unit}</span>

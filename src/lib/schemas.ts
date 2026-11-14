@@ -104,6 +104,8 @@ export const paymentSchema = z.object({
   amount: z.number().min(0),
   status: payStatusSchema,
   source: paySourceSchema.default('manual'),
+  /** « Saisi par »: who recorded it (PRO-173), set by the database; none for online payments */
+  createdByName: z.string().optional(),
 });
 
 export const productSchema = z.object({
@@ -117,6 +119,9 @@ export const productSchema = z.object({
   used:  z.number().int().min(0),
   ico:   z.string(),
   color: z.string(),
+  /** Last change of what the item is or costs (PRO-173), set by the database */
+  updatedAt:     z.string().optional(),
+  updatedByName: z.string().optional(),
 });
 
 export const creditNoteSchema = z.object({

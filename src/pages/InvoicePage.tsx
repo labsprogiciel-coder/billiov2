@@ -449,6 +449,7 @@ export default function InvoicePage() {
         ref:                payRef.trim() || METHOD_LABEL[payMethod],
         amount:             payAmount,
         clientName:         client.name,
+        recordedBy:         userLabel,
         tvaRetenue,
         serviceWithholding,
       });
