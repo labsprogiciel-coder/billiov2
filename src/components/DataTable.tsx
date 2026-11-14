@@ -61,6 +61,8 @@ export interface DataTableProps<T> {
   /** Shown after the count in the footer, e.g. the amount due of the shown rows. */
   footerSummary?: (shown: T[]) => ReactNode;
   emptyMessage?: ReactNode;
+  /** Status filter selected at first (e.g. « En retard » from the command box). */
+  initialFilter?: string;
   /**
    * Told the rows the filters and search keep (all pages), e.g. for an export of
    * what's listed. Keep them in a ref: setting state here renders the table again.
@@ -71,9 +73,9 @@ export interface DataTableProps<T> {
 export default function DataTable<T>({
   caption, rows, rowKey, columns, noun, filters = [], allLabel = 'Toutes', search, mine,
   toolbarExtra, onRowClick, rowLabel, rowActions, selectable, bulkActions,
-  pageSize = 25, footerSummary, emptyMessage, onShownChange,
+  pageSize = 25, footerSummary, emptyMessage, onShownChange, initialFilter,
 }: DataTableProps<T>) {
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(initialFilter ?? 'all');
   const [query, setQuery] = useState('');
   const [mineOnly, setMineOnly] = useState(!!mine?.defaultOn);
   const [page, setPage] = useState(1);

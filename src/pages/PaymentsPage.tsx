@@ -18,6 +18,7 @@ import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
 import type { Payment, PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 import Page from '@/components/Page';
 import PaymentList from '@/components/sales/PaymentList';
+import { useCommandIntent } from '@/lib/command-intent';
 import { UI_V2 } from '@/lib/features';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
@@ -135,6 +136,12 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
   }
 
   function closePanel() { setPanelOpen(false); }
+
+  // From the command box (PRO-162)
+  useCommandIntent(intent => {
+    if (intent.command !== 'new-payment' || !writable) return false;
+    openPanel();
+  }, !loading);
   function requestClosePanel() {
     if (confirmDiscard(invId !== '' || amount.trim() !== '' || ref.trim() !== '')) closePanel();
   }

@@ -25,9 +25,11 @@ export interface InvoiceListProps {
   onDownload: (id: string) => void;
   /** An invoice's PDF is being made: other downloads wait. */
   downloading: boolean;
+  /** Bumped to show the late invoices (command box). */
+  showLate?: number;
 }
 
-export default function InvoiceList({ writable, onOpen, onSend, onDownload, downloading }: InvoiceListProps) {
+export default function InvoiceList({ writable, onOpen, onSend, onDownload, downloading, showLate = 0 }: InvoiceListProps) {
   const { invoices, payments, clientsMap, orgId } = useApp();
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   useEffect(() => {
@@ -83,6 +85,8 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
         { label: 'Encaissé', value: fmtCompact(figures.collected.amount), unit: 'F CFA', note: `sur ${figures.collected.count} factures`, tone: 'good' },
       ]} />
       <DataTable
+        key={showLate}
+        initialFilter={showLate ? 'overdue' : undefined}
         caption="Factures"
         rows={rows}
         rowKey={r => r.id}

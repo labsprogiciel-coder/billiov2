@@ -8,6 +8,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import BillioMark from '@/components/BillioMark';
 import UpgradeModal from '@/components/UpgradeModal';
+import CommandBox from '@/components/CommandBox';
 import { useApp } from '@/context/AppContext';
 import { ACCOUNTING_ENABLED } from '@/lib/features';
 import { PLAN_LABELS, minPlanForFeature, type Feature } from '@/lib/plans';
@@ -54,6 +55,7 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
           )}
         </nav>
 
+        <CommandBox />
         <AccountMenu onLogout={onLogout} />
       </header>
     </>

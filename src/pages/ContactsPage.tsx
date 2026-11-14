@@ -27,6 +27,7 @@ import { todayISO } from '@/lib/invoice-status';
 import { downloadBlob } from '@/lib/download';
 import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 import Page from '@/components/Page';
+import { useCommandIntent } from '@/lib/command-intent';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -548,6 +549,13 @@ export default function ContactsPage() {
     () => linkedClient ? { kind: 'detail', code: linkedClient } : null,
   );
   const [form, setForm] = useState<NewClientForm>(EMPTY_FORM);
+  // From the command box (PRO-162): a new client, or one found by the search
+  useCommandIntent(intent => {
+    if (intent.command === 'open-client') { setTab('clients'); setClientPanel({ kind: 'detail', code: intent.client }); return; }
+    if (intent.command !== 'new-client' || !writable) return false;
+    setTab('clients');
+    setClientPanel({ kind: 'new' });
+  }, !clientsLoading);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
   const [deleteClient, setDeleteClient] = useState<ClientRecord | null>(null);

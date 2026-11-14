@@ -26,6 +26,7 @@ import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import Page from '@/components/Page';
 import QuoteList from '@/components/sales/QuoteList';
+import { useCommandIntent } from '@/lib/command-intent';
 import { UI_V2 } from '@/lib/features';
 
 type FilterKey = 'all' | QuoteStatus;
@@ -137,6 +138,13 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     setPanelOpen(true);
   }
   function closePanel() { setPanelOpen(false); setShowPicker(false); }
+
+  // From the command box (PRO-162): a new quote, maybe for a client
+  useCommandIntent(intent => {
+    if (intent.command !== 'new-quote' || !writable) return false;
+    openPanel();
+    if (intent.client) setFClient(intent.client);
+  }, !loading);
   function requestClosePanel() {
     const dirty = fClient !== '' || fSubject.trim() !== '' || filledLines(lines).length > 0;
     if (confirmDiscard(dirty)) closePanel();
