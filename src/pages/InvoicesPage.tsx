@@ -29,6 +29,7 @@ import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import Page from '@/components/Page';
 import InvoiceList from '@/components/sales/InvoiceList';
+import { useCommandIntent } from '@/lib/command-intent';
 import { UI_V2 } from '@/lib/features';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -123,6 +124,15 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     setPanelOpen(true);
   };
   const closePanel = () => { setPanelOpen(false); setShowPicker(false); };
+
+  // From the command box (PRO-162): a new invoice, maybe for a client; the late ones
+  const [showLate, setShowLate] = useState(0);
+  useCommandIntent(intent => {
+    if (intent.command === 'show-late') { setShowLate(n => n + 1); return; }
+    if (intent.command !== 'new-invoice' || !writable) return false;
+    openPanel();
+    if (intent.client) setFClient(intent.client);
+  }, !loading);
   // Scrim, ✕ and Annuler ask first when something was typed
   const requestClosePanel = () => {
     // The issue checks and the save use this form: wait for them rather than discard it midway
@@ -312,6 +322,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
               onSend={id => openSend(null, id)}
               onDownload={id => void downloadPdf(null, id)}
               downloading={downloadingId !== null}
+              showLate={showLate}
             />
           ) : <>
           {/* Metrics */}
