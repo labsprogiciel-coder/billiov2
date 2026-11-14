@@ -6,6 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { PLAN_LABELS, minPlanForFeature, type Feature } from '@/lib/plans';
 import BillioMark from '@/components/BillioMark';
 import { ACCOUNTING_ENABLED } from '@/lib/features';
+import { ROUTE_FEATURE } from '@/lib/nav';
 
 type NavItem = { icon: string; label: string; to: string };
 
@@ -31,26 +32,6 @@ const NAV_ACCOUNTING: NavItem[] = [
 const NAV_ACCOUNT: NavItem[] = [
   { icon: 'settings', label: 'Paramètres', to: '/settings' },
 ];
-
-// Maps each route to the Feature that must be unlocked to access it.
-// Routes not listed here are available on all plans (including Solo).
-//
-// Solo now includes: basic DGI-compliant accounting, financial statements,
-// basic VAT tracking, online payment links — so those routes are ungated.
-// Business+ gates: full SYSCOHADA, unlimited invoicing, quotes, AI reminders.
-// Cabinet+ gates: fixed assets, period closing.
-const ROUTE_FEATURE: Record<string, Feature> = {
-  // Business+
-  '/accounting/opening-balances':        'accounting_syscohada',
-  '/accounting/chart-of-accounts':       'accounting_syscohada',
-  '/accounting/journals':                'accounting_syscohada',
-  '/accounting/trial-balance':           'accounting_syscohada',
-  '/accounting/financial-statements':    'accounting_syscohada',
-  '/accounting/tax':                     'accounting_syscohada',
-  // Cabinet+
-  '/accounting/fixed-assets':            'fixed_assets',
-  '/accounting/period-closing':          'period_closing',
-};
 
 // Badge colour per plan tier
 const PLAN_BADGE_CLASS: Record<string, string> = {

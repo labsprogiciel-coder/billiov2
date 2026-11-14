@@ -28,6 +28,7 @@ import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import Page from '@/components/Page';
+import { UI_V2 } from '@/lib/features';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -288,12 +289,12 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     }
   };
 
-  if (loading) return <PageSkeleton title="Facturation" subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title={UI_V2 ? 'Factures' : 'Facturation'} subtitle="Gérez et suivez vos factures" metrics={4} rows={6} />;
 
   return (
     <>
       <Page
-        title="Facturation"
+        title={UI_V2 ? 'Factures' : 'Facturation'}
         subtitle="Gérez et suivez vos factures"
         actions={<>
           {writable && (
