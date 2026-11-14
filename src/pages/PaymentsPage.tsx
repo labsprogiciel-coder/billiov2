@@ -1,5 +1,5 @@
 import { invoiceRef } from '@/lib/invoice-number';
-import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
@@ -15,8 +15,9 @@ import { csvBlob } from '@/lib/csv';
 import { confirmDiscard } from '@/lib/confirm-discard';
 import { downloadBlob } from '@/lib/download';
 import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
-import type { PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
+import type { Payment, PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 import Page from '@/components/Page';
+import PaymentList from '@/components/sales/PaymentList';
 import { UI_V2 } from '@/lib/features';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
@@ -113,9 +114,12 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
   const onlineCount = payments.filter(p => p.source === 'online').length;
 
   // Relevé: the payments currently listed, as a CSV for Excel
+  // In the ERP look the table filters itself and tells us what it lists
+  const tableShown = useRef<Payment[]>([]);
   function exportStatement() {
-    if (filtered.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
-    const rows = filtered.map(p => [
+    const listed = UI_V2 ? tableShown.current : filtered;
+    if (listed.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
+    const rows = listed.map(p => [
       p.date, invRef(p.inv), clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status],
     ]);
     downloadBlob(
@@ -197,6 +201,18 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
           )}
         </>}
       >
+          {UI_V2 ? <>
+            {onlineCount > 0 && (
+              <div className="recon-banner">
+                <div className="rb-ico"><Icon name="bolt" size={18} /></div>
+                <div className="rb-text">
+                  <b>Les paiements en ligne se rapprochent automatiquement</b>
+                  Connecté via Paystack — chaque paiement en ligne est associé à la facture correspondante en temps réel.
+                </div>
+              </div>
+            )}
+            <PaymentList onShownChange={rows => { tableShown.current = rows; }} />
+          </> : <>
           {/* Metrics */}
           <div className="metrics">
             {/* Feature card — total received */}
@@ -370,6 +386,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
               })
             )}
           </div>
+          </>}
       </Page>
 
       {/* Scrim */}

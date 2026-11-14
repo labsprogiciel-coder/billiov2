@@ -25,6 +25,7 @@ import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import Page from '@/components/Page';
+import QuoteList from '@/components/sales/QuoteList';
 import { UI_V2 } from '@/lib/features';
 
 type FilterKey = 'all' | QuoteStatus;
@@ -217,14 +218,14 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  function sendReminder(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
+  function sendReminder(id: string, e?: React.MouseEvent) {
+    e?.stopPropagation();
     setSendQuote({ id, kind: 'reminder' });
   }
 
   // A new draft with the same client, subject and lines, dated today
-  async function duplicateQuote(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function duplicateQuote(id: string, e?: React.MouseEvent) {
+    e?.stopPropagation();
     const quote = quotes.find(q => q.id === id);
     if (!quote || duplicating) return;
     setDuplicating(id);
@@ -252,8 +253,8 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  function handleDelete(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
+  function handleDelete(id: string, e?: React.MouseEvent) {
+    e?.stopPropagation();
     setDeleteId(id);
   }
 
@@ -289,6 +290,18 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
           )}
         </>}
       >
+          {UI_V2 ? (
+            <QuoteList
+              writable={writable}
+              deletable={deletable}
+              onOpen={id => navigate(`/quotes/${id}`)}
+              onConvert={q => void compliance.guard(q.client, () => void convertToInvoice(q.id), { returnTo: '/quotes' })}
+              onRemind={id => sendReminder(id)}
+              onDuplicate={id => void duplicateQuote(id)}
+              onDelete={id => handleDelete(id)}
+              duplicating={duplicating !== null}
+            />
+          ) : <>
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -457,6 +470,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
               })
             )}
           </div>
+          </>}
       </Page>
 
       {/* Scrim */}

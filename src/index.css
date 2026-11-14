@@ -2225,3 +2225,18 @@ html[data-ui="v2"] .page-section { display: none; }
   .dt-strip > div:nth-child(n+3) { border-top: 1px solid var(--color-border-tertiary); }
   .dt-search input { min-width: 0; width: 100%; }
 }
+
+/* ── Facturation tables (PRO-165, src/components/sales) ─────────────────── */
+.dt-status { display: inline-block; font-size: 12px; font-weight: 600; line-height: 18px; padding: 0 7px; border-radius: 3px; white-space: nowrap; }
+.dt-status.late    { background: var(--status-late-tint, #FDECEA);    color: var(--status-late, #B42318); }
+.dt-status.paid    { background: var(--status-paid-tint, #E7F6EC);    color: var(--status-paid, #1E6B3A); }
+.dt-status.wait    { background: var(--status-wait-tint, #E5EEF8);    color: var(--status-wait, #1A5C9E); }
+.dt-status.partial { background: var(--status-partial-tint, #FEF3C7); color: var(--status-partial, #92400E); }
+.dt-status.draft,
+.dt-status.muted   { background: var(--color-background-secondary);   color: var(--status-draft, #606C7E); }
+.dt-ref { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dt-muted { color: var(--color-text-tertiary); }
+.dt-warn { color: var(--status-partial, #92400E); font-size: 12px; font-weight: 600; }
+.dt-clip { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.dt-linkcell { border: 0; background: none; padding: 0; font: inherit; color: var(--brand); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.dt-table .btn-sm { padding: 3px 9px; white-space: nowrap; }

@@ -28,6 +28,7 @@ import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import Page from '@/components/Page';
+import InvoiceList from '@/components/sales/InvoiceList';
 import { UI_V2 } from '@/lib/features';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -141,8 +142,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
 
   // Sending happens from the invoice page's send dialog (email / WhatsApp)
   // Same PDF as the invoice page, without leaving the list
-  const downloadPdf = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const downloadPdf = async (e: React.MouseEvent | null, id: string) => {
+    e?.stopPropagation();
     const invoice = invoices.find(i => i.id === id);
     if (!invoice || downloadingId) return;
     if (paymentMethodsStatus !== 'ready') { showToast(paymentMethodsNotReadyMessage(paymentMethodsStatus), true); return; }
@@ -171,8 +172,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     }
   };
 
-  const openSend = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const openSend = (e: React.MouseEvent | null, id: string) => {
+    e?.stopPropagation();
     navigate(`/invoices/${id}`, { state: { openSend: true } });
   };
 
@@ -304,6 +305,15 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           )}
         </>}
       >
+          {UI_V2 ? (
+            <InvoiceList
+              writable={writable}
+              onOpen={id => navigate(`/invoices/${id}`)}
+              onSend={id => openSend(null, id)}
+              onDownload={id => void downloadPdf(null, id)}
+              downloading={downloadingId !== null}
+            />
+          ) : <>
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -448,6 +458,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
               );
             })}
           </div>
+          </>}
       </Page>
 
       {/* Slide-over panel — sibling of .main, both inside .main-rel */}
