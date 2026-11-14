@@ -16,6 +16,7 @@ export function dbToPayment(row: Record<string, unknown>): Payment {
     amount: Number(row.amount),
     status: (row.status ?? 'completed') as Payment['status'],
     source: (row.source ?? 'manual') as Payment['source'],
+    createdByName: row.created_by_name ? String(row.created_by_name) : undefined,
   };
 }
 
@@ -103,6 +104,8 @@ export async function settleInvoicePayment(
     clientName:          string;
     tvaRetenue?:         number;
     serviceWithholding?: number;
+    /** Name of the signed-in user, shown as « Saisi par » until the list reloads (the database stores its own). */
+    recordedBy?:         string;
   },
 ): Promise<InvoiceSettlement> {
   let result: { payment_id: string; client_code: string; invoice_status: Invoice['status']; balance: number };
@@ -131,6 +134,7 @@ export async function settleInvoicePayment(
     amount: opts.amount,
     status: 'completed',
     source: 'manual',
+    createdByName: opts.recordedBy,
   };
 
   let accountingOk = true;

@@ -18,6 +18,7 @@ import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
 import type { Payment, PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 import Page from '@/components/Page';
 import PaymentList from '@/components/sales/PaymentList';
+import { paymentAuthor } from '@/lib/sales-tables';
 import { useCommandIntent } from '@/lib/command-intent';
 import { UI_V2 } from '@/lib/features';
 
@@ -58,7 +59,7 @@ const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
 /** Rendered by SalesPage, which passes the Factures | Devis | Paiements tab switcher. */
 export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
   const { writable } = usePermissions();
-  const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading } = useApp();
+  const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading, userLabel } = useApp();
 
   const [filter, setFilter]     = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
@@ -121,10 +122,10 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     const listed = UI_V2 ? tableShown.current : filtered;
     if (listed.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
     const rows = listed.map(p => [
-      p.date, invRef(p.inv), clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status],
+      p.date, invRef(p.inv), clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status], paymentAuthor(p),
     ]);
     downloadBlob(
-      csvBlob(['Date', 'Facture', 'Client', 'Méthode', 'Référence', 'Montant (F CFA)', 'Statut'], rows),
+      csvBlob(['Date', 'Facture', 'Client', 'Méthode', 'Référence', 'Montant (F CFA)', 'Statut', 'Saisi par'], rows),
       `releve-paiements-${todayISO()}.csv`,
     );
   }
@@ -171,6 +172,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
         ref:        ref.trim() || m.sub,
         amount:     amt,
         clientName: clientsMap[inv?.client ?? '']?.name ?? (inv?.client ?? '?'),
+        recordedBy: userLabel,
       });
       setPayments(prev => prev.some(p => p.id === res.payment.id) ? prev : [{ ...res.payment, client: res.payment.client || (inv?.client ?? '') }, ...prev]);
       setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: res.invoiceStatus } : i));

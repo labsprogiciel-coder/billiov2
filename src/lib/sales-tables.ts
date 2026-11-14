@@ -173,3 +173,17 @@ export function ownerOptions(rows: Owned[]): { key: string; label: string }[] {
   return [...seen].map(([key, label]) => ({ key, label }))
     .sort((a, b) => (a.key === 'none' ? 1 : b.key === 'none' ? -1 : a.label.localeCompare(b.label, 'fr')));
 }
+
+// ── « Saisi par » (PRO-173) ──────────────────────────────────────────────────
+
+/** Who recorded a payment, as shown: online payments come from Paystack. */
+export function paymentAuthor(p: Pick<Payment, 'source' | 'createdByName'>): string {
+  return p.source === 'online' ? 'En ligne' : p.createdByName ?? 'Inconnu';
+}
+
+/** The authors present, by name; « En ligne » and « Inconnu » last. */
+export function paymentAuthorOptions(payments: Pick<Payment, 'source' | 'createdByName'>[]): { key: string; label: string }[] {
+  const names = [...new Set(payments.map(paymentAuthor))];
+  const rank = (n: string) => (n === 'En ligne' ? 1 : n === 'Inconnu' ? 2 : 0);
+  return names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'fr')).map(n => ({ key: n, label: n }));
+}

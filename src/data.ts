@@ -194,3 +194,10 @@ export function mockOwner(ownerId?: string): { ownerId: string; ownerName: strin
 for (const list of [INITIAL_INVOICES, INITIAL_QUOTES, INITIAL_CLIENTS] as { ownerId?: string; ownerName?: string }[][]) {
   list.forEach((r, i) => Object.assign(r, mockOwner(MOCK_TEAM[i % MOCK_TEAM.length].id)));
 }
+
+// Who recorded the demo payments (online ones have no one) and changed the items (PRO-173)
+INITIAL_PAYMENTS.forEach((p, i) => { if (p.source !== 'online') p.createdByName = MOCK_TEAM[i % MOCK_TEAM.length].name; });
+INITIAL_PRODUCTS.forEach((p, i) => {
+  p.updatedAt = new Date(Date.UTC(2026, 4, 2 + i * 3, 9)).toISOString();
+  p.updatedByName = MOCK_TEAM[(i + 1) % MOCK_TEAM.length].name;
+});
