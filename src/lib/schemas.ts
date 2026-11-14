@@ -147,6 +147,8 @@ export const quoteSchema = z.object({
   expSoon: z.boolean(),
   amount:  z.number().min(0),
   status:  quoteStatusSchema,
+  /** The invoice it became, once converted (internal id; none for quotes converted before this was kept) */
+  invoiceId: z.string().optional(),
   /** « Responsable »: the team member in charge (PRO-172), set and named by the database */
   ownerId:     z.string().optional(),
   ownerName:   z.string().optional(),

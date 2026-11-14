@@ -33,6 +33,8 @@ describe('convertQuoteToInvoice', () => {
     api.updateInvoice.mockResolvedValue({ number: 'FACT-2026-0001', firstIssuedAt: '2026-11-11T10:00:00Z' });
     const { invoice } = await convertQuoteToInvoice('org', quote, opts);
     expect(api.createInvoice.mock.calls[0][1]).toMatchObject({ id: 'BR-TEST', status: 'draft', ownerId: 'u-awa' });
+    // The quote links to the invoice it became
+    expect(api.updateQuote).toHaveBeenCalledWith('org', 'DEV-1', { status: 'invoiced', invoiceId: 'BR-TEST' });
     // The invoice keeps the quote's « Responsable » (PRO-172)
     expect(invoice).toMatchObject({ status: 'pending', number: 'FACT-2026-0001', ownerId: 'u-awa', ownerName: 'Awa' });
   });
@@ -50,7 +52,7 @@ describe('convertQuoteToInvoice', () => {
     api.updateInvoice.mockRejectedValue(new Error('solo_invoice_limit'));
     api.fetchInvoiceIssue.mockResolvedValue({ status: 'draft' });
     await expect(convertQuoteToInvoice('org', quote, opts)).rejects.toThrow('solo_invoice_limit');
-    expect(api.updateQuote).toHaveBeenLastCalledWith('org', 'DEV-1', { status: 'accepted' });
+    expect(api.updateQuote).toHaveBeenLastCalledWith('org', 'DEV-1', { status: 'accepted', invoiceId: null });
     expect(api.removeInvoice).toHaveBeenCalledWith('org', 'BR-TEST');
   });
 

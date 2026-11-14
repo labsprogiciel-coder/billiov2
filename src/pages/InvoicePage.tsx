@@ -75,7 +75,7 @@ const BillioLogoSvg = () => (
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { invoices, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
+  const { invoices, quotes, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
   const writable = canWrite(userRole);
   const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
@@ -691,6 +691,12 @@ export default function InvoicePage() {
 
             <div className="rail-card">
               <OwnerLine table="invoices" id={invoice.id} ownerId={invoice.ownerId} ownerName={invoice.ownerName} />
+              {(() => {
+                const from = quotes.find(q => q.invoiceId === invoice.id);
+                return from ? (
+                  <p className="doc-link">Issue du devis <button type="button" className="dt-linkcell" onClick={() => navigate(`/quotes/${from.id}`)}>{from.id}</button></p>
+                ) : null;
+              })()}
             </div>
 
             <div className="rail-card">

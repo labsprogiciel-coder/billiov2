@@ -3,6 +3,8 @@
 // converting, reminding, duplicating and deleting stay in the page.
 
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { invoiceRef } from '@/lib/invoice-number';
 import DataTable, { SummaryStrip, type Column, type RowAction, type StatusFilter } from '@/components/DataTable';
 import Icon from '@/components/Icon';
 import StatusPill from '@/components/sales/StatusPill';
@@ -40,7 +42,9 @@ export interface QuoteListProps {
 }
 
 export default function QuoteList({ writable, deletable, onOpen, onConvert, onRemind, onDuplicate, onDelete, duplicating }: QuoteListProps) {
-  const { quotes, clientsMap, userId, userRole } = useApp();
+  const { quotes, invoices, clientsMap, userId, userRole } = useApp();
+  const navigate = useNavigate();
+  const invoiceById = useMemo(() => new Map(invoices.map(i => [i.id, i])), [invoices]);
   // « Responsable » (PRO-172): members start on their own records
   const { managesOrg } = usePermissions();
   const team = useTeam(managesOrg);
@@ -51,6 +55,8 @@ export default function QuoteList({ writable, deletable, onOpen, onConvert, onRe
     () => ownerFilter === 'all' ? quotes : quotes.filter(r => ownerKey(r) === ownerFilter),
     [quotes, ownerFilter],
   );
+  // Members only see their own records (the database filters them): no « Toute l'équipe » switch or Responsable filter
+  const onlyOwn = userRole === 'member';
   const mine = useMemo(() => ({
     label: 'Mes devis', isMine: (r: { ownerId?: string }) => r.ownerId === userId, defaultOn: userRole === 'member',
   }), [userId, userRole]);
@@ -77,11 +83,20 @@ export default function QuoteList({ writable, deletable, onOpen, onConvert, onRe
     {
       // An accepted quote is waiting to be invoiced: put the button in the row
       key: 'next', header: <span className="sr-only">Suite</span>, width: '110px',
-      cell: q => writable && q.status === 'accepted'
-        ? <button type="button" className="btn btn-sm btn-primary" onClick={() => onConvert(q)} aria-label={`Facturer le devis ${q.id}`}>
-            <Icon name="arrow-right" size={13} ariaHidden /> Facturer
-          </button>
-        : null,
+      cell: q => {
+        if (writable && q.status === 'accepted') {
+          return (
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => onConvert(q)} aria-label={`Facturer le devis ${q.id}`}>
+              <Icon name="arrow-right" size={13} ariaHidden /> Facturer
+            </button>
+          );
+        }
+        // A converted quote links to the invoice it became
+        const inv = q.invoiceId ? invoiceById.get(q.invoiceId) : undefined;
+        return inv
+          ? <button type="button" className="dt-linkcell" onClick={() => navigate(`/invoices/${inv.id}`)} aria-label={`Ouvrir la facture ${invoiceRef(inv)} issue de ce devis`}>→ {invoiceRef(inv)}</button>
+          : null;
+      },
     },
   ];
 
@@ -114,8 +129,8 @@ export default function QuoteList({ writable, deletable, onOpen, onConvert, onRe
         search={search}
         onRowClick={q => onOpen(q.id)}
         rowActions={rowActions}
-        mine={mine}
-        toolbarExtra={<OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
+        mine={onlyOwn ? undefined : mine}
+        toolbarExtra={onlyOwn ? undefined : <OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
         selectable={managesOrg}
         bulkActions={(selected, clear) => (
           <ReassignControl

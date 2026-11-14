@@ -209,7 +209,7 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
         clientName: clientsMap[quote.client]?.name ?? quote.client,
       });
       setInvoices(prev => prev.some(i => i.id === invoice.id) ? prev : [invoice, ...prev]);
-      setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced' } : q));
+      setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: 'invoiced', invoiceId: invoice.id } : q));
       posthog.capture('quote_converted_to_invoice', { quote_id: id, invoice_id: invoice.id });
       showToast(`Devis ${id} → Facture #${invoiceRef(invoice)} créée`);
       if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);

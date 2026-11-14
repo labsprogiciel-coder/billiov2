@@ -38,7 +38,7 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
+  const { quotes, invoices, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
   const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
@@ -216,7 +216,7 @@ export default function QuotePage() {
     try {
       const { invoice, accountingOk } = await convertQuoteToInvoice(orgId, quote, { canInvoiceTVA, clientName: client.name });
       setInvoices(prev => prev.some(i => i.id === invoice.id) ? prev : [invoice, ...prev]);
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced' } : q));
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced', invoiceId: invoice.id } : q));
       posthog.capture('quote_converted_to_invoice', { quote_id: quote.id, invoice_id: invoice.id });
       showToast(`Devis ${quote.id} → Facture #${invoiceRef(invoice)} créée`);
       if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
@@ -413,6 +413,12 @@ export default function QuotePage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <span className={`status-pill sq-${quote.status}`}>{STATUS_LABEL[quote.status]}</span>
               </div>
+              {(() => {
+                const inv = quote.invoiceId ? invoices.find(i => i.id === quote.invoiceId) : undefined;
+                return inv ? (
+                  <p className="doc-link">Facture : <button type="button" className="dt-linkcell" onClick={() => navigate(`/invoices/${inv.id}`)}>{invoiceRef(inv)}</button></p>
+                ) : null;
+              })()}
               <div className="rail-title">Informations</div>
               <div style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 7 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
