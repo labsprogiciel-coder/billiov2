@@ -17,21 +17,24 @@ vi.mock('@/lib/api/accounting', () => ({ recordInvoiceIssuanceEntry: api.recordI
 import { ConversionOutcomeUnknownError, convertQuoteToInvoice } from '@/lib/api/quote-conversion';
 import type { Quote } from '@/lib/schemas';
 
-const quote = { id: 'DEV-1', subject: 'Audit', client: 'TK', amount: 118000, status: 'accepted' } as unknown as Quote;
+const quote = { id: 'DEV-1', subject: 'Audit', client: 'TK', amount: 118000, status: 'accepted', ownerId: 'u-awa', ownerName: 'Awa' } as unknown as Quote;
 const opts = { canInvoiceTVA: true, clientName: 'TK' };
 
 beforeEach(() => {
   Object.values(api).forEach(f => f.mockReset());
   api.fetchLineItems.mockResolvedValue([]);
-  for (const f of [api.createInvoice, api.saveLineItems, api.updateQuote, api.deleteLineItems, api.removeInvoice, api.recordInvoiceIssuanceEntry]) f.mockResolvedValue(undefined);
+  // Like the database: returns the saved draft, owned by the member named
+  api.createInvoice.mockImplementation(async (_org: string, p: Record<string, unknown>) => ({ ...p, ownerName: p.ownerId === 'u-awa' ? 'Awa' : undefined }));
+  for (const f of [api.saveLineItems, api.updateQuote, api.deleteLineItems, api.removeInvoice, api.recordInvoiceIssuanceEntry]) f.mockResolvedValue(undefined);
 });
 
 describe('convertQuoteToInvoice', () => {
   it('saves a draft, marks the quote, then issues it with the number from the database', async () => {
     api.updateInvoice.mockResolvedValue({ number: 'FACT-2026-0001', firstIssuedAt: '2026-11-11T10:00:00Z' });
     const { invoice } = await convertQuoteToInvoice('org', quote, opts);
-    expect(api.createInvoice.mock.calls[0][1]).toMatchObject({ id: 'BR-TEST', status: 'draft' });
-    expect(invoice).toMatchObject({ status: 'pending', number: 'FACT-2026-0001' });
+    expect(api.createInvoice.mock.calls[0][1]).toMatchObject({ id: 'BR-TEST', status: 'draft', ownerId: 'u-awa' });
+    // The invoice keeps the quote's « Responsable » (PRO-172)
+    expect(invoice).toMatchObject({ status: 'pending', number: 'FACT-2026-0001', ownerId: 'u-awa', ownerName: 'Awa' });
   });
 
   it('keeps an invoice whose issue committed although the response was lost', async () => {

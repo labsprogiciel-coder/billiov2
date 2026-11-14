@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { INITIAL_INVOICES } from '@/data';
+import { INITIAL_INVOICES, mockOwner } from '@/data';
 import type { Invoice } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
@@ -17,6 +17,8 @@ export function dbToInvoice(row: Record<string, unknown>): Invoice {
     firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined,
     number:      row.number ? String(row.number) : undefined,
     issuedByName: row.issued_by_name ? String(row.issued_by_name) : undefined,
+    ownerId:     row.owner_id ? String(row.owner_id) : undefined,
+    ownerName:   row.owner_name ? String(row.owner_name) : undefined,
   };
 }
 
@@ -39,9 +41,9 @@ export async function fetchInvoices(orgId: string): Promise<Invoice[]> {
 
 export async function createInvoice(
   orgId: string,
-  payload: Pick<Invoice, 'id' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'status' | 'discountPct'>,
+  payload: Pick<Invoice, 'id' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'status' | 'discountPct'> & Pick<Invoice, 'ownerId'>,
 ): Promise<Invoice> {
-  if (MOCK) return { ...payload, number: payload.status === 'draft' ? undefined : mockNumber() };
+  if (MOCK) return { ...payload, number: payload.status === 'draft' ? undefined : mockNumber(), ...mockOwner(payload.ownerId) };
   const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('invoices')
@@ -56,6 +58,9 @@ export async function createInvoice(
       status:       payload.status,
       discount_pct: payload.discountPct ?? 0,
       created_by:   user?.id ?? null,
+      // The database makes the creator the owner unless this names another
+      // member (an invoice made from a quote keeps the quote's owner)
+      ...(payload.ownerId ? { owner_id: payload.ownerId } : {}),
     })
     .select()
     .single();

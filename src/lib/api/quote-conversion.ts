@@ -45,7 +45,9 @@ export async function convertQuoteToInvoice(
     amount: quote.amount, status: 'draft', discountPct: 0,
   };
 
-  await createInvoice(orgId, draft);
+  // The invoice keeps the quote's « Responsable » (PRO-172), if they are still
+  // in the team (the database decides: else whoever converts it)
+  const created = await createInvoice(orgId, { ...draft, ownerId: quote.ownerId });
   let quoteMarked = false;
   let issued: { firstIssuedAt?: string; number?: string; issuedByName?: string } | null = null;
   try {
@@ -75,7 +77,7 @@ export async function convertQuoteToInvoice(
     }
   }
   const invoice: Invoice = {
-    ...draft, status: 'pending', number: issued?.number, issuedByName: issued?.issuedByName,
+    ...draft, ownerId: created.ownerId, ownerName: created.ownerName, status: 'pending', number: issued?.number, issuedByName: issued?.issuedByName,
     firstIssuedAt: issued?.firstIssuedAt ?? new Date().toISOString(),
   };
 

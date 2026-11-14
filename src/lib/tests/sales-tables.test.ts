@@ -93,3 +93,18 @@ describe('salesTabRedirect', () => {
     expect(salesTabRedirect('invoices')).toBeNull();
   });
 });
+
+describe('owner filter', () => {
+  it('lists each owner once, departed members by name, unowned last', async () => {
+    const { ownerKey, ownerOptions } = await import('@/lib/sales-tables');
+    const rows = [
+      { ownerId: 'u2', ownerName: 'Paul' }, { ownerId: 'u1', ownerName: 'Awa' }, { ownerId: 'u2', ownerName: 'Paul' },
+      {}, { ownerName: 'Issa' },
+    ];
+    expect(ownerOptions(rows)).toEqual([
+      { key: 'id:u1', label: 'Awa' }, { key: 'name:Issa', label: 'Issa' }, { key: 'id:u2', label: 'Paul' },
+      { key: 'none', label: 'Sans responsable' },
+    ]);
+    expect(ownerKey({ ownerName: 'Issa' })).toBe('name:Issa');
+  });
+});

@@ -153,3 +153,23 @@ export const PAYMENT_STATUS: Record<Payment['status'], RowStatus> = {
 export function salesTabRedirect(tab: string | null): '/quotes' | '/payments' | null {
   return tab === 'quotes' ? '/quotes' : tab === 'payments' ? '/payments' : null;
 }
+
+// ── « Responsable » (PRO-172) ────────────────────────────────────────────────
+
+interface Owned { ownerId?: string; ownerName?: string }
+
+/** Who a record belongs to, for filtering: the member, or the name a departed member left. */
+export function ownerKey(r: Owned): string {
+  return r.ownerId ? `id:${r.ownerId}` : r.ownerName ? `name:${r.ownerName}` : 'none';
+}
+
+/** The owners present in `rows`, by name, with « Sans responsable » last if any. */
+export function ownerOptions(rows: Owned[]): { key: string; label: string }[] {
+  const seen = new Map<string, string>();
+  for (const r of rows) {
+    const k = ownerKey(r);
+    if (!seen.has(k)) seen.set(k, r.ownerName ?? 'Sans responsable');
+  }
+  return [...seen].map(([key, label]) => ({ key, label }))
+    .sort((a, b) => (a.key === 'none' ? 1 : b.key === 'none' ? -1 : a.label.localeCompare(b.label, 'fr')));
+}

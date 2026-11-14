@@ -173,3 +173,24 @@ export function clientInitials(name: string): string {
 export function newLineItem(desc = '', qty = 1, price = 0, unit = 'unité', productId?: string): LineItem {
   return { id: crypto.randomUUID(), desc, unit, qty, price, ...(productId ? { productId } : {}) };
 }
+
+// ---------------------------------------------------------------------------
+// Demo team (PRO-172): who is « Responsable » of the demo records
+// ---------------------------------------------------------------------------
+
+export const MOCK_TEAM: { id: string; name: string; role: string }[] = [
+  { id: 'mock-user', name: 'Vous (démo)',    role: 'admin' },
+  { id: 'demo-awa',  name: 'Awa Ouédraogo',  role: 'member' },
+  { id: 'demo-issa', name: 'Issa Traoré',    role: 'accountant' },
+];
+
+/** Owner of a record created in demo mode: the one named, else the demo user. */
+export function mockOwner(ownerId?: string): { ownerId: string; ownerName: string } {
+  const m = MOCK_TEAM.find(t => t.id === ownerId) ?? MOCK_TEAM[0];
+  return { ownerId: m.id, ownerName: m.name };
+}
+
+// Spread the demo records over the team, so « Mes … » has something to show
+for (const list of [INITIAL_INVOICES, INITIAL_QUOTES, INITIAL_CLIENTS] as { ownerId?: string; ownerName?: string }[][]) {
+  list.forEach((r, i) => Object.assign(r, mockOwner(MOCK_TEAM[i % MOCK_TEAM.length].id)));
+}

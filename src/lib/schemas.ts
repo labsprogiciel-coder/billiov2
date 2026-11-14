@@ -41,6 +41,9 @@ export const invoiceSchema = z.object({
   number:      z.string().optional(),
   /** Who issued it (set by the database at first issue): the operator mention */
   issuedByName: z.string().optional(),
+  /** « Responsable »: the team member in charge (PRO-172), set and named by the database */
+  ownerId:     z.string().optional(),
+  ownerName:   z.string().optional(),
 });
 
 export const serviceWithholdingScenarioSchema = z.enum([
@@ -86,6 +89,9 @@ export const clientRecordSchema = z.object({
   billed:              z.number().min(0),
   balance:             z.number().min(0),
   status:              clientStatusSchema,
+  /** « Responsable »: the team member in charge (PRO-172), set and named by the database */
+  ownerId:     z.string().optional(),
+  ownerName:   z.string().optional(),
 });
 
 export const paymentSchema = z.object({
@@ -134,6 +140,9 @@ export const quoteSchema = z.object({
   expSoon: z.boolean(),
   amount:  z.number().min(0),
   status:  quoteStatusSchema,
+  /** « Responsable »: the team member in charge (PRO-172), set and named by the database */
+  ownerId:     z.string().optional(),
+  ownerName:   z.string().optional(),
 });
 
 export const activityPartSchema = z.object({

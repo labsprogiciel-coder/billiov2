@@ -217,12 +217,14 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
     const cName = clientsMap[fClient]?.name ?? fClient;
     let invoiceCreated = false;
     const id = newDraftId();
-    const draft = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status: 'draft' as const, discountPct: fDiscount };
+    let draft: Invoice = { id, subject: fSubject.trim() || 'Facture sans titre', client: fClient, issued: fDate, due: fDue, amount: total, status: 'draft' as const, discountPct: fDiscount };
 
     try {
       // Saved as a draft first, with its lines, then issued: the database gives
       // the legal number at issue, so a failure before that uses up no number
-      await createInvoice(orgId, draft);
+      const stored = await createInvoice(orgId, draft);
+      // The database sets the « Responsable » (PRO-172)
+      draft = { ...draft, ownerId: stored.ownerId, ownerName: stored.ownerName };
       invoiceCreated = true;
       // Don't leave a draft without lines behind if saving them fails
       try {

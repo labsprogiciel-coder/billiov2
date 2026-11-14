@@ -5,9 +5,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import DataTable, { SummaryStrip, type Column, type RowAction, type StatusFilter } from '@/components/DataTable';
 import { useApp } from '@/context/AppContext';
+import { OwnerFilter, ReassignControl } from '@/components/owner/OwnerControls';
+import { usePermissions } from '@/lib/use-permissions';
+import { useTeam } from '@/lib/use-team';
+import { useReassign } from '@/lib/use-reassign';
+
 import { fetchCreditNotes } from '@/lib/api/credit-notes';
 import { invoiceRef } from '@/lib/invoice-number';
-import { invoiceFigures, invoiceRowStatus, invoiceRows, type InvoiceRow } from '@/lib/sales-tables';
+import { invoiceFigures, invoiceRowStatus, invoiceRows, ownerKey, ownerOptions, type InvoiceRow } from '@/lib/sales-tables';
 import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { CreditNote } from '@/lib/schemas';
 import StatusPill from '@/components/sales/StatusPill';
@@ -30,7 +35,7 @@ export interface InvoiceListProps {
 }
 
 export default function InvoiceList({ writable, onOpen, onSend, onDownload, downloading, showLate = 0 }: InvoiceListProps) {
-  const { invoices, payments, clientsMap, orgId } = useApp();
+  const { invoices, payments, clientsMap, orgId, userId, userRole } = useApp();
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   useEffect(() => {
     if (orgId) fetchCreditNotes(orgId).then(setCreditNotes).catch(err => console.error('[fetchCreditNotes]', err));
@@ -38,6 +43,19 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
 
   const rows = useMemo(() => invoiceRows(invoices, payments, creditNotes), [invoices, payments, creditNotes]);
   const figures = useMemo(() => invoiceFigures(rows), [rows]);
+  // « Responsable » (PRO-172): members start on their own records
+  const { managesOrg } = usePermissions();
+  const team = useTeam(managesOrg);
+  const { reassign, busy: reassigning } = useReassign();
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const ownerChoices = useMemo(() => ownerOptions(rows), [rows]);
+  const ownedRows = useMemo(
+    () => ownerFilter === 'all' ? rows : rows.filter(r => ownerKey(r) === ownerFilter),
+    [rows, ownerFilter],
+  );
+  const mine = useMemo(() => ({
+    label: 'Mes factures', isMine: (r: { ownerId?: string }) => r.ownerId === userId, defaultOn: userRole === 'member',
+  }), [userId, userRole]);
   const clientName = (id: string) => clientsMap[id]?.name ?? id;
   const search = useMemo(() => ({
     placeholder: 'N°, client ou objet…',
@@ -53,8 +71,7 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
     },
     { key: 'client', header: 'Client', cell: r => clientName(r.client) },
     { key: 'subject', header: 'Objet', cell: r => <span className="dt-clip">{r.subject}</span> },
-    // Who is in charge of each invoice comes with PRO-172
-    { key: 'owner', header: 'Responsable', cell: () => null, hidden: true },
+    { key: 'owner', header: 'Responsable', cell: r => r.ownerName ?? <span className="dt-muted">—</span> },
     { key: 'issued', header: 'Émission', cell: r => fmtDate(r.issued) },
     { key: 'due', header: 'Échéance', cell: r => fmtDate(r.due) },
     { key: 'amount', header: 'Montant TTC', align: 'right', cell: r => fmt(r.amount) },
@@ -88,7 +105,7 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
         key={showLate}
         initialFilter={showLate ? 'overdue' : undefined}
         caption="Factures"
-        rows={rows}
+        rows={ownedRows}
         rowKey={r => r.id}
         rowLabel={r => r.status === 'draft' ? `le brouillon ${r.subject}` : `la facture ${invoiceRef(r)}`}
         noun={{ one: 'facture', many: 'factures' }}
@@ -97,6 +114,19 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
         search={search}
         onRowClick={r => onOpen(r.id)}
         rowActions={rowActions}
+        mine={mine}
+        toolbarExtra={<OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
+        selectable={managesOrg}
+        bulkActions={(selected, clear) => (
+          <ReassignControl
+            team={team}
+            busy={reassigning}
+            onAssign={id => {
+              const name = team.find(m => m.id === id)?.name ?? '';
+              void reassign('invoices', selected.map(r => r.id), id, name).then(ok => { if (ok) clear(); });
+            }}
+          />
+        )}
         footerSummary={shown => <>Reste dû <b>{fmt(shown.reduce((s, r) => s + r.balance, 0))} F CFA</b></>}
         emptyMessage={invoices.length === 0 ? 'Aucune facture pour le moment. Créez votre première facture.' : 'Aucune facture ne correspond.'}
       />
