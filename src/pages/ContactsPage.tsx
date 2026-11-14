@@ -20,6 +20,9 @@ import { useCommandIntent } from '@/lib/command-intent';
 import ClientList from '@/components/contacts/ClientList';
 import ClientRecordPanel from '@/components/contacts/ClientRecordPanel';
 import { useCreditNotes } from '@/lib/use-credit-notes';
+import { useClientDocuments } from '@/lib/use-client-documents';
+import { kybItems, kybSummary } from '@/lib/kyb';
+import { todayISO } from '@/lib/invoice-status';
 import { invoiceRows } from '@/lib/sales-tables';
 import { clientDocuments, clientRows } from '@/lib/client-table';
 import { UI_V2 } from '@/lib/features';
@@ -113,6 +116,12 @@ export default function ContactsPage() {
   const invRows = useMemo(() => invoiceRows(invoices, payments, creditNotes), [invoices, payments, creditNotes]);
   const cRows = useMemo(() => clientRows(clients, invRows, year), [clients, invRows, year]);
   const selectedRow = cRows.find(c => c.code === selectedCode) ?? null;
+  // KYB documents (PRO-176): every client's status for the list, details for the record
+  const kyb = useClientDocuments();
+  const kybByClient = useMemo(() => {
+    const today = todayISO();
+    return new Map(clients.map(c => [c.code, kybSummary(kybItems(clientTypeOf(c), kyb.docs.filter(d => d.clientCode === c.code), today))]));
+  }, [clients, kyb.docs]);
   const selectedDocs = useMemo(() => clientDocuments(selectedCode ?? '', invRows, quotes), [selectedCode, invRows, quotes]);
   // In the ERP look the side panel is only the edit form: when editing ends,
   // close it and show that client's record beside the list
@@ -263,11 +272,12 @@ export default function ContactsPage() {
           {UI_V2 && (
             <>
               <div className="cr-split">
-                <ClientList rows={cRows} year={year} selected={selectedCode} onSelect={setSelectedCode} />
+                <ClientList rows={cRows} year={year} selected={selectedCode} onSelect={setSelectedCode} kyb={kybByClient} />
                 <ClientRecordPanel
                   client={selectedRow}
                   year={year}
                   docs={selectedDocs}
+                  kyb={kyb}
                   onClose={() => setSelectedCode(null)}
                   onEdit={code => { const cl = clients.find(c => c.code === code) ?? null; setClientPanel({ kind: 'detail', code }); openDetailEdit(cl); }}
                   onDelete={code => handleDeleteClient(clients.find(c => c.code === code) ?? null)}
