@@ -2164,6 +2164,7 @@ html[data-ui="v2"] .page-section { display: none; }
   /* Until the phone layout (PRO-178): let the areas scroll sideways */
   .tn-areas { overflow-x: auto; scrollbar-width: none; }
   .tn-menu.wide { grid-template-columns: 1fr; }
+}
 
 /* ── Shared dense table (PRO-163, src/components/DataTable.tsx) ────────── */
 .dt { background: var(--color-background-primary); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
