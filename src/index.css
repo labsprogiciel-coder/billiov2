@@ -2376,3 +2376,42 @@ html[data-ui="v2"] .page-section { display: none; }
 .form-hint { margin: 4px 0 0; font-size: 12px; color: var(--color-text-tertiary); }
 .form-error { margin: 4px 0 0; font-size: 12px; color: var(--status-late, #B42318); font-weight: 600; }
 .doc-link { margin: 8px 0 0; font-size: 13px; color: var(--color-text-secondary); }
+
+/* ── Dashboard of the ERP look (PRO-164) ──────────────────────────────────── */
+:root { --chart-bar: #1A5C9E; --chart-bar-current: #5E8FC8; --chart-grid: #E6E9EE; }
+.dash-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-bottom: 16px; }
+.dash-panel { background: var(--color-background-primary); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 14px 16px; min-width: 0; }
+.dash-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.dash-title { margin: 0; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.dash-panel > .dash-title { margin-bottom: 10px; }
+.dash-latest { margin-top: 4px; }
+.dash-empty { margin: 16px 0; display: flex; align-items: center; gap: 6px; color: var(--status-paid, #1E6B3A); font-size: 13px; font-weight: 600; }
+.chase-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.chase-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--color-border-tertiary); font-size: 13px; }
+.chase-list li:first-child { border-top: 0; }
+.chase-open { border: 0; background: none; padding: 0; font: inherit; text-align: left; cursor: pointer; display: grid; min-width: 0; color: var(--color-text-primary); }
+.chase-open b { font-variant-numeric: tabular-nums; }
+.chase-open span { font-size: 12px; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chase-open:hover b, .chase-open:focus-visible b { color: var(--brand); text-decoration: underline; }
+.chase-late { font-size: 12px; font-weight: 600; color: var(--status-late, #B42318); white-space: nowrap; }
+.chase-amt { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Cash chart: one series, thin columns from one baseline, recessive grid */
+.cash-chart { margin: 0; }
+.cash-plot { position: relative; height: 170px; margin-left: 44px; }
+.cash-grid { position: absolute; inset: 0; }
+.cash-tick { position: absolute; left: 0; right: 0; border-top: 1px solid var(--chart-grid); }
+.cash-tick span { position: absolute; right: calc(100% + 8px); top: -8px; font-size: 11px; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cash-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; }
+.cash-slot { position: relative; flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; outline: none; border-radius: 3px; }
+.cash-slot:focus-visible { box-shadow: inset 0 0 0 2px var(--brand); }
+.cash-slot.on { background: color-mix(in srgb, var(--brand) 6%, transparent); }
+.cash-bar { width: min(24px, 60%); background: var(--chart-bar); border-radius: 4px 4px 0 0; }
+.cash-bar.current { background: var(--chart-bar-current); }
+.cash-cap { font-size: 11px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.cash-tip { position: absolute; bottom: calc(100% - 6px); left: 50%; transform: translateX(-50%); z-index: 5; display: grid; gap: 1px; padding: 6px 9px; background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); box-shadow: 0 8px 20px -10px rgba(16,33,58,0.35); font-size: 12px; white-space: nowrap; pointer-events: none; }
+.cash-tip span { color: var(--color-text-secondary); }
+.cash-axis { display: flex; margin: 6px 0 0 44px; }
+.cash-axis span { flex: 1; text-align: center; font-size: 11.5px; color: var(--color-text-secondary); }
+.cash-axis span.current { font-weight: 700; color: var(--color-text-primary); }
+.cash-empty { margin: 8px 0 0; font-size: 12.5px; color: var(--color-text-tertiary); text-align: center; }
+.dash-head .dt-linkcell { font-size: 13px; }

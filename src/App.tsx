@@ -20,6 +20,7 @@ const ResetPasswordPage      = lazy(() => import('./pages/ResetPasswordPage'));
 const InvitePage             = lazy(() => import('./pages/InvitePage'));
 const OnboardingPage         = lazy(() => import('./pages/OnboardingPage'));
 const DashboardPage          = lazy(() => import('./pages/DashboardPage'));
+const DashboardV2Page        = lazy(() => import('./pages/DashboardV2Page'));
 const SalesPage              = lazy(() => import('./pages/SalesPage'));
 const QuotesPage             = lazy(() => import('./pages/QuotesPage'));
 const PaymentsPage           = lazy(() => import('./pages/PaymentsPage'));
@@ -106,7 +107,7 @@ export default function App() {
 
           {/* All other routes redirect to /onboarding when setup is missing */}
           <Route element={<OnboardingGuard />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={UI_V2 ? <DashboardV2Page /> : <DashboardPage />} />
             <Route path="/invoices" element={<SalesPage />} />
             <Route path="/invoices/:id" element={<InvoicePage />} />
             <Route path="/contacts" element={<ContactsPage />} />
