@@ -17,6 +17,7 @@ import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-paym
 import { fmt, fmtDateLong, newLineItem } from '@/data';
 import type { LineItem } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import Page from '@/components/Page';
 
 const STATUS_LABEL: Record<string, string> = {
   draft:    'Brouillon',
@@ -70,24 +71,18 @@ export default function QuotePage() {
     if (id && orgId) fetchLineItems(orgId, { quoteId: id }).then(setLines).catch(err => { console.error('[QuotePage] fetchLineItems error:', err); setLines([]); });
   }, [id, orgId]);
 
-  if (loading) return <PageSkeleton title="Devis" variant="table-only" metrics={0} rows={4} />;
+  if (loading) return <PageSkeleton title="Devis" variant="document" rows={4} />;
 
   const quote = quotes.find(q => q.id === id);
   if (!quote) {
     return (
-      <div className="main">
-        <div className="topbar">
-          <div className="crumbs">
-            <button className="crumb-back" onClick={() => navigate('/invoices?tab=quotes')} aria-label="Retour">
-              <Icon name="arrow-left" ariaHidden />
-            </button>
-            <div className="crumb-text">Devis introuvable</div>
-          </div>
-        </div>
-        <div className="content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
+      <Page
+        back={{ label: "Retour", onClick: () => navigate('/invoices?tab=quotes') }}
+        title="Devis introuvable"
+        contentStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}
+      >
           Le devis #{id} n'existe pas.
-        </div>
-      </div>
+      </Page>
     );
   }
 
@@ -242,36 +237,27 @@ export default function QuotePage() {
 
   return (
     <>
-    <div className="main">
-      <div className="topbar">
-        <div className="crumbs">
-          <button className="crumb-back" onClick={() => navigate('/invoices?tab=quotes')} aria-label="Retour aux devis">
-            <Icon name="arrow-left" ariaHidden />
+    <Page
+      back={{ label: "Retour aux devis", onClick: () => navigate('/invoices?tab=quotes') }}
+      title={<><button className="crumb-link" onClick={() => navigate('/invoices?tab=quotes')}>Devis</button>{' / '}<b>#{quote.id}</b></>}
+      documentTitle={`Devis ${quote.id}`}
+      actions={<>
+        <button className="btn" onClick={handleDownloadPDF} disabled={!paymentMethodsReady}>
+          <Icon name="printer" ariaHidden /> Télécharger PDF
+        </button>
+        {canEdit && (
+          <button className="btn" onClick={openEdit} disabled={converting}>
+            <Icon name="edit" ariaHidden /> Modifier
           </button>
-          <div className="crumb-text">
-            <button className="crumb-link" onClick={() => navigate('/invoices?tab=quotes')}>Devis</button>
-            {' / '}<b>#{quote.id}</b>
-          </div>
-        </div>
-        <div className="topbar-actions">
-          <button className="btn" onClick={handleDownloadPDF} disabled={!paymentMethodsReady}>
-            <Icon name="printer" ariaHidden /> Télécharger PDF
+        )}
+        {canConvert && (
+          <button className="btn btn-primary" onClick={requestConvert} disabled={converting || compliance.checking}>
+            <Icon name="arrow-right" ariaHidden />
+            {converting ? 'Conversion…' : 'Créer une facture'}
           </button>
-          {canEdit && (
-            <button className="btn" onClick={openEdit} disabled={converting}>
-              <Icon name="edit" ariaHidden /> Modifier
-            </button>
-          )}
-          {canConvert && (
-            <button className="btn btn-primary" onClick={requestConvert} disabled={converting || compliance.checking}>
-              <Icon name="arrow-right" ariaHidden />
-              {converting ? 'Conversion…' : 'Créer une facture'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="content">
+        )}
+      </>}
+    >
         <div className="detail-grid">
 
           {/* Quote paper */}
@@ -441,8 +427,7 @@ export default function QuotePage() {
             </div>
           </aside>
         </div>
-      </div>
-    </div>
+    </Page>
 
     {/* Edit panel */}
     <div className={`scrim${editOpen ? ' open' : ''}`} onClick={() => { if (!saving) setEditOpen(false); }} />

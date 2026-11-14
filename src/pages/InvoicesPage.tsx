@@ -27,6 +27,7 @@ import type { Activity, Invoice } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
+import Page from '@/components/Page';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Toutes' },
@@ -291,22 +292,17 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
 
   return (
     <>
-      <div className="main">
-        <div className="topbar">
-          <div>
-            <div className="page-title">Facturation</div>
-            <div className="page-sub">Gérez et suivez vos factures</div>
-          </div>
-          <div className="topbar-actions">
-            {writable && (
-              <button className="btn btn-primary" onClick={openPanel}>
-                <Icon name="plus" ariaHidden /> Nouvelle facture
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="content">
+      <Page
+        title="Facturation"
+        subtitle="Gérez et suivez vos factures"
+        actions={<>
+          {writable && (
+            <button className="btn btn-primary" onClick={openPanel}>
+              <Icon name="plus" ariaHidden /> Nouvelle facture
+            </button>
+          )}
+        </>}
+      >
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -451,8 +447,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
               );
             })}
           </div>
-        </div>
-      </div>
+      </Page>
 
       {/* Slide-over panel — sibling of .main, both inside .main-rel */}
       <div className={`scrim${panelOpen ? ' open' : ''}`} onClick={requestClosePanel} />

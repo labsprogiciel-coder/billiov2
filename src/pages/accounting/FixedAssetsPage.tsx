@@ -10,6 +10,7 @@ import { fmt, fmtCompact, amortSchedule, netValueOf } from '@/lib/accounting-dat
 import { useFixedAssets } from '@/lib/accounting-hooks';
 import { FixedAssetsEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 import { exerciseYear } from '@/lib/period';
+import Page from '@/components/Page';
 
 const ASSET_METHODS = ['Linéaire', 'Dégressif'];
 const ASSET_ICONS = ['building-warehouse', 'device-laptop', 'car', 'tool', 'server', 'printer'] as const;
@@ -182,25 +183,24 @@ export default function FixedAssetsPage() {
   const totalAmort  = totalGross - totalNet;
   const monthlyAmort = fixedAssets.reduce((s, a) => s + a.grossValue / a.usefulLife / 12, 0);
 
-  if (loading) return <PageSkeleton title="Immobilisations" variant="accounting" rows={6} />;
+  if (loading) return <PageSkeleton section={{ icon: 'building-warehouse', label: 'Comptabilité' }} title="Immobilisations" variant="accounting" rows={6} />;
 
   return (
-    <div className="main" style={{ position: 'relative' }}>
-      <div className="topbar">
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-            <Icon name="building-warehouse" size={13} /> Accounting
-          </div>
-          <div className="page-title">Immobilisations</div>
-          <div className="page-sub">Registre des actifs et plan d'amortissement</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
-          {writable && <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle immobilisation</button>}
-        </div>
-      </div>
+    <Page
+      section={{ icon: 'building-warehouse', label: 'Comptabilité' }}
+      title="Immobilisations"
+      subtitle="Registre des actifs et plan d'amortissement"
+      actions={<>
+        <span className="period-pill"><span className="dot" />Exercice {exerciseYear()} · ouvert</span>
+        {writable && <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" />Nouvelle immobilisation</button>}
+      </>}
+      mainStyle={{ position: 'relative' }}
+      after={<>
 
-      <div className="content">
+        {selected && <AssetDrawer asset={selected} onClose={() => setSelected(null)} />}
+        {showForm && <AssetForm onSave={handleCreate} onClose={() => setShowForm(false)} />}
+      </>}
+    >
         <KPIStrip items={[
           { icon: 'building-warehouse', iconBg: '#ECE9FB', iconColor: '#5B45C7', label: 'Valeur brute totale', value: fmtCompact(totalGross), unit: 'F CFA', sub: `${fixedAssets.length} immobilisations` },
           { icon: 'trending-down', iconBg: '#FCEBEB', iconColor: '#A32D2D', label: 'Amort. cumulé', value: fmtCompact(totalAmort), unit: 'F CFA', sub: 'Dépréciation totale' },
@@ -250,10 +250,6 @@ export default function FixedAssetsPage() {
             );
           })}
         </div>
-      </div>
-
-      {selected && <AssetDrawer asset={selected} onClose={() => setSelected(null)} />}
-      {showForm && <AssetForm onSave={handleCreate} onClose={() => setShowForm(false)} />}
-    </div>
+    </Page>
   );
 }

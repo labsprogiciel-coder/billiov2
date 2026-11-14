@@ -30,6 +30,7 @@ import type { Status } from '@/data';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
 import type { Activity, CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, splitTtc, vatOn } from '@/lib/vat';
+import Page from '@/components/Page';
 
 type DotKind = 'paid' | 'sent' | 'overdue' | 'avoir' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
@@ -149,24 +150,18 @@ export default function InvoicePage() {
     navigate(location.pathname, { replace: true, state: null });
   }, [openSendRequested, requestedInvoiceStatus, paymentMethodsStatus, navigate, location.pathname]);
 
-  if (loading) return <PageSkeleton title="Facture" variant="table-only" metrics={0} rows={4} />;
+  if (loading) return <PageSkeleton title="Facture" variant="document" rows={4} />;
 
   const invoice = invoices.find(i => i.id === id);
   if (!invoice) {
     return (
-      <div className="main">
-        <div className="topbar">
-          <div className="crumbs">
-            <button className="crumb-back" onClick={() => navigate('/invoices')} aria-label="Retour">
-              <Icon name="arrow-left" ariaHidden />
-            </button>
-            <div className="crumb-text">Facture introuvable</div>
-          </div>
-        </div>
-        <div className="content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>
+      <Page
+        back={{ label: "Retour", onClick: () => navigate('/invoices') }}
+        title="Facture introuvable"
+        contentStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}
+      >
           La facture #{id} n'existe pas.
-        </div>
-      </div>
+      </Page>
     );
   }
 
@@ -472,41 +467,31 @@ export default function InvoicePage() {
 
   return (
     <>
-    <div className="main">
-      {/* Topbar — breadcrumb variant */}
-      <div className="topbar">
-        <div className="crumbs">
-          <button className="crumb-back" onClick={() => navigate('/invoices')} aria-label="Retour aux factures">
-            <Icon name="arrow-left" ariaHidden />
+    <Page
+      back={{ label: "Retour aux factures", onClick: () => navigate('/invoices') }}
+      title={<><button className="crumb-link" onClick={() => navigate('/invoices')}>Factures</button>{' / '}<b>#{invoiceRef(invoice)}</b></>}
+      documentTitle={`Facture ${invoiceRef(invoice)}`}
+      actions={<>
+        <button className="btn" onClick={handleDownloadPDF} disabled={linesLoading || !paymentMethodsReady}>
+          <Icon name="printer" ariaHidden /> Télécharger PDF
+        </button>
+        {canEdit && (
+          <button className="btn" onClick={openEdit}>
+            <Icon name="edit" ariaHidden /> Modifier
           </button>
-          <div className="crumb-text">
-            <button className="crumb-link" onClick={() => navigate('/invoices')}>Factures</button>
-            {' / '}<b>#{invoiceRef(invoice)}</b>
-          </div>
-        </div>
-        <div className="topbar-actions">
-          <button className="btn" onClick={handleDownloadPDF} disabled={linesLoading || !paymentMethodsReady}>
-            <Icon name="printer" ariaHidden /> Télécharger PDF
+        )}
+        {writable && invoice.status === 'draft' && (
+          <button className="btn btn-primary" onClick={requestIssue} disabled={busyAction !== null || linesLoading || compliance.checking}>
+            <Icon name="send" ariaHidden /> {busyAction === 'issue' ? 'Émission…' : 'Émettre la facture'}
           </button>
-          {canEdit && (
-            <button className="btn" onClick={openEdit}>
-              <Icon name="edit" ariaHidden /> Modifier
-            </button>
-          )}
-          {writable && invoice.status === 'draft' && (
-            <button className="btn btn-primary" onClick={requestIssue} disabled={busyAction !== null || linesLoading || compliance.checking}>
-              <Icon name="send" ariaHidden /> {busyAction === 'issue' ? 'Émission…' : 'Émettre la facture'}
-            </button>
-          )}
-          {writable && (isOverdue || invoice.status === 'pending') && (
-            <button className="btn btn-primary" onClick={() => setSendKind(isOverdue ? 'reminder' : 'send')} disabled={!paymentMethodsReady}>
-              <Icon name="send" ariaHidden /> {isOverdue ? 'Envoyer une relance' : 'Envoyer au client'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="content">
+        )}
+        {writable && (isOverdue || invoice.status === 'pending') && (
+          <button className="btn btn-primary" onClick={() => setSendKind(isOverdue ? 'reminder' : 'send')} disabled={!paymentMethodsReady}>
+            <Icon name="send" ariaHidden /> {isOverdue ? 'Envoyer une relance' : 'Envoyer au client'}
+          </button>
+        )}
+      </>}
+    >
         <div className="detail-grid">
 
           {/* Invoice paper */}
@@ -724,8 +709,7 @@ export default function InvoicePage() {
             </div>
           </aside>
         </div>
-      </div>
-    </div>
+    </Page>
 
     {sendKind && paymentMethodsReady && (() => {
       const msg = invoiceMessage(sendKind, {

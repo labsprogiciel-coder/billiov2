@@ -10,6 +10,7 @@ import { useApp } from '@/context/AppContext';
 import { createClient, updateClient, removeClient } from '@/lib/api/clients';
 import { fmt, fmtCompact, clientInitials } from '@/data';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
+import Page from '@/components/Page';
 
 type FilterKey = 'all' | 'active' | 'lead' | 'balance';
 
@@ -149,28 +150,22 @@ export default function ClientsPage() {
     closePanel();
   }
 
-  if (loading) return <PageSkeleton title="Clients" subtitle="Gérez vos clients" variant="table-only" rows={6} />;
+  if (loading) return <PageSkeleton title="Clients" subtitle="Tous vos clients en un seul endroit" variant="table-only" rows={6} />;
 
   return (
     <>
-      <div className="main">
-        {/* Topbar */}
-        <div className="topbar">
-          <div>
-            <div className="page-title">Clients</div>
-            <div className="page-sub">Tous vos clients en un seul endroit</div>
-          </div>
-          <div className="topbar-actions">
-            {writable && (
-              <button className="btn btn-primary" onClick={() => setPanel({ kind: 'new' })}>
-                <Icon name="user-plus" size={16} />
-                Nouveau client
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="content">
+      <Page
+        title="Clients"
+        subtitle="Tous vos clients en un seul endroit"
+        actions={<>
+          {writable && (
+            <button className="btn btn-primary" onClick={() => setPanel({ kind: 'new' })}>
+              <Icon name="user-plus" size={16} />
+              Nouveau client
+            </button>
+          )}
+        </>}
+      >
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -314,8 +309,7 @@ export default function ClientsPage() {
               ))
             )}
           </div>
-        </div>
-      </div>
+      </Page>
 
       {/* Scrim */}
       <div className={'scrim' + (panel ? ' open' : '')} onClick={closePanel} />

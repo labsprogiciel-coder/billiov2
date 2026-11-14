@@ -10,6 +10,7 @@ import { useApp } from '@/context/AppContext';
 import { createProduct, updateProduct, removeProduct } from '@/lib/api/products';
 import { fmt, fmtCompact } from '@/data';
 import type { ProductType, Product } from '@/lib/schemas';
+import Page from '@/components/Page';
 
 type FilterKey = 'all' | ProductType;
 type ViewMode  = 'list' | 'grid';
@@ -27,7 +28,7 @@ export default function ProductsPage() {
   const { writable, deletable } = usePermissions();
   const { showToast, products, setProducts, orgId, loading } = useApp();
 
-  if (loading) return <PageSkeleton title="Produits & Services" subtitle="Gérez votre catalogue" variant="table-only" rows={6} />;
+  if (loading) return <PageSkeleton title="Produits & Services" subtitle="Articles réutilisables pour vos factures et devis" variant="table-only" rows={6} />;
   const [filter, setFilter]         = useState<FilterKey>('all');
   const [view, setView]             = useState<ViewMode>('list');
   const [search, setSearch]         = useState('');
@@ -150,23 +151,18 @@ export default function ProductsPage() {
 
   return (
     <>
-      <div className="main">
-        <div className="topbar">
-          <div>
-            <div className="page-title">Produits &amp; Services</div>
-            <div className="page-sub">Articles réutilisables pour vos factures et devis</div>
-          </div>
-          <div className="topbar-actions">
-            <button className="btn"><Icon name="download" ariaHidden /> Exporter</button>
-            {writable && (
-              <button className="btn btn-primary" onClick={openPanel}>
-                <Icon name="plus" ariaHidden /> Nouvel article
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="content">
+      <Page
+        title="Produits & Services"
+        subtitle="Articles réutilisables pour vos factures et devis"
+        actions={<>
+          <button className="btn"><Icon name="download" ariaHidden /> Exporter</button>
+          {writable && (
+            <button className="btn btn-primary" onClick={openPanel}>
+              <Icon name="plus" ariaHidden /> Nouvel article
+            </button>
+          )}
+        </>}
+      >
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -347,8 +343,7 @@ export default function ProductsPage() {
               ))}
             </div>
           )}
-        </div>
-      </div>
+      </Page>
 
       {/* Slide-over: New item */}
       <div className={`scrim${panelOpen ? ' open' : ''}`} onClick={() => setPanelOpen(false)} />

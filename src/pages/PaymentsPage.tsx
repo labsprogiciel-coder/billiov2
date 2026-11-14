@@ -16,6 +16,7 @@ import { confirmDiscard } from '@/lib/confirm-discard';
 import { downloadBlob } from '@/lib/download';
 import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
 import type { PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
+import Page from '@/components/Page';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
 
@@ -175,32 +176,26 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  if (loading) return <PageSkeleton title="Facturation" subtitle="Suivez vos encaissements" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title="Facturation" subtitle="Argent reçu sur vos factures" metrics={4} rows={6} />;
 
   return (
     <>
-      <div className="main">
-        {/* Topbar */}
-        <div className="topbar">
-          <div>
-            <div className="page-title">Facturation</div>
-            <div className="page-sub">Argent reçu sur vos factures</div>
-          </div>
-          <div className="topbar-actions">
-            <button className="btn" onClick={exportStatement} title="Exporter les paiements affichés (CSV)">
-              <Icon name="download" size={16} />
-              Relevé
+      <Page
+        title="Facturation"
+        subtitle="Argent reçu sur vos factures"
+        actions={<>
+          <button className="btn" onClick={exportStatement} title="Exporter les paiements affichés (CSV)">
+            <Icon name="download" size={16} />
+            Relevé
+          </button>
+          {writable && (
+            <button className="btn btn-primary" onClick={openPanel}>
+              <Icon name="plus" size={16} />
+              Enregistrer un paiement
             </button>
-            {writable && (
-              <button className="btn btn-primary" onClick={openPanel}>
-                <Icon name="plus" size={16} />
-                Enregistrer un paiement
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="content">
+          )}
+        </>}
+      >
           {/* Metrics */}
           <div className="metrics">
             {/* Feature card — total received */}
@@ -374,8 +369,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
               })
             )}
           </div>
-        </div>
-      </div>
+      </Page>
 
       {/* Scrim */}
       <div className={'scrim' + (panelOpen ? ' open' : '')} onClick={requestClosePanel} />

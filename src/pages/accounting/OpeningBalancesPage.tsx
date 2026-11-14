@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { useApp } from '@/context/AppContext';
 import { adoptOpeningBalances } from '@/lib/api/accounting';
+import Page from '@/components/Page';
 import {
   ACCOUNTS, CLASSES, clsOf, acctOf, fmt,
 } from '@/lib/accounting-data';
@@ -459,42 +460,32 @@ export default function OpeningBalancesPage() {
 
   if (openingBalancesAdopted) {
     return (
-      <div className="main">
-        <div className="topbar">
-          <div className="topbar-left">
-            <div className="crumb"><Icon name="arrows-exchange" size={14} /> Comptabilité</div>
-            <div className="page-title">À-nouveaux</div>
-            <div className="page-sub">Journal des à-nouveaux · reprise au 1 juin 2026</div>
-          </div>
-          <div className="topbar-actions">
-            <span className="period-pill"><span className="dot" /> Exercice 2026 · ouverture</span>
-          </div>
-        </div>
-        <div className="content">
+      <Page
+        section={{ icon: 'arrows-exchange', label: 'Comptabilité' }}
+        title="À-nouveaux"
+        subtitle="Journal des à-nouveaux · reprise au 1 juin 2026"
+        actions={<>
+          <span className="period-pill"><span className="dot" /> Exercice 2026 · ouverture</span>
+        </>}
+      >
           <SuccessView
             totD={totD} totC={totC} lineCount={lineCount}
             bankAmt={bankAmt} piece={piece}
             onEdit={() => setOpeningBalancesAdopted(false)}
           />
-        </div>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="main">
-      <div className="topbar">
-        <div className="topbar-left">
-          <div className="crumb"><Icon name="arrows-exchange" size={14} /> Accounting</div>
-          <div className="page-title">Opening balances</div>
-          <div className="page-sub">Journal des à-nouveaux · reprise au 1 juin 2026</div>
-        </div>
-        <div className="topbar-actions">
-          <span className="period-pill"><span className="dot" /> Exercice 2026 · ouverture</span>
-        </div>
-      </div>
-
-      <div className="content">
+    <Page
+      section={{ icon: 'arrows-exchange', label: 'Comptabilité' }}
+      title="Opening balances"
+      subtitle="Journal des à-nouveaux · reprise au 1 juin 2026"
+      actions={<>
+        <span className="period-pill"><span className="dot" /> Exercice 2026 · ouverture</span>
+      </>}
+    >
         {/* ── intro banner ── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 18, padding: '16px 20px',
@@ -684,7 +675,6 @@ export default function OpeningBalancesPage() {
           {/* ── live preview ── */}
           <PreviewPanel lines={lines} totD={totD} totC={totC} />
         </div>
-      </div>
-    </div>
+    </Page>
   );
 }

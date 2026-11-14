@@ -284,6 +284,11 @@ select.input {
   border-bottom: 0.5px solid var(--color-border-tertiary);
   display: flex; align-items: center; justify-content: space-between;
 }
+/* Page headings are <h1> (src/components/Page.tsx) but keep the class's look */
+.page-h1 { font-size: inherit; font-weight: inherit; line-height: inherit; margin: 0; }
+.page-h1:focus { outline: none; }
+/* The area a page belongs to, above its title (Page `section`) */
+.page-section { font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); letter-spacing: 0.3px; display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
 .page-title { font-size: 17px; font-weight: 700; color: var(--color-text-primary); letter-spacing: -0.3px; text-wrap: balance; }
 .page-sub { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
@@ -1653,6 +1658,19 @@ select.form-input {
 .skel-panel { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 16px 18px; box-shadow: var(--shadow-sm); }
 .skel-panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .skel-panel-rows { display: flex; flex-direction: column; gap: 14px; }
+.skel-doc { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.skel-doc > .skel-panel { display: flex; flex-direction: column; gap: 18px; }
+.skel-doc-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.skel-doc-totals { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.skel-doc-side { display: flex; flex-direction: column; gap: 16px; }
+.skel-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
+@media (max-width: 900px) { .skel-doc, .skel-form, .skel-doc-parties { grid-template-columns: 1fr; } }
+
+/* Page error state (src/components/Page.tsx) */
+.page-error { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 64px 24px; color: var(--color-text-secondary); }
+.page-error > svg { color: #A32D2D; }
+.page-error-title { font-size: 15px; font-weight: 700; color: var(--color-text-primary); }
+.page-error-sub { font-size: 12.5px; margin-bottom: 8px; }
 
 /* ── UpgradeModal ──────────────────────────────────────────────── */
 .upg-modal {

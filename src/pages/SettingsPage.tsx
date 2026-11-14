@@ -20,6 +20,7 @@ import { getFiscalIdLabel } from '@/lib/ohada';
 import { sellerIssues, type SellerInfo } from '@/lib/invoice-compliance';
 import { issuedThisMonth } from '@/lib/invoice-limit';
 import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
+import Page from '@/components/Page';
 
 type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
 
@@ -1712,18 +1713,15 @@ export default function SettingsPage() {
   const onSave = () => showToast('Paramètres enregistrés');
 
   return (
-    <div className="main">
-      <div className="topbar">
-        <div>
-          <div className="page-title">Paramètres</div>
-          <div className="page-sub">Gérez vos préférences de workspace et de facturation</div>
-        </div>
+    <Page
+      title="Paramètres"
+      subtitle="Gérez vos préférences de workspace et de facturation"
+      actions={<>
         <button className="btn btn-primary" onClick={onSave} disabled={ORG_TABS.includes(tab) && !managesOrg}>
           <Icon name="check" size={15} /> Enregistrer
         </button>
-      </div>
-
-      <div className="content">
+      </>}
+    >
         <div className="s-grid">
           {/* Sub-nav */}
           <nav className="s-nav">
@@ -1769,7 +1767,6 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </Page>
   );
 }
