@@ -2099,6 +2099,72 @@ html[data-ui="v2"] .tp-paper {
   }
 }
 
+/* ── ERP top bar (PRO-161), only when VITE_UI_V2=true ─────────────────── */
+html[data-ui="v2"] .app { flex-direction: column; }
+/* No breadcrumbs: the bar says where you are */
+html[data-ui="v2"] .page-section { display: none; }
+
+.topnav {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  height: 48px; padding: 0 16px;
+  background: var(--nav-bg); color: var(--nav-fg);
+}
+.tn-brand { display: flex; align-items: center; gap: 8px; margin-right: 18px; text-decoration: none; color: var(--nav-fg-active); }
+.tn-mark { width: 26px; height: 26px; border-radius: 3px; background: #fff; display: grid; place-items: center; }
+.tn-name { font-weight: 700; font-size: 15px; }
+.tn-areas { display: flex; align-items: stretch; height: 100%; gap: 2px; min-width: 0; }
+.tn-link {
+  display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 12px;
+  color: var(--nav-fg); font-weight: 600; font-size: 14px; text-decoration: none; white-space: nowrap;
+  border-bottom: 3px solid transparent; border-top: 3px solid transparent;
+}
+.tn-link:hover, .tn-area:hover .tn-link { color: var(--nav-fg-active); }
+.tn-link.on, .tn-area.on .tn-link { color: var(--nav-fg-active); border-bottom-color: var(--nav-accent); }
+.tn-link:focus-visible, .tn-toggle:focus-visible, .tn-brand:focus-visible, .tn-avatar-btn:focus-visible { outline: 2px solid var(--nav-accent); outline-offset: -2px; }
+.tn-count { font-size: 10.5px; font-weight: 700; background: var(--status-late); color: #fff; border-radius: 9px; padding: 0 6px; line-height: 16px; }
+.tn-area { position: relative; display: flex; align-items: stretch; }
+.tn-area.on { box-shadow: inset 0 -3px 0 var(--nav-accent); }
+.tn-area .tn-link { padding-right: 2px; }
+.tn-toggle {
+  border: 0; background: none; color: var(--nav-fg); padding: 0 8px 0 2px; cursor: pointer;
+  display: flex; align-items: center;
+}
+.tn-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.tn-menu {
+  position: absolute; top: 100%; left: 0; z-index: 40; min-width: 260px;
+  background: var(--color-background-primary); color: var(--color-text-primary);
+  border: 1px solid var(--color-border-secondary); border-top: 3px solid var(--nav-accent);
+  border-radius: 0 0 4px 4px; box-shadow: 0 14px 32px -10px rgba(16,33,58,0.35);
+  padding: 6px; display: grid; gap: 2px;
+}
+.tn-menu.wide { grid-template-columns: repeat(3, 200px); gap: 4px; }
+.tn-menu-right { left: auto; right: 0; min-width: 240px; }
+.tn-group { display: grid; gap: 1px; align-content: start; }
+.tn-group-title { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-tertiary); padding: 6px 10px 4px; font-weight: 700; }
+.tn-mi {
+  display: grid; gap: 1px; width: 100%; text-align: left; border: 0; background: none; border-radius: 3px;
+  padding: 7px 10px; cursor: pointer; font: inherit; color: var(--color-text-primary);
+}
+.tn-mi:hover, .tn-mi:focus-visible { background: var(--brand-tint); outline: none; }
+.tn-mi.on { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand); }
+.tn-mi.on .tn-mi-label { color: var(--brand); }
+.tn-mi-label { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; }
+.tn-mi-hint { color: var(--color-text-tertiary); font-size: 12px; }
+.tn-mi.danger .tn-mi-label { color: var(--status-late); }
+.tn-sep { height: 1px; background: var(--color-border-tertiary); margin: 4px 6px; }
+.tn-who { padding: 8px 10px 10px; border-bottom: 1px solid var(--color-border-tertiary); margin-bottom: 4px; display: grid; gap: 1px; }
+.tn-who small { color: var(--color-text-tertiary); font-size: 12px; }
+.tn-account { position: relative; margin-left: auto; display: flex; align-items: center; height: 100%; }
+.tn-avatar-btn { display: flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--nav-fg); padding: 4px; border-radius: 3px; cursor: pointer; }
+.tn-avatar-btn[aria-expanded="true"], .tn-avatar-btn:hover { background: var(--nav-bg-hover); }
+.tn-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--nav-bg-hover); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+.tn-account .tn-menu { top: calc(100% - 4px); }
+@media (max-width: 760px) {
+  .tn-name { display: none; }
+  /* Until the phone layout (PRO-178): let the areas scroll sideways */
+  .tn-areas { overflow-x: auto; scrollbar-width: none; }
+  .tn-menu.wide { grid-template-columns: 1fr; }
+
 /* ── Shared dense table (PRO-163, src/components/DataTable.tsx) ────────── */
 .dt { background: var(--color-background-primary); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
 .dt-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--color-border-tertiary); }

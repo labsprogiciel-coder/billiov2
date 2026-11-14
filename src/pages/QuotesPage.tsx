@@ -25,6 +25,7 @@ import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
 import Page from '@/components/Page';
+import { UI_V2 } from '@/lib/features';
 
 type FilterKey = 'all' | QuoteStatus;
 
@@ -272,12 +273,12 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  if (loading) return <PageSkeleton title="Facturation" subtitle="Estimations envoyées avant facturation" metrics={0} rows={6} />;
+  if (loading) return <PageSkeleton title={UI_V2 ? 'Devis' : 'Facturation'} subtitle="Estimations envoyées avant facturation" metrics={0} rows={6} />;
 
   return (
     <>
       <Page
-        title="Facturation"
+        title={UI_V2 ? 'Devis' : 'Facturation'}
         subtitle="Estimations envoyées avant facturation"
         actions={<>
           {writable && (
