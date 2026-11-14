@@ -19,7 +19,7 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
   const [locked, setLocked] = useState<Feature | null>(null);
 
   const overdue = useMemo(() => invoices.filter(i => i.status === 'overdue').length, [invoices]);
-  const salesActive = pathname.startsWith('/invoices') || pathname.startsWith('/quotes');
+  const salesActive = pathname.startsWith('/invoices') || pathname.startsWith('/quotes') || pathname.startsWith('/payments');
   const accountingMenu = useMemo<MenuGroup[]>(() => ACCOUNTING_MENU.map(g => ({
     ...g,
     // Same rule as the side menu: once opening balances are adopted the page is done

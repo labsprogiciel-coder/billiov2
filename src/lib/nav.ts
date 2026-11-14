@@ -2,6 +2,7 @@
 // Shared by the side menu (Sidebar) and the ERP top bar (TopNav, PRO-161).
 
 import type { Feature } from '@/lib/plans';
+import { UI_V2 } from '@/lib/features';
 
 /** Facturation tabs (?tab=) that need a higher plan; Factures is on every plan. */
 export type SalesTab = 'invoices' | 'quotes' | 'payments';
@@ -35,8 +36,9 @@ export interface MenuLink {
 
 export const SALES_MENU: MenuLink[] = [
   { label: 'Factures',  hint: 'Émises, brouillons, retards',     to: '/invoices' },
-  { label: 'Devis',     hint: 'Envoyés, acceptés, convertis',    to: '/invoices?tab=quotes',   feature: SALES_TAB_FEATURE.quotes },
-  { label: 'Paiements', hint: 'Encaissements par méthode',       to: '/invoices?tab=payments', feature: SALES_TAB_FEATURE.payments },
+  // Pages of their own in the ERP look (PRO-165), tabs of /invoices before
+  { label: 'Devis',     hint: 'Envoyés, acceptés, convertis',    to: UI_V2 ? '/quotes' : '/invoices?tab=quotes',     feature: SALES_TAB_FEATURE.quotes },
+  { label: 'Paiements', hint: 'Encaissements par méthode',       to: UI_V2 ? '/payments' : '/invoices?tab=payments', feature: SALES_TAB_FEATURE.payments },
 ];
 
 export interface MenuGroup { title: string; links: MenuLink[] }

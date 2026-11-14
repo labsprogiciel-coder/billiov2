@@ -5,7 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
 import AppShell from '@/components/AppShell';
-import { ACCOUNTING_ENABLED } from '@/lib/features';
+import { ACCOUNTING_ENABLED, UI_V2 } from '@/lib/features';
 import FeatureGuard from '@/components/FeatureGuard';
 import type { Feature } from '@/lib/plans';
 
@@ -21,6 +21,8 @@ const InvitePage             = lazy(() => import('./pages/InvitePage'));
 const OnboardingPage         = lazy(() => import('./pages/OnboardingPage'));
 const DashboardPage          = lazy(() => import('./pages/DashboardPage'));
 const SalesPage              = lazy(() => import('./pages/SalesPage'));
+const QuotesPage             = lazy(() => import('./pages/QuotesPage'));
+const PaymentsPage           = lazy(() => import('./pages/PaymentsPage'));
 const InvoicePage            = lazy(() => import('./pages/InvoicePage'));
 const ContactsPage           = lazy(() => import('./pages/ContactsPage'));
 const ProductsPage           = lazy(() => import('./pages/ProductsPage'));
@@ -125,8 +127,9 @@ export default function App() {
             )}
             {/* Reports aren't built yet; old links land on the dashboard */}
             <Route path="/reports"  element={<Navigate to="/dashboard" replace />} />
-            <Route path="/payments" element={<Navigate to="/invoices?tab=payments" replace />} />
-            <Route path="/quotes"     element={<Navigate to="/invoices?tab=quotes" replace />} />
+            {/* In the ERP look Devis and Paiements are pages of their own (PRO-165) */}
+            <Route path="/payments" element={UI_V2 ? <Gated feature="payments_mobilemoney" title="Paiements"><PaymentsPage /></Gated> : <Navigate to="/invoices?tab=payments" replace />} />
+            <Route path="/quotes"     element={UI_V2 ? <Gated feature="quotes" title="Devis"><QuotesPage /></Gated> : <Navigate to="/invoices?tab=quotes" replace />} />
             <Route path="/quotes/:id" element={<Gated feature="quotes" title="Devis"><QuotePage /></Gated>} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/settings"  element={<SettingsPage />} />

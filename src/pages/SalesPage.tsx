@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import PageTabs from '@/components/PageTabs';
 import UpgradeModal from '@/components/UpgradeModal';
 import { useApp } from '@/context/AppContext';
@@ -9,6 +9,7 @@ import QuotesPage from '@/pages/QuotesPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import { SALES_TAB_FEATURE, type SalesTab } from '@/lib/nav';
 import { UI_V2 } from '@/lib/features';
+import { salesTabRedirect } from '@/lib/sales-tables';
 
 type Tab = SalesTab;
 const TAB_FEATURE = SALES_TAB_FEATURE;
@@ -17,8 +18,21 @@ function parseTab(value: string | null): Tab {
   return value === 'quotes' || value === 'payments' ? value : 'invoices';
 }
 
-/** Facturation: one page with a tab per document type (?tab=quotes|payments). */
+/**
+ * Facturation: one page with a tab per document type (?tab=quotes|payments).
+ * In the ERP look (PRO-165) Devis and Paiements are pages of their own
+ * (/quotes, /payments), reached from the top bar; old ?tab= links go there.
+ */
 export default function SalesPage() {
+  const [searchParams] = useSearchParams();
+  if (UI_V2) {
+    const to = salesTabRedirect(searchParams.get('tab'));
+    return to ? <Navigate to={to} replace /> : <InvoicesPage />;
+  }
+  return <TabbedSalesPage />;
+}
+
+function TabbedSalesPage() {
   const { invoices, quotes, payments, hasFeature } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [lockedFeature, setLockedFeature] = useState<Feature | null>(null);
