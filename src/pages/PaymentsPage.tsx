@@ -17,6 +17,7 @@ import { downloadBlob } from '@/lib/download';
 import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
 import type { PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 import Page from '@/components/Page';
+import { UI_V2 } from '@/lib/features';
 
 type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
 
@@ -176,12 +177,12 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  if (loading) return <PageSkeleton title="Facturation" subtitle="Argent reçu sur vos factures" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title={UI_V2 ? 'Paiements' : 'Facturation'} subtitle="Argent reçu sur vos factures" metrics={4} rows={6} />;
 
   return (
     <>
       <Page
-        title="Facturation"
+        title={UI_V2 ? 'Paiements' : 'Facturation'}
         subtitle="Argent reçu sur vos factures"
         actions={<>
           <button className="btn" onClick={exportStatement} title="Exporter les paiements affichés (CSV)">
