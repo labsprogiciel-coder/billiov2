@@ -73,7 +73,14 @@ export default function Page({
       <button className="crumb-back" onClick={back.onClick} aria-label={back.label}>
         <Icon name="arrow-left" ariaHidden />
       </button>
-      <h1 ref={headingRef} tabIndex={-1} className="page-h1 crumb-text" style={titleStyle}>{title}</h1>
+      {subtitle ? (
+        <div className="crumb-stack">
+          <h1 ref={headingRef} tabIndex={-1} className="page-h1 crumb-text" style={titleStyle}>{title}</h1>
+          <div className="page-sub">{subtitle}</div>
+        </div>
+      ) : (
+        <h1 ref={headingRef} tabIndex={-1} className="page-h1 crumb-text" style={titleStyle}>{title}</h1>
+      )}
     </div>
   ) : (
     <div>
