@@ -3,6 +3,9 @@
 // and the actions on it.
 
 import { useEffect, useRef, useState } from 'react';
+import KybSection from '@/components/contacts/KybSection';
+import type { ClientDocumentsApi } from '@/lib/use-client-documents';
+import { useApp } from '@/context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import StatusPill from '@/components/sales/StatusPill';
@@ -16,13 +19,14 @@ import { withIntent } from '@/lib/command-intent';
 import { QUOTE_STATUS, invoiceRowStatus, type InvoiceRow } from '@/lib/sales-tables';
 import type { ClientRow } from '@/lib/client-table';
 import type { Quote } from '@/lib/schemas';
-import { KYB_DOCS } from '@/lib/kyb';
 import { clientInitials, fmt, fmtCompact, fmtDate } from '@/data';
 
 const STATUS: Record<ClientRow['status'], string> = { active: 'Actif', lead: 'Prospect', inactive: 'Inactif' };
 
-export default function ClientRecordPanel({ client, year, docs, onEdit, onDelete, onClose }: {
+export default function ClientRecordPanel({ client, year, docs, kyb, onEdit, onDelete, onClose }: {
   client: ClientRow | null;
+  /** The KYB documents (PRO-176). */
+  kyb?: ClientDocumentsApi;
   year: number;
   docs: { invoices: InvoiceRow[]; quotes: Quote[]; invoiceCount: number; quoteCount: number };
   onEdit: (code: string) => void;
@@ -31,6 +35,8 @@ export default function ClientRecordPanel({ client, year, docs, onEdit, onDelete
 }) {
   const navigate = useNavigate();
   const { writable, deletable, postable } = usePermissions();
+  const { orgSettings } = useApp();
+  const orgName = orgSettings.name;
 
   if (!client) {
     return (
@@ -113,7 +119,16 @@ export default function ClientRecordPanel({ client, year, docs, onEdit, onDelete
         </section>
       )}
 
-      <KybSection docs={KYB_DOCS[type.code]} />
+      {kyb && (
+        <KybSection
+          client={client}
+          type={type.code}
+          docs={kyb.docs.filter(d => d.clientCode === client.code)}
+          api={kyb}
+          can={{ write: writable, check: postable, remove: deletable }}
+          orgName={orgName}
+        />
+      )}
 
       <section className="cr-section">
         <h3>Factures <span className="cr-count">{docs.invoiceCount}</span></h3>
@@ -181,37 +196,3 @@ function MoreMenu({ label, onDelete }: { label: string; onDelete: () => void }) 
   );
 }
 
-/** The client's business documents (KYB): what is expected for its type. */
-function KybSection({ docs }: { docs: { key: string; label: string; validity?: string }[] }) {
-  const [open, setOpen] = useState(false);
-  const id = `kyb-${docs.length}`;
-  return (
-    <section className="cr-section">
-      <h3>
-        <button type="button" className="cr-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(o => !o)}>
-          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} ariaHidden />
-          Dossier KYB
-          <span className="cr-count">{docs.length ? `0 / ${docs.length}` : '—'}</span>
-        </button>
-      </h3>
-      {open && (
-        <div id={id}>
-          {docs.length === 0 ? <p className="dt-muted">Aucun document demandé pour un client comptant.</p> : (
-            <>
-              <ul className="cr-kyb">
-                {docs.map(d => (
-                  <li key={d.key}>
-                    <Icon name="file-text" size={14} ariaHidden />
-                    <span className="cr-kyb-label">{d.label}{d.validity && <small> · valable {d.validity}</small>}</span>
-                    <StatusPill label="Non fourni" tone="draft" />
-                  </li>
-                ))}
-              </ul>
-              <p className="cr-note">Le dépôt et la validation des pièces arrivent dans une prochaine version.</p>
-            </>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}

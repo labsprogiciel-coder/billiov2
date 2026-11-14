@@ -13,20 +13,25 @@ import { clientTypeOf } from '@/lib/client-type';
 import { ownerKey, ownerOptions } from '@/lib/sales-tables';
 import type { ClientRow } from '@/lib/client-table';
 import { fmt } from '@/data';
+import StatusPill from '@/components/sales/StatusPill';
+import { kybSummaryLabel, type KybSummary } from '@/lib/kyb';
 
-const FILTERS: StatusFilter<ClientRow>[] = [
-  { key: 'lead',    label: 'Prospects',  match: c => c.status === 'lead' },
-  { key: 'balance', label: 'Avec solde', match: c => c.balance > 0 },
-  { key: 'late',    label: 'En retard',  match: c => c.late },
-];
 
-export default function ClientList({ rows, year, selected, onSelect }: {
+export default function ClientList({ rows, year, selected, onSelect, kyb }: {
   rows: ClientRow[];
+  /** Each client's KYB summary (PRO-176), by code. */
+  kyb?: Map<string, KybSummary>;
   year: number;
   selected: string | null;
   onSelect: (code: string) => void;
 }) {
   const { userId, userRole } = useApp();
+  const filters = useMemo<StatusFilter<ClientRow>[]>(() => [
+    { key: 'lead',    label: 'Prospects',  match: c => c.status === 'lead' },
+    { key: 'balance', label: 'Avec solde', match: c => c.balance > 0 },
+    { key: 'late',    label: 'En retard',  match: c => c.late },
+    ...(kyb ? [{ key: 'kyb', label: 'KYB incomplet', match: (c: ClientRow) => { const k = kyb.get(c.code); return !!k && k.required > 0 && !k.complete; } }] : []),
+  ], [kyb]);
   const { managesOrg } = usePermissions();
   const team = useTeam(managesOrg);
   const { reassign, busy } = useReassign();
@@ -54,6 +59,15 @@ export default function ClientList({ rows, year, selected, onSelect }: {
     { key: 'type', header: 'Type', width: '64px', cell: c => <span className="dt-tag" title={clientTypeOf(c)}>{clientTypeOf(c)}</span> },
     { key: 'city', header: 'Ville', cell: c => c.city !== '—' ? c.city : <span className="dt-muted">—</span> },
     { key: 'owner', header: 'Responsable', cell: c => c.ownerName ?? <span className="dt-muted">—</span> },
+    {
+      key: 'kyb', header: 'Dossier KYB', hidden: !kyb,
+      cell: c => {
+        const k = kyb?.get(c.code);
+        if (!k || k.required === 0) return <span className="dt-muted">—</span>;
+        const tone = k.complete ? 'paid' : k.expired || k.missing ? 'late' : 'wait';
+        return <span title={kybSummaryLabel(k)}><StatusPill label={k.complete ? 'Complet' : `${k.verified}/${k.required}`} tone={tone} /></span>;
+      },
+    },
     { key: 'year', header: `Facturé ${year}`, align: 'right', cell: c => c.invoicedYear ? fmt(c.invoicedYear) : <span className="dt-muted">—</span> },
     {
       key: 'balance', header: 'Solde dû', align: 'right',
@@ -71,7 +85,7 @@ export default function ClientList({ rows, year, selected, onSelect }: {
       noun={{ one: 'client', many: 'clients' }}
       allLabel="Tous"
       columns={columns}
-      filters={FILTERS}
+      filters={filters}
       search={search}
       mine={mine}
       toolbarExtra={<OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
