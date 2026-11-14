@@ -2022,3 +2022,61 @@ select.form-input {
 .period-switch-opt:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .upg-period { display: flex; width: max-content; margin: 16px auto 0; }
 .s-period { align-self: flex-start; }
+
+/* ============================================================
+   ERP LOOK (PRO-160), only when VITE_UI_V2=true (html[data-ui="v2"])
+   Same token names as above with the ERP values, plus the new tokens the
+   redesigned shell and tables use. Flag off: nothing here applies.
+   ============================================================ */
+html[data-ui="v2"] {
+  --font-sans: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Page #EEF0F3 and table heads #E9EDF1: tertiary text stays >= 4.5:1 on both */
+  --color-background-secondary: #EEF0F3;
+  --color-background-tertiary: #E9EDF1;
+  --color-border-secondary: #C7CED7;
+  --color-border-tertiary: #DFE3E8;
+  --brand: #1A5C9E;
+  --brand-dark: #13406E;
+  --brand-tint: #E5EEF8;
+  /* Square corners, flat surfaces */
+  --border-radius-md: 3px;
+  --border-radius-lg: 3px;
+  --shadow-sm: none;
+  --shadow-md: 0 1px 2px rgba(16,33,58,0.08);
+
+  /* New: navy top bar */
+  --nav-bg: #13324F;
+  --nav-bg-hover: #1E4366;
+  --nav-border: #2E5276;
+  --nav-fg: #C1D0E0;
+  --nav-fg-active: #FFFFFF;
+  --nav-accent: #6FA8E0;
+  /* New: dense tables */
+  --row-zebra: #F7F8FA;
+  /* New: document statuses (dot + word, or a tinted badge) */
+  --status-late: #B42318;
+  --status-late-tint: #FDECEA;
+  --status-paid: #1E6B3A;
+  --status-paid-tint: #E7F6EC;
+  --status-wait: #1A5C9E;
+  --status-wait-tint: #E5EEF8;
+  --status-partial: #92400E;
+  --status-partial-tint: #FEF3C7;
+  --status-draft: #606C7E;
+}
+
+/* Template previews show the invoice as it prints: keep the original font */
+html[data-ui="v2"] .tp-paper {
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+@media (prefers-contrast: more) {
+  html[data-ui="v2"] {
+    --color-text-secondary: #3A4554;
+    --color-text-tertiary: #4E5A6B;
+    --color-border-secondary: #848FA0;
+    --color-border-tertiary: #A3ADBA;
+    --color-border-input: #5C687A;
+    --status-draft: #4E5A6B;
+  }
+}

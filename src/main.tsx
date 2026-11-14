@@ -5,6 +5,11 @@ import * as Sentry from '@sentry/react'
 import posthog from 'posthog-js'
 import './index.css'
 import App from '@/App.tsx'
+import { UI_V2 } from '@/lib/features'
+import { applyUiV2 } from '@/lib/ui-v2'
+
+// Before the first render, so the new look applies from the first paint
+if (UI_V2) applyUiV2()
 
 if (import.meta.env.VITE_POSTHOG_KEY) {
   posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
