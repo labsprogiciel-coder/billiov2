@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { documentTitleFor, shouldMoveFocus } from '@/lib/page';
+import { documentTitleFor, shouldFocusHeading, shouldMoveFocus } from '@/lib/page';
 
 describe('documentTitleFor', () => {
   it('names the tab after the page', () => {
@@ -20,6 +20,19 @@ describe('shouldMoveFocus', () => {
     expect(shouldMoveFocus({ tagName: 'textarea' })).toBe(false);
     expect(shouldMoveFocus({ tagName: 'SELECT' })).toBe(false);
     expect(shouldMoveFocus({ tagName: 'DIV', isContentEditable: true })).toBe(false);
+  });
+});
+
+describe('shouldFocusHeading', () => {
+  const link = { tagName: 'A' };
+  it('focuses once per path', () => {
+    expect(shouldFocusHeading('/invoices', null, link)).toBe(true);
+    // the loaded page replacing its skeleton, or a ?tab= switch: same path
+    expect(shouldFocusHeading('/invoices', '/invoices', { tagName: 'BUTTON' })).toBe(false);
+    // from one invoice to another (e.g. after duplicating)
+    expect(shouldFocusHeading('/invoices/FACT-2', '/invoices/FACT-1', link)).toBe(true);
+    // never while typing
+    expect(shouldFocusHeading('/products', '/invoices', { tagName: 'INPUT' })).toBe(false);
   });
 });
 

@@ -7,9 +7,15 @@
 // skeleton shaped like the page, so the title can't drift between the two.
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { SkeletonBody, SkeletonActions, type SkeletonSpec } from '@/components/SkeletonLoader';
-import { documentTitleFor, shouldMoveFocus } from '@/lib/page';
+import { documentTitleFor, shouldFocusHeading } from '@/lib/page';
+
+// The page whose heading last took focus, so a page only takes focus once per
+// navigation: not again when its data finishes loading (PageSkeleton → Page),
+// nor when SalesPage switches tabs (?tab=, same path).
+let lastFocusedPath: string | null = null;
 
 export type PageStatus = 'ready' | 'loading' | 'error';
 
@@ -54,11 +60,13 @@ export default function Page({
     return () => { document.title = previous; };
   }, [tabTitle]);
 
+  const { pathname } = useLocation();
   useEffect(() => {
-    if (shouldMoveFocus(document.activeElement as HTMLElement | null)) {
+    if (shouldFocusHeading(pathname, lastFocusedPath, document.activeElement as HTMLElement | null)) {
       headingRef.current?.focus({ preventScroll: true });
     }
-  }, []);
+    lastFocusedPath = pathname;
+  }, [pathname]);
 
   const heading = back ? (
     <div className="crumbs">

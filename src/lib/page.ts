@@ -15,3 +15,16 @@ export function shouldMoveFocus(active: { tagName?: string; isContentEditable?: 
   if (active.isContentEditable) return false;
   return !['INPUT', 'TEXTAREA', 'SELECT'].includes((active.tagName ?? '').toUpperCase());
 }
+
+/**
+ * Whether a page that just rendered should take focus: only when the path
+ * changed (a real navigation, including from one invoice to another), not on
+ * a tab switch (?tab=) or when a loading page is replaced by the loaded one.
+ */
+export function shouldFocusHeading(
+  pathname: string,
+  lastFocusedPath: string | null,
+  active: { tagName?: string; isContentEditable?: boolean } | null,
+): boolean {
+  return pathname !== lastFocusedPath && shouldMoveFocus(active);
+}
