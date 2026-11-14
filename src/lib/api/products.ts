@@ -20,6 +20,7 @@ export function dbToProduct(row: Record<string, unknown>): Product {
     color: String(row.color ?? 'ico-blue'),
     updatedAt:     row.updated_at ? String(row.updated_at) : undefined,
     updatedByName: row.updated_by_name ? String(row.updated_by_name) : undefined,
+    createdById:   row.created_by ? String(row.created_by) : undefined,
   };
 }
 
@@ -43,7 +44,7 @@ export async function createProduct(
   orgId: string,
   payload: Omit<Product, 'used'>,
 ): Promise<Product> {
-  if (MOCK) return { ...payload, used: 0, ...mockChange() };
+  if (MOCK) return { ...payload, used: 0, ...mockChange(), createdById: MOCK_TEAM[0].id };
   const { data, error } = await supabase
     .from('products')
     .insert({
