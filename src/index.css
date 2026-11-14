@@ -2286,3 +2286,58 @@ html[data-ui="v2"] .page-section { display: none; }
 
 /* ── Last change of a catalogue item (PRO-173) ───────────────────────────── */
 .prod-changed { font-size: 11.5px; color: var(--color-text-tertiary); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Contacts: client list with the record beside it (PRO-169) ──────────── */
+.cr-split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: start; }
+.cr-panel { position: sticky; top: 12px; max-height: calc(100vh - 140px); overflow-y: auto; background: var(--color-background-primary); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 14px 16px; display: grid; gap: 12px; }
+.cr-empty { place-items: center; text-align: center; color: var(--color-text-tertiary); font-size: 13px; padding: 40px 16px; }
+.cr-empty p { margin: 0; }
+.cr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.cr-name { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.cr-sub { margin-top: 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-text-secondary); }
+.cr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-figures { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); }
+.cr-figures > div { padding: 8px 10px; border-left: 1px solid var(--color-border-tertiary); min-width: 0; }
+.cr-figures > div:first-child { border-left: 0; }
+.cr-figures dt { font-size: 11.5px; font-weight: 600; color: var(--color-text-secondary); }
+.cr-figures dd { margin: 2px 0 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cr-figures small { font-size: 10.5px; color: var(--color-text-tertiary); }
+.cr-section { border-top: 1px solid var(--color-border-tertiary); padding-top: 10px; }
+.cr-section h3 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-tertiary); display: flex; align-items: center; gap: 6px; }
+.cr-section dl { margin: 0; display: grid; gap: 4px; }
+.cr-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.cr-row dt { color: var(--color-text-secondary); }
+.cr-row dd { margin: 0; overflow-wrap: anywhere; }
+.cr-warn { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--status-partial, #92400E); font-weight: 600; }
+.cr-count { font-size: 11px; color: var(--color-text-secondary); background: var(--color-background-secondary); border-radius: 9px; padding: 0 6px; letter-spacing: 0; }
+.cr-docs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cr-docs li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; font-size: 12.5px; }
+.cr-doc-date { color: var(--color-text-tertiary); white-space: nowrap; }
+.cr-doc-amt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-cell { display: grid; }
+.cl-cell b { font-weight: 600; }
+.cl-cell small { font-size: 11.5px; color: var(--color-text-tertiary); }
+.dt-table tr:has(.cl-cell.on) { background: var(--brand-tint) !important; box-shadow: inset 3px 0 0 var(--brand); }
+.dt-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 3px; border: 1px solid var(--color-border-secondary); color: var(--color-text-secondary); line-height: 16px; }
+.dt-late { color: var(--status-late, #B42318); }
+@media (max-width: 1100px) {
+  .cr-split { grid-template-columns: minmax(0, 1fr); }
+  .cr-panel { position: static; max-height: none; }
+}
+.cr-docs .dt-linkcell { justify-self: start; }
+/* Client record: header, actions and KYB file (PRO-169) */
+.cr-head { align-items: center; }
+.cr-av { width: 40px; height: 40px; flex: none; border-radius: var(--border-radius-md); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.cr-title { flex: 1; min-width: 0; }
+.cr-close { align-self: flex-start; }
+.cr-actions { gap: 8px; align-items: center; }
+.cr-actions .btn { height: 34px; }
+.cr-main { flex: 1; justify-content: center; }
+.cr-more { width: 34px; padding: 0; justify-content: center; }
+.cr-toggle { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.cr-toggle:hover { color: var(--color-text-secondary); }
+.cr-kyb { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.cr-kyb li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
+.cr-kyb-label { color: var(--color-text-primary); }
+.cr-kyb small { color: var(--color-text-tertiary); }
+.cr-note { margin: 8px 0 0; font-size: 12px; color: var(--color-text-tertiary); }
