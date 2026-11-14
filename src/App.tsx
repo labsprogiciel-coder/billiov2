@@ -118,7 +118,7 @@ export default function App() {
               <Route path="/accounting/trial-balance"        element={<Gated feature="accounting_syscohada" title="Balance générale"><TrialBalancePage /></Gated>} />
               <Route path="/accounting/financial-statements" element={<Gated feature="accounting_syscohada" title="États financiers"><FinancialStatementsPage /></Gated>} />
               <Route path="/accounting/fixed-assets"         element={<Gated feature="fixed_assets" title="Immobilisations"><FixedAssetsPage /></Gated>} />
-              <Route path="/accounting/suppliers"            element={<Navigate to="/contacts?tab=suppliers" replace />} />
+              <Route path="/accounting/suppliers"            element={<Navigate to="/contacts" replace />} />
               <Route path="/accounting/tax"                  element={<Gated feature="accounting_syscohada" title="Fiscalité"><TaxPage /></Gated>} />
               <Route path="/accounting/period-closing"       element={<Gated feature="period_closing" title="Clôture"><PeriodClosingPage /></Gated>} />
               <Route path="/accounting/opening-balances"     element={<Gated feature="accounting_syscohada" title="Ouverture"><OpeningBalancesPage /></Gated>} />

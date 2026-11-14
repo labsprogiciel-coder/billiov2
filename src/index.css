@@ -2341,3 +2341,18 @@ html[data-ui="v2"] .page-section { display: none; }
 .cr-kyb-label { color: var(--color-text-primary); }
 .cr-kyb small { color: var(--color-text-tertiary); }
 .cr-note { margin: 8px 0 0; font-size: 12px; color: var(--color-text-tertiary); }
+
+/* ── Catalogue table (PRO-170) ────────────────────────────────────────────── */
+.dt-sub { font-size: 12.5px; color: var(--color-text-secondary); white-space: nowrap; }
+.dt-strip-text { display: block; font-size: 15px; line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Change of « Responsable » dialog (PRO-172) */
+.owner-dialog { width: min(420px, calc(100vw - 32px)); }
+.owner-dialog-now { margin: 0 0 10px; font-size: 13px; color: var(--color-text-secondary); }
+.owner-choices { border: 0; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 300px; overflow-y: auto; }
+.owner-choice { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); cursor: pointer; font-size: 13.5px; }
+.owner-choice:has(input:checked) { border-color: var(--brand); background: var(--brand-tint); }
+.owner-choice.current { cursor: default; opacity: 0.7; }
+.owner-choice-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.owner-choice-role { font-size: 12px; color: var(--color-text-tertiary); }
+.owner-search { margin-bottom: 8px; }
+.owner-search input { min-width: 0; width: 100%; }

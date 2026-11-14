@@ -200,6 +200,7 @@ INITIAL_PAYMENTS.forEach((p, i) => { if (p.source !== 'online') p.createdByName 
 INITIAL_PRODUCTS.forEach((p, i) => {
   p.updatedAt = new Date(Date.UTC(2026, 4, 2 + i * 3, 9)).toISOString();
   p.updatedByName = MOCK_TEAM[(i + 1) % MOCK_TEAM.length].name;
+  p.createdById = MOCK_TEAM[i % MOCK_TEAM.length].id;
 });
 
 // Some demo clients are companies with their tax identifiers (PRO-169 record, KYB file)

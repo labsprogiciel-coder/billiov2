@@ -4,14 +4,9 @@ import { usePermissions } from '@/lib/use-permissions';
 import { useSearchParams } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
-import PageTabs from '@/components/PageTabs';
-import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { EmptyState, EmptyInline } from '@/components/EmptyState';
 import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
-import { SuppliersEmptyIllustration } from '@/components/accounting/EmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
-import DrawerPanel from '@/components/accounting/DrawerPanel';
-import StatusPill from '@/components/accounting/StatusPill';
 import { useApp } from '@/context/AppContext';
 import FiscalDivisionSelect, { fiscalDivisionLabel } from '@/components/FiscalDivisionSelect';
 import { createClient, updateClient, removeClient } from '@/lib/api/clients';
@@ -19,13 +14,6 @@ import { fmt, fmtCompact, clientInitials } from '@/data';
 import { getFiscalIdLabel, OHADA_COUNTRY_NAMES } from '@/lib/ohada';
 import { CLIENT_TYPES, clientTypeDef, clientTypeOf, type ClientType } from '@/lib/client-type';
 import type { ClientStatus, ClientRecord, InvoiceStatus, NewClientForm } from '@/lib/schemas';
-import type { SupplierBill, PaymentMethod } from '@/lib/accounting-data';
-import { useSupplierBills } from '@/lib/accounting-hooks';
-import { ACCOUNTING_ENABLED } from '@/lib/features';
-import { csvBlob } from '@/lib/csv';
-import { todayISO } from '@/lib/invoice-status';
-import { downloadBlob } from '@/lib/download';
-import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 import Page from '@/components/Page';
 import { OwnerLine } from '@/components/owner/OwnerControls';
 import { useCommandIntent } from '@/lib/command-intent';
@@ -35,85 +23,6 @@ import { useCreditNotes } from '@/lib/use-credit-notes';
 import { invoiceRows } from '@/lib/sales-tables';
 import { clientDocuments, clientRows } from '@/lib/client-table';
 import { UI_V2 } from '@/lib/features';
-
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-
-type Tab = 'clients' | 'suppliers';
-
-const AV_COLORS = [
-  { bg: '#B5D4F4', color: '#0C447C' },
-  { bg: '#9FE1CB', color: '#085041' },
-  { bg: '#F5C4B3', color: '#712B13' },
-  { bg: '#C0DD97', color: '#27500A' },
-  { bg: '#F4C0D1', color: '#72243E' },
-];
-
-function supplierAvColor(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % AV_COLORS.length;
-  return AV_COLORS[hash];
-}
-function supplierInitials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
-}
-// Whole calendar days between today and the due date (both at UTC midnight)
-function daysDue(dueDate: string) {
-  return Math.round((Date.parse(dueDate + 'T00:00:00Z') - Date.parse(todayISO() + 'T00:00:00Z')) / 86400000);
-}
-function ageBucket(b: SupplierBill): 'cur' | 'd30' | 'd60' | 'd90' | null {
-  if (b.status === 'paid') return null;
-  const d = daysDue(b.dueDate);
-  if (d >= 0) return 'cur';
-  if (d >= -30) return 'd30';
-  if (d >= -60) return 'd60';
-  return 'd90';
-}
-
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmtDate(iso: string) {
-  const p = iso.split('-');
-  return parseInt(p[2], 10) + ' ' + MONTHS[parseInt(p[1], 10) - 1];
-}
-
-// ─── Aging strip ──────────────────────────────────────────────────────────────
-
-const AGING_SEGS = [
-  { key: 'cur' as const, label: 'Not due',    color: '#276C2B' },
-  { key: 'd30' as const, label: '1–30 days',  color: '#8A5207' },
-  { key: 'd60' as const, label: '31–60 days', color: '#C2570B' },
-  { key: 'd90' as const, label: '60+ days',   color: '#A32D2D' },
-];
-
-function AgingStrip({ bills }: { bills: SupplierBill[] }) {
-  const tot: Record<string, number> = {};
-  bills.forEach(b => {
-    const k = ageBucket(b);
-    if (k) tot[k] = (tot[k] || 0) + b.htAmount + b.tvaAmount;
-  });
-  const max = Math.max(1, ...Object.values(tot));
-  return (
-    <div className="aging-strip">
-      {AGING_SEGS.map(s => {
-        const v = tot[s.key] || 0;
-        return (
-          <div key={s.key} className="aging-seg">
-            <div className="aging-top">
-              <span className="aging-dot" style={{ background: s.color }} />
-              <span className="aging-lbl">{s.label}</span>
-            </div>
-            <div className="aging-amt mono" style={{ color: v ? s.color : 'var(--color-text-tertiary)' }}>
-              {v ? fmtCompact(v) : '—'}
-              {v ? <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', marginLeft: 3 }}>F CFA</span> : null}
-            </div>
-            <div className="aging-bar">
-              <div style={{ width: `${Math.round((v / max) * 100)}%`, background: s.color }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 // ─── Clients sub-components ───────────────────────────────────────────────────
 
@@ -138,414 +47,11 @@ const CLIENT_FILTERS: { key: ClientFilterKey; label: string }[] = [
   { key: 'all', label: 'Tous' }, { key: 'active', label: 'Actifs' }, { key: 'lead', label: 'Prospects' }, { key: 'balance', label: 'Avec solde' },
 ];
 
-// ─── Supplier sub-components ──────────────────────────────────────────────────
-
-type SupplierFilterKey = 'all' | 'open' | 'overdue' | 'settled';
-const SUPPLIER_FILTERS: { key: SupplierFilterKey; label: string }[] = [
-  { key: 'all', label: 'Tous' }, { key: 'open', label: 'En cours' }, { key: 'overdue', label: 'En retard' }, { key: 'settled', label: 'Soldés' },
-];
-
-interface SupplierContact {
-  name: string;
-  city: string;
-  bills: SupplierBill[];
-  totalTTC: number;
-  totalPayable: number;
-  overdueCount: number;
-}
-
-interface BillForm { supplier: string; city: string; piece: string; date: string; dueDate: string; htAmount: string; paymentMethod: PaymentMethod; ifu: string; rccm: string; taxRegime: string; fiscalDivision: string }
-const EMPTY_BILL_FORM: BillForm = { supplier: '', city: '', piece: '', date: new Date().toISOString().slice(0, 10), dueDate: '', htAmount: '', paymentMethod: 'wire', ifu: '', rccm: '', taxRegime: '', fiscalDivision: '' };
-
-const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  wire:   'Virement',
-  cash:   'Espèces',
-  mobile: 'Mobile money',
-};
-const PAYMENT_METHOD_ICONS: Record<PaymentMethod, string> = {
-  wire:   'building-bank',
-  cash:   'cash',
-  mobile: 'device-mobile',
-};
-
-function JournalLines({ lines }: { lines: SupplierBill['acctLines'] }) {
-  return (
-    <div style={{ border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', marginBottom: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 90px 90px', gap: 8, padding: '8px 14px', background: 'var(--color-background-secondary)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-text-secondary)' }}>
-        <span>Cpte</span><span>Libellé</span><span style={{ textAlign: 'right' }}>Débit</span><span style={{ textAlign: 'right' }}>Crédit</span>
-      </div>
-      {lines.map((l, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 90px 90px', gap: 8, padding: '9px 14px', borderTop: '0.5px solid var(--color-border-tertiary)', fontSize: 12.5, alignItems: 'center' }}>
-          <span className="mono" style={{ fontWeight: 700, color: 'var(--brand)' }}>{l.acct}</span>
-          <span style={{ color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.label}</span>
-          <span className="mono" style={{ textAlign: 'right', fontWeight: l.side === 'D' ? 600 : 400, color: l.side === 'D' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>{l.side === 'D' ? fmt(l.amount) : '—'}</span>
-          <span className="mono" style={{ textAlign: 'right', fontWeight: l.side === 'C' ? 600 : 400, color: l.side === 'C' ? '#A32D2D' : 'var(--color-text-tertiary)' }}>{l.side === 'C' ? fmt(l.amount) : '—'}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function BillDrawer({ bill, onMarkPaid, onClose }: { bill: SupplierBill; onMarkPaid: (id: string) => void; onClose: () => void }) {
-  const { writable } = usePermissions();
-  const av = supplierAvColor(bill.supplier);
-  return (
-    <DrawerPanel open onClose={onClose} title={
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-          {supplierInitials(bill.supplier)}
-        </div>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{bill.supplier}</div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{bill.city} · {bill.piece}</div>
-        </div>
-      </div>
-    }>
-      {/* Meta grid: date, due, status, payment method */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-        {([
-          { label: 'Date facture', value: bill.date },
-          { label: 'Échéance', value: bill.dueDate },
-          { label: 'Statut', value: <StatusPill status={bill.status} /> },
-          { label: 'Mode de règlement', value: (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <Icon name={PAYMENT_METHOD_ICONS[bill.paymentMethod]} size={14} />
-              {PAYMENT_METHOD_LABELS[bill.paymentMethod]}
-            </span>
-          )},
-        ] as { label: string; value: React.ReactNode }[]).map(({ label, value }) => (
-          <div key={label} style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '11px 13px', border: '0.5px solid var(--color-border-tertiary)' }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-text-tertiary)' }}>{label}</div>
-            <div style={{ marginTop: 5, fontSize: 13.5, fontWeight: 600 }}>{value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Amount breakdown */}
-      <div className="dsec-label"><Icon name="receipt" size={13} />Détail montant</div>
-      <div style={{ border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden', marginBottom: 20 }}>
-        {[
-          { label: 'Montant HT', value: bill.htAmount },
-          { label: VAT_LABEL, value: bill.tvaAmount },
-          { label: 'Total TTC', value: bill.htAmount + bill.tvaAmount, bold: true, highlight: true },
-        ].map(({ label, value, bold, highlight }) => (
-          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)', background: highlight ? 'var(--brand-tint)' : 'transparent', fontWeight: bold ? 700 : 400, fontSize: 13 }}>
-            <span style={{ color: highlight ? 'var(--brand-dark)' : 'var(--color-text-secondary)' }}>{label}</span>
-            <span className="mono">{fmt(value)} F CFA</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Purchase journal entry */}
-      <div className="dsec-label"><Icon name="book-2" size={13} />Écriture d'achat (AC)</div>
-      <JournalLines lines={bill.acctLines} />
-
-      {/* Payment journal entry — shown when paid */}
-      {bill.status === 'paid' && (() => {
-        const total = bill.htAmount + bill.tvaAmount;
-        const creditAcct = bill.paymentMethod === 'cash' ? '571' : '521';
-        const creditLabel = bill.paymentMethod === 'cash' ? 'Caisse' : 'Banque';
-        const journalLabel = bill.paymentMethod === 'cash' ? 'Écriture de règlement (CA)' : 'Écriture de règlement (BQ)';
-        return (
-          <>
-            <div className="dsec-label" style={{ marginTop: 4 }}><Icon name="book-2" size={13} />{journalLabel}</div>
-            <JournalLines lines={[
-              { acct: '401', label: 'Fournisseurs',  amount: total, side: 'D' },
-              { acct: creditAcct, label: creditLabel, amount: total, side: 'C' },
-            ]} />
-          </>
-        );
-      })()}
-
-      {writable && bill.status !== 'paid' && (
-        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { onMarkPaid(bill.id); onClose(); }}>
-          <Icon name="check" />Marquer comme payé · <span style={{ opacity: 0.8, fontSize: 12 }}>{PAYMENT_METHOD_LABELS[bill.paymentMethod]}</span>
-        </button>
-      )}
-    </DrawerPanel>
-  );
-}
-
-const TAX_REGIME_OPTIONS = [
-  { value: '', label: 'Sélectionner…' },
-  { value: 'reel', label: 'Réel normal' },
-  { value: 'simplifie', label: 'Réel simplifié' },
-  { value: 'micro', label: 'Micro-entreprise' },
-  { value: 'forfait', label: 'Forfait' },
-  { value: 'exonere', label: 'Exonéré' },
-];
-
-function NewBillDrawer({ onSave, onClose, initialSupplier = '' }: { onSave: (f: BillForm) => Promise<void>; onClose: () => void; initialSupplier?: string }) {
-  const [form, setForm] = useState<BillForm>({ ...EMPTY_BILL_FORM, supplier: initialSupplier });
-  const [amountMode, setAmountMode] = useState<'ht' | 'ttc'>('ht');
-  const [saving, setSaving] = useState(false);
-  const set = (k: keyof BillForm, v: string) => setForm(p => ({ ...p, [k]: v }));
-  const raw = parseFloat(form.htAmount) || 0;
-  const ht  = amountMode === 'ht' ? raw : Math.round(raw / (1 + VAT_RATE));
-  const tva = Math.round(ht * VAT_RATE);
-  const ttc = ht + tva;
-  const valid = form.supplier.trim() && form.piece.trim() && form.dueDate && raw > 0;
-  const handleSave = async () => {
-    if (!valid) return;
-    setSaving(true);
-    try { await onSave({ ...form, htAmount: String(ht) }); onClose(); } finally { setSaving(false); }
-  };
-  return (
-    <DrawerPanel open onClose={onClose} title="Nouvelle facture fournisseur" subtitle="Enregistrement d'une dette">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div style={{ gridColumn: '1/-1' }}>
-          <label className="form-label">Fournisseur *</label>
-          <input className="form-input" value={form.supplier} onChange={e => set('supplier', e.target.value)} placeholder="Nom du fournisseur" />
-        </div>
-        <div>
-          <label className="form-label">Ville</label>
-          <input className="form-input" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Ouagadougou" />
-        </div>
-        <div>
-          <label className="form-label">Référence pièce *</label>
-          <input className="form-input" value={form.piece} onChange={e => set('piece', e.target.value)} placeholder="FACT-2026-001" />
-        </div>
-        <div>
-          <label className="form-label">Date facture</label>
-          <input className="form-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-        </div>
-        <div>
-          <label className="form-label">Date d'échéance *</label>
-          <input className="form-input" type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
-        </div>
-        <div style={{ gridColumn: '1/-1' }}>
-          <label className="form-label">Saisie du montant</label>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            {(['ht', 'ttc'] as const).map(m => (
-              <button key={m} type="button" onClick={() => setAmountMode(m)}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                  padding: '7px 10px', borderRadius: 'var(--border-radius-md)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .1s',
-                  border: amountMode === m ? '1.5px solid var(--brand)' : '0.5px solid var(--color-border-secondary)',
-                  background: amountMode === m ? 'var(--brand-tint)' : 'var(--color-background-primary)',
-                  color: amountMode === m ? 'var(--brand)' : 'var(--color-text-secondary)',
-                }}>
-                {m === 'ht' ? 'Montant HT (hors taxe)' : 'Montant TTC (taxe incluse)'}
-              </button>
-            ))}
-          </div>
-          <input className="form-input" type="number" min="0" value={form.htAmount}
-            onChange={e => set('htAmount', e.target.value)}
-            placeholder={amountMode === 'ht' ? 'Montant hors taxe' : 'Montant toutes taxes comprises'} />
-        </div>
-        <div style={{ gridColumn: '1/-1' }}>
-          <label className="form-label">Mode de règlement</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(['wire', 'cash', 'mobile'] as PaymentMethod[]).map(m => (
-              <button key={m} type="button"
-                onClick={() => set('paymentMethod', m)}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '8px 10px', borderRadius: 'var(--border-radius-md)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .1s',
-                  border: form.paymentMethod === m ? '1.5px solid var(--brand)' : '0.5px solid var(--color-border-secondary)',
-                  background: form.paymentMethod === m ? 'var(--brand-tint)' : 'var(--color-background-primary)',
-                  color: form.paymentMethod === m ? 'var(--brand)' : 'var(--color-text-secondary)',
-                }}>
-                <Icon name={PAYMENT_METHOD_ICONS[m]} size={14} />
-                {PAYMENT_METHOD_LABELS[m]}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {raw > 0 && (
-        <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '11px 14px', marginBottom: 16 }}>
-          {[{ label: 'Montant HT', value: ht }, { label: VAT_LABEL, value: tva }, { label: 'Total TTC', value: ttc }].map(({ label, value }, i) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: i > 0 ? '0.5px solid var(--color-border-tertiary)' : 'none', fontWeight: i === 2 ? 700 : 400, fontSize: 12.5 }}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
-              <span className="mono">{fmt(value)} F CFA</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="dsec-label" style={{ marginTop: 4 }}><Icon name="id-badge-2" size={13} />Informations fiscales fournisseur</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div>
-          <label className="form-label">IFU</label>
-          <input className="form-input" value={form.ifu} onChange={e => set('ifu', e.target.value)} placeholder="Identifiant fiscal unique" />
-        </div>
-        <div>
-          <label className="form-label">RCCM</label>
-          <input className="form-input" value={form.rccm} onChange={e => set('rccm', e.target.value)} placeholder="Registre de commerce" />
-        </div>
-        <div>
-          <label className="form-label">Régime fiscal</label>
-          <select className="form-input" value={form.taxRegime} onChange={e => set('taxRegime', e.target.value)}>
-            {TAX_REGIME_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="form-label">Division fiscale</label>
-          <FiscalDivisionSelect value={form.fiscalDivision} onChange={v => set('fiscalDivision', v)} />
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 9 }}>
-        <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Annuler</button>
-        <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={!valid || saving} onClick={handleSave}>
-          <Icon name="check" size={15} />{saving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </DrawerPanel>
-  );
-}
-
-const BILL_STATUS_FILTERS = [
-  { key: 'all', label: 'Toutes' },
-  { key: 'open', label: 'En cours' },
-  { key: 'overdue', label: 'En retard' },
-  { key: 'paid', label: 'Payées' },
-];
-
-function SupplierDetailDrawer({ supplier, onClose, onMarkPaid, onNewBill }: {
-  supplier: SupplierContact;
-  onClose: () => void;
-  onMarkPaid: (id: string) => void;
-  onNewBill: (name: string) => void;
-}) {
-  const [localBill, setLocalBill] = useState<SupplierBill | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const av = supplierAvColor(supplier.name);
-
-  if (localBill) {
-    return <BillDrawer bill={localBill} onMarkPaid={onMarkPaid} onClose={() => setLocalBill(null)} />;
-  }
-
-  const visibleBills = statusFilter === 'all' ? supplier.bills : supplier.bills.filter(b => b.status === statusFilter);
-  const statusCounts: Record<string, number> = { all: supplier.bills.length };
-  supplier.bills.forEach(b => { statusCounts[b.status] = (statusCounts[b.status] || 0) + 1; });
-
-  // Per-supplier aging bar
-  const ageTot: Record<string, number> = {};
-  supplier.bills.forEach(b => {
-    const k = ageBucket(b);
-    if (k) ageTot[k] = (ageTot[k] || 0) + b.htAmount + b.tvaAmount;
-  });
-  const ageCols: Record<string, string> = { cur: '#276C2B', d30: '#8A5207', d60: '#C2570B', d90: '#A32D2D' };
-  const ageTotal = Object.values(ageTot).reduce((a, v) => a + v, 0) || 1;
-
-  // Relevé: every bill from this supplier, as a CSV for Excel
-  const BILL_STATUS: Record<SupplierBill['status'], string> = { open: 'À payer', overdue: 'En retard', paid: 'Payée' };
-  function exportStatement() {
-    const rows = supplier.bills.map(b => [b.date, b.piece, b.dueDate, b.htAmount, b.tvaAmount, b.htAmount + b.tvaAmount, BILL_STATUS[b.status]]);
-    const slug = supplier.name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'fournisseur';
-    downloadBlob(
-      csvBlob(['Date', 'Pièce', 'Échéance', 'HT (F CFA)', 'TVA (F CFA)', 'TTC (F CFA)', 'Statut'], rows),
-      `releve-${slug}-${todayISO()}.csv`,
-    );
-  }
-
-  return (
-    <DrawerPanel open onClose={onClose} title={
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-          {supplierInitials(supplier.name)}
-        </div>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{supplier.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Icon name="map-pin" size={12} />{supplier.city}
-          </div>
-        </div>
-      </div>
-    }>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-        <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '11px 13px', border: '0.5px solid var(--color-border-tertiary)' }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-text-tertiary)' }}>Total TTC</div>
-          <div className="mono" style={{ marginTop: 5, fontSize: 17, fontWeight: 700, letterSpacing: -0.4 }}>{fmtCompact(supplier.totalTTC)}<span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-text-tertiary)', marginLeft: 3 }}>F CFA</span></div>
-        </div>
-        <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '11px 13px', border: '0.5px solid var(--color-border-tertiary)' }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-text-tertiary)' }}>À payer</div>
-          <div className="mono" style={{ marginTop: 5, fontSize: 17, fontWeight: 700, letterSpacing: -0.4, color: supplier.totalPayable > 0 ? '#A32D2D' : 'var(--color-text-primary)' }}>
-            {fmtCompact(supplier.totalPayable)}<span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-text-tertiary)', marginLeft: 3 }}>F CFA</span>
-          </div>
-          {/* Aging mini-bar */}
-          {supplier.totalPayable > 0 && (
-            <div style={{ height: 5, display: 'flex', gap: 2, marginTop: 9, borderRadius: 3, overflow: 'hidden' }}>
-              {(['cur', 'd30', 'd60', 'd90'] as const).map(k => ageTot[k] ? (
-                <div key={k} style={{ height: '100%', borderRadius: 3, background: ageCols[k], flex: ageTot[k] / ageTotal }} />
-              ) : null)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Bill status filter */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-        {BILL_STATUS_FILTERS.map(({ key, label }) => (
-          <button key={key} onClick={() => setStatusFilter(key)}
-            style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 20, border: '0.5px solid var(--color-border-secondary)', cursor: 'pointer', transition: 'all .1s',
-              background: statusFilter === key ? 'var(--brand)' : 'var(--color-background-secondary)',
-              color: statusFilter === key ? '#fff' : 'var(--color-text-secondary)' }}>
-            {label} {statusCounts[key] ?? 0}
-          </button>
-        ))}
-      </div>
-
-      {/* Bills list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {visibleBills.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-tertiary)', fontSize: 13 }}>Aucune facture dans ce filtre</div>
-        ) : visibleBills.map(bill => {
-          const d = daysDue(bill.dueDate);
-          const ttc = bill.htAmount + bill.tvaAmount;
-          return (
-            <div key={bill.id} onClick={() => setLocalBill(bill)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: 'var(--border-radius-md)', cursor: 'pointer', transition: 'background .1s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-              onMouseLeave={e => (e.currentTarget.style.background = '')}>
-              <div style={{ minWidth: 0 }}>
-                <div className="mono" style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bill.piece}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                  {bill.status === 'paid' ? 'Réglé' : bill.status === 'overdue'
-                    ? <span style={{ color: '#A32D2D', fontWeight: 700 }}>{Math.abs(d)} j. de retard</span>
-                    : `échéance ${fmtDate(bill.dueDate)}`}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 12 }}>
-                <div className="mono" style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700 }}>
-                  {fmt(ttc)} <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-text-tertiary)' }}>F CFA</span>
-                </div>
-                <StatusPill status={bill.status} />
-                <Icon name="chevron-right" size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div style={{ display: 'flex', gap: 9, marginTop: 20 }}>
-        <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={exportStatement} disabled={supplier.bills.length === 0}>
-          <Icon name="download" size={15} />Relevé
-        </button>
-        <button className="btn btn-primary" style={{ flex: 1.4, justifyContent: 'center' }} onClick={() => { onClose(); onNewBill(supplier.name); }}>
-          <Icon name="plus" size={15} />Nouvelle facture
-        </button>
-      </div>
-    </DrawerPanel>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
   const { writable, deletable } = usePermissions();
-  const [searchParams, setSearchParams] = useSearchParams();
-  // Suppliers (and their bills) belong to the accounting module
-  const [tab, setTab] = useState<Tab>(() =>
-    ACCOUNTING_ENABLED && searchParams.get('tab') === 'suppliers' ? 'suppliers' : 'clients'
-  );
-
-  useEffect(() => {
-    setSearchParams(tab === 'suppliers' ? { tab: 'suppliers' } : {}, { replace: true });
-  }, [tab]);
-
+  const [searchParams] = useSearchParams();
   // Clients data
   const { clients, setClients, invoices, quotes, payments, orgId, showToast, loading: clientsLoading } = useApp();
   const [clientFilter, setClientFilter] = useState<ClientFilterKey>('all');
@@ -559,13 +65,11 @@ export default function ContactsPage() {
   // From the command box (PRO-162): a new client, or one found by the search
   useCommandIntent(intent => {
     if (intent.command === 'open-client') {
-      setTab('clients');
       // ERP look: the record opens beside the list (PRO-169)
       if (UI_V2) setSelectedCode(intent.client); else setClientPanel({ kind: 'detail', code: intent.client });
       return;
     }
     if (intent.command !== 'new-client' || !writable) return false;
-    setTab('clients');
     setClientPanel({ kind: 'new' });
   }, !clientsLoading);
   const [editMode, setEditMode] = useState(false);
@@ -573,14 +77,6 @@ export default function ContactsPage() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<NewClientForm>(EMPTY_FORM);
   const [deleteClient, setDeleteClient] = useState<ClientRecord | null>(null);
-
-  // Suppliers data
-  const { data: bills, loading: suppLoading, markPaid, createBill } = useSupplierBills(ACCOUNTING_ENABLED);
-  const [selectedSupplier, setSelectedSupplier] = useState<SupplierContact | null>(null);
-  const [showBillForm, setShowBillForm] = useState(false);
-  const [billInitialSupplier, setBillInitialSupplier] = useState('');
-  const [supplierSearch, setSupplierSearch] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState<SupplierFilterKey>('all');
 
   // ── useMemo calls must be unconditional (before any early return) ─────────
 
@@ -611,36 +107,6 @@ export default function ContactsPage() {
     return list;
   }, [clients, clientFilter, clientSearch, clientStatsMap]);
 
-  const supplierBillsAll = bills ?? [];
-  const supplierContacts = useMemo((): SupplierContact[] => {
-    const map = new Map<string, SupplierContact>();
-    supplierBillsAll.forEach(b => {
-      const ttc = b.htAmount + b.tvaAmount;
-      const ex = map.get(b.supplier);
-      if (ex) {
-        ex.bills.push(b);
-        ex.totalTTC += ttc;
-        if (b.status !== 'paid') ex.totalPayable += ttc;
-        if (b.status === 'overdue') ex.overdueCount++;
-      } else {
-        map.set(b.supplier, { name: b.supplier, city: b.city, bills: [b], totalTTC: ttc, totalPayable: b.status !== 'paid' ? ttc : 0, overdueCount: b.status === 'overdue' ? 1 : 0 });
-      }
-    });
-    return Array.from(map.values());
-  }, [supplierBillsAll]);
-
-  const filteredSuppliers = useMemo(() => {
-    let list = supplierContacts;
-    if (supplierFilter === 'overdue') list = list.filter(s => s.overdueCount > 0);
-    else if (supplierFilter === 'open') list = list.filter(s => s.totalPayable > 0);
-    else if (supplierFilter === 'settled') list = list.filter(s => s.totalPayable === 0);
-    if (supplierSearch.trim()) {
-      const q = supplierSearch.toLowerCase();
-      list = list.filter(s => s.name.toLowerCase().includes(q) || s.city.toLowerCase().includes(q));
-    }
-    return list;
-  }, [supplierContacts, supplierFilter, supplierSearch]);
-
   // ERP look: each client's figures from the invoices' real balances
   const creditNotes = useCreditNotes();
   const year = new Date().getFullYear();
@@ -656,7 +122,7 @@ export default function ContactsPage() {
     setClientPanel(null);
   }, [clientPanel, editMode]);
 
-  const loading = tab === 'clients' ? clientsLoading : suppLoading;
+  const loading = clientsLoading;
   // Opens the linked client's form once it is loaded (writers only)
   const linkedEditOpened = useRef(false);
   useEffect(() => {
@@ -667,7 +133,7 @@ export default function ContactsPage() {
     openDetailEdit(cl);
   }, [linkedClient, clients, writable]);
 
-  if (loading) return <PageSkeleton title="Contacts" subtitle={ACCOUNTING_ENABLED ? 'Clients & fournisseurs' : 'Vos clients'} variant="accounting" rows={6} />;
+  if (loading) return <PageSkeleton title="Contacts" subtitle="Vos clients" variant="accounting" rows={6} />;
 
   // ── Clients computed ──────────────────────────────────────────────────────
   const totalBilled  = Array.from(clientStatsMap.values()).reduce((s, v) => s + v.billed, 0);
@@ -760,65 +226,27 @@ export default function ContactsPage() {
     }
   }
 
-  // ── Suppliers computed ────────────────────────────────────────────────────
-  const supplierBills = supplierBillsAll;
-  const totalPayable  = supplierBills.filter(b => b.status !== 'paid').reduce((s, b) => s + b.htAmount + b.tvaAmount, 0);
-  const dueSoon       = supplierBills.filter(b => b.status === 'open' && daysDue(b.dueDate) >= 0 && daysDue(b.dueDate) <= 7).reduce((s, b) => s + b.htAmount + b.tvaAmount, 0);
-  const overdueTTC    = supplierBills.filter(b => b.status === 'overdue').reduce((s, b) => s + b.htAmount + b.tvaAmount, 0);
-  const suppCount     = supplierContacts.length;
-  const supplierCounts: Record<SupplierFilterKey, number> = {
-    all: suppCount,
-    overdue: supplierContacts.filter(s => s.overdueCount > 0).length,
-    open: supplierContacts.filter(s => s.totalPayable > 0).length,
-    settled: supplierContacts.filter(s => s.totalPayable === 0).length,
-  };
-
-  async function handleCreateBill(billForm: BillForm) {
-    const ht = parseFloat(billForm.htAmount);
-    await createBill({ supplier: billForm.supplier, city: billForm.city, piece: billForm.piece, date: billForm.date, dueDate: billForm.dueDate, htAmount: ht, tvaAmount: Math.round(ht * VAT_RATE), status: 'open', paymentMethod: billForm.paymentMethod, ifu: billForm.ifu || undefined, rccm: billForm.rccm || undefined, taxRegime: billForm.taxRegime || undefined, fiscalDivision: billForm.fiscalDivision || undefined });
-  }
-
   // ── Contextual KPIs ───────────────────────────────────────────────────────
-  const kpis = tab === 'clients' ? [
+  const kpis = [
     { icon: 'users',        iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)',  label: 'Clients',          value: clients.length,         sub: `${activeCount} actifs · ${leadCount} prospect${leadCount !== 1 ? 's' : ''}` },
     { icon: 'user-check',   iconBg: '#EAF3DE',           iconColor: '#3B6D11',       label: 'Actifs',           value: activeCount,             sub: 'relations de facturation' },
     { icon: 'report-money', iconBg: '#ECE9FB',            iconColor: '#5B45C7',       label: 'Total facturé',    value: fmtCompact(totalBilled), unit: 'F CFA', sub: 'revenu cumulé' },
     { icon: 'clock-pause',  iconBg: '#FAEEDA',            iconColor: '#8A5207',       label: 'Solde impayé (411)', value: fmtCompact(outstanding), unit: 'F CFA', sub: `${withBalance} client${withBalance !== 1 ? 's' : ''} avec solde` },
-  ] : [
-    { icon: 'truck-delivery', iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)', label: 'À payer (401)',    value: fmtCompact(totalPayable), unit: 'F CFA', sub: `${supplierBills.filter(b => b.status !== 'paid').length} factures ouvertes` },
-    { icon: 'clock',          iconBg: '#FAEEDA',            iconColor: '#8A5207',      label: 'Échéance ≤ 7 j.', value: fmtCompact(dueSoon),      unit: 'F CFA', sub: 'à planifier' },
-    { icon: 'alert-triangle', iconBg: '#FCEBEB',            iconColor: '#A32D2D',      label: 'En retard',       value: fmtCompact(overdueTTC),   unit: 'F CFA', sub: `${supplierBills.filter(b => b.status === 'overdue').length} facture${supplierBills.filter(b => b.status === 'overdue').length !== 1 ? 's' : ''} échues` },
-    { icon: 'briefcase',      iconBg: '#E7F3E2',            iconColor: '#276C2B',      label: 'Fournisseurs',    value: suppCount,                sub: 'avec activité' },
   ];
-
-  const tabSwitcher = !ACCOUNTING_ENABLED ? <div className="section-title">Clients</div> : (
-    <PageTabs<Tab>
-      tabs={[
-        { key: 'clients',   label: 'Clients',      icon: 'users',          count: clients.length },
-        { key: 'suppliers', label: 'Fournisseurs', icon: 'truck-delivery', count: suppCount },
-      ]}
-      active={tab}
-      onChange={setTab}
-      idPrefix="contacts"
-    />
-  );
 
   return (
     <>
       <Page
         title="Contacts"
-        subtitle={<>{ACCOUNTING_ENABLED ? 'Clients & fournisseurs' : 'Vos clients'}</>}
+        subtitle="Vos clients"
         actions={<>
           <button className="btn"><Icon name="download" size={15} />Exporter</button>
-          {writable && (tab === 'clients'
-            ? <button className="btn btn-primary" onClick={() => setClientPanel({ kind: 'new' })}><Icon name="user-plus" size={15} />Nouveau client</button>
-            : <button className="btn btn-primary" onClick={() => setShowBillForm(true)}><Icon name="plus" size={15} />Nouvelle facture</button>
-          )}
+          {writable && <button className="btn btn-primary" onClick={() => setClientPanel({ kind: 'new' })}><Icon name="user-plus" size={15} />Nouveau client</button>}
         </>}
         mainStyle={{ position: 'relative' }}
       >
           {/* ── Contextual KPI strip ──────────────────────────────────────── */}
-          {!(UI_V2 && tab === 'clients') && <div className="metrics" style={{ marginBottom: 20 }}>
+          {!UI_V2 && <div className="metrics" style={{ marginBottom: 20 }}>
             {kpis.map(k => (
               <div key={k.label} className="metric-card">
                 <div className="metric-top">
@@ -832,10 +260,9 @@ export default function ContactsPage() {
           </div>}
 
           {/* ── Clients tab, ERP look (PRO-169): list with the record beside it ── */}
-          {tab === 'clients' && UI_V2 && (
+          {UI_V2 && (
             <>
-              {ACCOUNTING_ENABLED && <div className="section-header">{tabSwitcher}</div>}
-              <div className="cr-split" {...(ACCOUNTING_ENABLED ? { role: 'tabpanel', id: tabPanelId('contacts'), 'aria-labelledby': tabId('contacts', tab) } : {})}>
+              <div className="cr-split">
                 <ClientList rows={cRows} year={year} selected={selectedCode} onSelect={setSelectedCode} />
                 <ClientRecordPanel
                   client={selectedRow}
@@ -850,10 +277,10 @@ export default function ContactsPage() {
           )}
 
           {/* ── Clients tab ──────────────────────────────────────────────── */}
-          {tab === 'clients' && !UI_V2 && (
+          {!UI_V2 && (
             <>
               <div className="section-header">
-                {tabSwitcher}
+                <div className="section-title">Clients</div>
                 <div className="list-controls">
                   <div className="search-box">
                     <Icon name="search" size={15} />
@@ -869,7 +296,7 @@ export default function ContactsPage() {
                 </div>
               </div>
 
-              <div className="client-table" {...(ACCOUNTING_ENABLED ? { role: 'tabpanel', id: tabPanelId('contacts'), 'aria-labelledby': tabId('contacts', tab) } : {})}>
+              <div className="client-table">
                 <div className="table-head client-grid-cols">
                   <div className="th">Client</div>
                   <div className="th">Localisation</div>
@@ -925,88 +352,6 @@ export default function ContactsPage() {
             </>
           )}
 
-          {/* ── Suppliers tab ─────────────────────────────────────────────── */}
-          {tab === 'suppliers' && (
-            <>
-              {/* AP Aging strip */}
-              <AgingStrip bills={supplierBillsAll} />
-
-              {/* Tabs + search + filter chips */}
-              <div className="section-header">
-                {tabSwitcher}
-                <div className="list-controls">
-                  <div className="search-box">
-                    <Icon name="search" size={15} />
-                    <input type="text" placeholder="Rechercher un fournisseur…" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} />
-                  </div>
-                  <div className="filters">
-                    {SUPPLIER_FILTERS.map(f => (
-                      <button key={f.key} className={'filter-chip' + (supplierFilter === f.key ? ' active' : '')} onClick={() => setSupplierFilter(f.key)}>
-                        {f.label}<span className="cnt">{supplierCounts[f.key]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="client-table" role="tabpanel" id={tabPanelId('contacts')} aria-labelledby={tabId('contacts', tab)}>
-                <div className="table-head supplier-grid-cols" style={{ padding: '10px 18px' }}>
-                  <div className="th">Fournisseur</div>
-                  <div className="th">Factures</div>
-                  <div className="th right">Total TTC</div>
-                  <div className="th">Règlement</div>
-                  <div className="th" />
-                </div>
-                {filteredSuppliers.length === 0 ? (
-                  <EmptyState illustration={<SuppliersEmptyIllustration />} title="Aucun fournisseur" description="Aucun fournisseur trouvé pour ce filtre." />
-                ) : filteredSuppliers.map(s => {
-                  const av = supplierAvColor(s.name);
-                  const pill = s.overdueCount > 0
-                    ? <span className="status-pill s-overdue">{s.overdueCount} en retard</span>
-                    : s.totalPayable > 0
-                      ? <span className="status-pill s-ontrack">En cours</span>
-                      : <span className="status-pill s-settled">Soldé</span>;
-                  return (
-                    <div key={s.name} className="supplier-row supplier-grid-cols" onClick={() => setSelectedSupplier(s)}>
-                      <div className="name-cell">
-                        <div style={{ width: 36, height: 36, borderRadius: 9, background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11.5, flexShrink: 0 }}>
-                          {supplierInitials(s.name)}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div className="cl-name">{s.name}</div>
-                          <div className="cl-contact">{s.city}</div>
-                        </div>
-                      </div>
-                      <div className="inv-count tnum">{s.bills.length} <span>facture{s.bills.length !== 1 ? 's' : ''}</span></div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className="billed tnum">{fmt(s.totalTTC)}<span className="cur">F CFA</span></div>
-                        {s.totalPayable > 0
-                          ? <div className="billed-sub bal">{fmt(s.totalPayable)} F CFA à payer</div>
-                          : <div className="billed-sub clear">Rien dû</div>
-                        }
-                      </div>
-                      <div>{pill}</div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--color-text-tertiary)' }}>
-                        <Icon name="chevron-right" size={16} />
-                      </div>
-                    </div>
-                  );
-                })}
-                {/* Table footer */}
-                {filteredSuppliers.length > 0 && (
-                  <div className="dir-foot">
-                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                      {filteredSuppliers.length} sur {suppCount} fournisseur{suppCount !== 1 ? 's' : ''}
-                    </span>
-                    <div className="dir-foot-r">
-                      <span>Total TTC<b>{fmt(filteredSuppliers.reduce((a, s) => a + s.totalTTC, 0))} F CFA</b></span>
-                      <span>À payer<b className={filteredSuppliers.reduce((a, s) => a + s.totalPayable, 0) > 0 ? 'due' : ''}>{fmt(filteredSuppliers.reduce((a, s) => a + s.totalPayable, 0))} F CFA</b></span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
       </Page>
 
       {/* ── Client panels ────────────────────────────────────────────────── */}
@@ -1228,16 +573,6 @@ export default function ContactsPage() {
       </div>
 
       {/* ── Supplier drawers ─────────────────────────────────────────────── */}
-      {selectedSupplier && (
-        <SupplierDetailDrawer
-          // The list's copy: marking a bill paid updates it, the captured one doesn't
-          supplier={supplierContacts.find(s => s.name === selectedSupplier.name) ?? selectedSupplier}
-          onMarkPaid={markPaid}
-          onNewBill={name => { setBillInitialSupplier(name); setSelectedSupplier(null); setShowBillForm(true); }}
-          onClose={() => setSelectedSupplier(null)}
-        />
-      )}
-      {showBillForm && <NewBillDrawer initialSupplier={billInitialSupplier} onSave={handleCreateBill} onClose={() => setShowBillForm(false)} />}
       {deleteClient && (documentCount(deleteClient.code) > 0 ? (
         <ConfirmModal
           title="Ce client ne peut pas être supprimé"

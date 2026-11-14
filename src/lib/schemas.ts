@@ -122,6 +122,8 @@ export const productSchema = z.object({
   /** Last change of what the item is or costs (PRO-173), set by the database */
   updatedAt:     z.string().optional(),
   updatedByName: z.string().optional(),
+  /** Who created it (PRO-170), set by the database; none for items older than that */
+  createdById:   z.string().optional(),
 });
 
 export const creditNoteSchema = z.object({

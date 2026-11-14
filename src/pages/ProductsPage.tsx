@@ -12,6 +12,12 @@ import { lastChangeLabel } from '@/lib/change-label';
 import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { ProductType, Product } from '@/lib/schemas';
 import Page from '@/components/Page';
+import ProductTable from '@/components/products/ProductTable';
+import { UI_V2 } from '@/lib/features';
+import { CATALOGUE_CSV_HEADER, catalogueCsvRows } from '@/lib/catalogue';
+import { csvBlob } from '@/lib/csv';
+import { downloadBlob } from '@/lib/download';
+import { todayISO } from '@/lib/invoice-status';
 
 type FilterKey = 'all' | ProductType;
 type ViewMode  = 'list' | 'grid';
@@ -29,7 +35,6 @@ export default function ProductsPage() {
   const { writable, deletable } = usePermissions();
   const { showToast, products, setProducts, orgId, loading } = useApp();
 
-  if (loading) return <PageSkeleton title="Produits & Services" subtitle="Articles réutilisables pour vos factures et devis" variant="table-only" rows={6} />;
   const [filter, setFilter]         = useState<FilterKey>('all');
   const [view, setView]             = useState<ViewMode>('list');
   const [search, setSearch]         = useState('');
@@ -139,7 +144,7 @@ export default function ProductsPage() {
       setProducts(prev => [item, ...prev]);
       try {
         const stored = await createProduct(orgId, item);
-        setProducts(prev => prev.map(p => p.id === item.id ? { ...p, updatedAt: stored.updatedAt, updatedByName: stored.updatedByName } : p));
+        setProducts(prev => prev.map(p => p.id === item.id ? { ...p, updatedAt: stored.updatedAt, updatedByName: stored.updatedByName, createdById: stored.createdById } : p));
       } catch (err) {
         console.error('[createProduct] failed:', err);
         setProducts(prev => prev.filter(p => p.id !== item.id));
@@ -152,13 +157,23 @@ export default function ProductsPage() {
     }
   };
 
+  // Waits until every hook above has run: returning earlier changes their
+  // number between renders, which React refuses
+  if (loading) return <PageSkeleton title="Produits & Services" subtitle="Articles réutilisables pour vos factures et devis" variant="table-only" rows={6} />;
+
+  // « Exporter »: the catalogue as a CSV for Excel
+  const exportCatalogue = () => {
+    if (products.length === 0) { showToast('Aucun article à exporter.', true); return; }
+    downloadBlob(csvBlob(CATALOGUE_CSV_HEADER, catalogueCsvRows(products)), `catalogue-${todayISO()}.csv`);
+  };
+
   return (
     <>
       <Page
         title="Produits & Services"
         subtitle="Articles réutilisables pour vos factures et devis"
         actions={<>
-          <button className="btn"><Icon name="download" ariaHidden /> Exporter</button>
+          <button className="btn" onClick={exportCatalogue}><Icon name="download" ariaHidden /> Exporter</button>
           {writable && (
             <button className="btn btn-primary" onClick={openPanel}>
               <Icon name="plus" ariaHidden /> Nouvel article
@@ -166,6 +181,9 @@ export default function ProductsPage() {
           )}
         </>}
       >
+          {UI_V2 ? (
+            <ProductTable writable={writable} deletable={deletable} onEdit={openEdit} onDelete={handleDelete} />
+          ) : <>
           {/* Metrics */}
           <div className="metrics">
             <div className="metric-card">
@@ -348,6 +366,7 @@ export default function ProductsPage() {
               ))}
             </div>
           )}
+          </>}
       </Page>
 
       {/* Slide-over: New item */}
