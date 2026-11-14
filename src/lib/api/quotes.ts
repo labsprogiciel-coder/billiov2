@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { INITIAL_QUOTES } from '@/data';
+import { INITIAL_QUOTES, mockOwner } from '@/data';
 import type { Quote } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
@@ -16,6 +16,8 @@ export function dbToQuote(row: Record<string, unknown>): Quote {
     expSoon: daysLeft > 0 && daysLeft <= 14,
     amount:  Number(row.amount),
     status:  (row.status ?? 'draft') as Quote['status'],
+    ownerId:     row.owner_id ? String(row.owner_id) : undefined,
+    ownerName:   row.owner_name ? String(row.owner_name) : undefined,
   };
 }
 
@@ -43,7 +45,7 @@ export async function createQuote(
 ): Promise<Quote> {
   const daysLeft = (new Date(payload.valid).getTime() - Date.now()) / 86_400_000;
   const expSoon  = daysLeft > 0 && daysLeft <= 14;
-  if (MOCK) return { ...payload, expSoon };
+  if (MOCK) return { ...payload, expSoon, ...mockOwner() };
   const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('quotes')

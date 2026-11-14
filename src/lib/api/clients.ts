@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { INITIAL_CLIENTS } from '@/data';
+import { INITIAL_CLIENTS, mockOwner } from '@/data';
 import type { ClientRecord } from '@/lib/schemas';
 import { clientTypeOf } from '@/lib/client-type';
 
@@ -25,6 +25,8 @@ export function dbToClient(row: Record<string, unknown>): ClientRecord {
     billed:   Number(row.billed ?? 0),
     balance:  Number(row.balance ?? 0),
     status:   (row.status ?? 'active') as ClientRecord['status'],
+    ownerId:     row.owner_id ? String(row.owner_id) : undefined,
+    ownerName:   row.owner_name ? String(row.owner_name) : undefined,
   };
 }
 
@@ -53,7 +55,7 @@ export async function createClient(
   payload: Omit<ClientRecord, 'code' | 'invoices' | 'billed' | 'balance'>,
 ): Promise<ClientRecord> {
   const code = await nextClientCode(orgId);
-  if (MOCK) return { ...payload, code, invoices: 0, billed: 0, balance: 0 };
+  if (MOCK) return { ...payload, code, invoices: 0, billed: 0, balance: 0, ...mockOwner() };
   const { data, error } = await supabase
     .from('clients')
     .insert({

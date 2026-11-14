@@ -27,6 +27,7 @@ import { todayISO } from '@/lib/invoice-status';
 import { downloadBlob } from '@/lib/download';
 import { VAT_LABEL, VAT_RATE } from '@/lib/vat';
 import Page from '@/components/Page';
+import { OwnerLine } from '@/components/owner/OwnerControls';
 import { useCommandIntent } from '@/lib/command-intent';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -1051,6 +1052,11 @@ export default function ContactsPage() {
                   </>
                 )}
               </div>
+              {!editMode && (
+                <div className="detail-block">
+                  <OwnerLine table="clients" id={detailClient.code} ownerId={detailClient.ownerId} ownerName={detailClient.ownerName} />
+                </div>
+              )}
               {!editMode && (
                 <div className="detail-block">
                   <div className="detail-block-title">Identifiants fiscaux</div>

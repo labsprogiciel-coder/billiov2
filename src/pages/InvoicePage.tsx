@@ -31,6 +31,7 @@ import { calculateServiceWithholding, SERVICE_WITHHOLDING_THRESHOLD } from '@/li
 import type { Activity, CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
 import { VAT_LABEL, chargesVat, splitTtc, vatOn } from '@/lib/vat';
 import Page from '@/components/Page';
+import { OwnerLine } from '@/components/owner/OwnerControls';
 
 type DotKind = 'paid' | 'sent' | 'overdue' | 'avoir' | '';
 interface TlEntry { dot: DotKind; text: string; time: string; }
@@ -214,14 +215,15 @@ export default function InvoicePage() {
       const due = new Date(Date.parse(issued + 'T00:00:00Z') + termDays * 86_400_000).toISOString().slice(0, 10);
       const id = newDraftId();
       const copy = { id, subject: invoice.subject, client: invoice.client, issued, due, amount: total, status: 'draft' as const, discountPct };
-      await createInvoice(orgId, copy);
+      // The copy belongs to whoever duplicates it (set by the database, PRO-172)
+      const stored = await createInvoice(orgId, copy);
       try {
         await saveLineItems(orgId, lines, { invoiceId: id });
       } catch (err) {
         await removeInvoice(orgId, id).catch(e => console.error('[rollback] removeInvoice failed:', e));
         throw err;
       }
-      setInvoices(prev => prev.some(i => i.id === id) ? prev : [copy, ...prev]);
+      setInvoices(prev => prev.some(i => i.id === id) ? prev : [{ ...copy, ownerId: stored.ownerId, ownerName: stored.ownerName }, ...prev]);
       showToast(`Brouillon #${id} créé à partir de #${invoiceRef(invoice)}`);
       navigate(`/invoices/${id}`);
     } catch (err) {
@@ -684,6 +686,10 @@ export default function InvoicePage() {
                 )}
                 </>)}
               </div>
+            </div>
+
+            <div className="rail-card">
+              <OwnerLine table="invoices" id={invoice.id} ownerId={invoice.ownerId} ownerName={invoice.ownerName} />
             </div>
 
             <div className="rail-card">

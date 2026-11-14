@@ -2,12 +2,17 @@
 // QuotesPage renders this instead of its cards and list when VITE_UI_V2 is on;
 // converting, reminding, duplicating and deleting stay in the page.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import DataTable, { SummaryStrip, type Column, type RowAction, type StatusFilter } from '@/components/DataTable';
 import Icon from '@/components/Icon';
 import StatusPill from '@/components/sales/StatusPill';
 import { useApp } from '@/context/AppContext';
-import { QUOTE_STATUS, quoteFigures } from '@/lib/sales-tables';
+import { OwnerFilter, ReassignControl } from '@/components/owner/OwnerControls';
+import { usePermissions } from '@/lib/use-permissions';
+import { useTeam } from '@/lib/use-team';
+import { useReassign } from '@/lib/use-reassign';
+
+import { QUOTE_STATUS, ownerKey, ownerOptions, quoteFigures } from '@/lib/sales-tables';
 import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { Quote } from '@/lib/schemas';
 
@@ -35,7 +40,21 @@ export interface QuoteListProps {
 }
 
 export default function QuoteList({ writable, deletable, onOpen, onConvert, onRemind, onDuplicate, onDelete, duplicating }: QuoteListProps) {
-  const { quotes, clientsMap } = useApp();
+  const { quotes, clientsMap, userId, userRole } = useApp();
+  // « Responsable » (PRO-172): members start on their own records
+  const { managesOrg } = usePermissions();
+  const team = useTeam(managesOrg);
+  const { reassign, busy: reassigning } = useReassign();
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const ownerChoices = useMemo(() => ownerOptions(quotes), [quotes]);
+  const ownedRows = useMemo(
+    () => ownerFilter === 'all' ? quotes : quotes.filter(r => ownerKey(r) === ownerFilter),
+    [quotes, ownerFilter],
+  );
+  const mine = useMemo(() => ({
+    label: 'Mes devis', isMine: (r: { ownerId?: string }) => r.ownerId === userId, defaultOn: userRole === 'member',
+  }), [userId, userRole]);
+
   const figures = useMemo(() => quoteFigures(quotes), [quotes]);
   const clientName = (id: string) => clientsMap[id]?.name ?? id;
   const search = useMemo(() => ({
@@ -47,8 +66,7 @@ export default function QuoteList({ writable, deletable, onOpen, onConvert, onRe
     { key: 'number', header: 'N°', width: '130px', cell: q => <b className="dt-ref">{q.id}</b> },
     { key: 'client', header: 'Client', cell: q => clientName(q.client) },
     { key: 'subject', header: 'Objet', cell: q => <span className="dt-clip">{q.subject}</span> },
-    // Who is in charge of each quote comes with PRO-172
-    { key: 'owner', header: 'Responsable', cell: () => null, hidden: true },
+    { key: 'owner', header: 'Responsable', cell: r => r.ownerName ?? <span className="dt-muted">—</span> },
     { key: 'issued', header: 'Émission', cell: q => fmtDate(q.issued) },
     {
       key: 'valid', header: 'Valide jusqu’au',
@@ -86,7 +104,7 @@ export default function QuoteList({ writable, deletable, onOpen, onConvert, onRe
       ]} />
       <DataTable
         caption="Devis"
-        rows={quotes}
+        rows={ownedRows}
         rowKey={q => q.id}
         rowLabel={q => `le devis ${q.id}`}
         noun={{ one: 'devis', many: 'devis' }}
@@ -96,6 +114,19 @@ export default function QuoteList({ writable, deletable, onOpen, onConvert, onRe
         search={search}
         onRowClick={q => onOpen(q.id)}
         rowActions={rowActions}
+        mine={mine}
+        toolbarExtra={<OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
+        selectable={managesOrg}
+        bulkActions={(selected, clear) => (
+          <ReassignControl
+            team={team}
+            busy={reassigning}
+            onAssign={id => {
+              const name = team.find(m => m.id === id)?.name ?? '';
+              void reassign('quotes', selected.map(q => q.id), id, name).then(ok => { if (ok) clear(); });
+            }}
+          />
+        )}
         footerSummary={shown => <>Total <b>{fmt(shown.reduce((s, q) => s + q.amount, 0))} F CFA</b></>}
         emptyMessage={quotes.length === 0 ? 'Aucun devis pour le moment. Créez un devis pour commencer.' : 'Aucun devis ne correspond.'}
       />
