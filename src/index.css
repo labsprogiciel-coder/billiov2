@@ -2415,3 +2415,45 @@ html[data-ui="v2"] .page-section { display: none; }
 .cash-axis span.current { font-weight: 700; color: var(--color-text-primary); }
 .cash-empty { margin: 8px 0 0; font-size: 12.5px; color: var(--color-text-tertiary); text-align: center; }
 .dash-head .dt-linkcell { font-size: 13px; }
+/* Invoice page in the ERP look (PRO-166): header, DGI mentions, side panels */
+.crumb-stack { display: grid; gap: 2px; min-width: 0; }
+.crumb-stack .page-sub { margin: 0; font-size: 12.5px; }
+.iv-title { font-size: 17px; font-weight: 700; color: var(--color-text-primary); }
+.iv-title { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.iv-title .dt-status { font-size: 12px; font-weight: 600; }
+.iv-sub { display: inline-flex; flex-wrap: wrap; gap: 4px 0; }
+.iv-sub > span + span::before { content: '·'; margin: 0 8px; color: var(--color-text-tertiary); }
+.more-btn { padding-left: 9px; padding-right: 9px; }
+.pp-words { margin: 10px 0 0; font-size: 12px; font-style: italic; color: var(--color-text-secondary); text-align: right; }
+.pp-mentions { margin-top: 18px; padding: 10px 12px; border: 1px dashed var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 11.5px; color: var(--color-text-secondary); }
+.pp-mentions ul { margin: 4px 0 0; padding-left: 16px; display: grid; gap: 2px; }
+.iv-rail { gap: 12px; }
+.iv-card { padding: 14px 16px; }
+.iv-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.iv-card-head h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-secondary); }
+.iv-card-head .dt-linkcell { font-size: 12.5px; }
+.iv-rows { margin: 0; display: grid; gap: 5px; font-size: 13px; }
+.iv-rows > div { display: flex; justify-content: space-between; gap: 12px; }
+.iv-rows dt { color: var(--color-text-secondary); }
+.iv-rows dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.iv-due { margin-top: 3px; padding-top: 7px; border-top: 1px solid var(--color-border-tertiary); font-weight: 700; }
+.iv-due dt { color: var(--color-text-primary); }
+.iv-strong { font-weight: 700; }
+.iv-client { margin: 0 0 6px; font-weight: 600; }
+.iv-note { margin: 0 0 6px; font-size: 12px; }
+.iv-entry + .iv-entry { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border-tertiary); }
+.iv-entry-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+.iv-entry-head span { color: var(--color-text-tertiary); white-space: nowrap; }
+.iv-lines { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.iv-lines th { text-align: left; font-weight: 600; color: var(--color-text-tertiary); padding: 2px 0; border-bottom: 1px solid var(--color-border-tertiary); }
+.iv-lines td { padding: 3px 0; border-bottom: 1px solid var(--color-border-tertiary); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iv-lines .num { text-align: right; padding-left: 8px; }
+.iv-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 12.5px; }
+.iv-sends { margin-bottom: 9px; padding-bottom: 9px; border-bottom: 1px solid var(--color-border-tertiary); }
+.iv-act { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 8px; align-items: start; }
+.iv-act small { color: var(--color-text-tertiary); font-size: 11.5px; }
+.iv-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--color-border-secondary); }
+.iv-act.paid .iv-dot, .iv-act.payment .iv-dot { background: var(--status-paid, #1E6B3A); }
+.iv-act.late .iv-dot, .iv-act.overdue .iv-dot { background: var(--status-late, #B42318); }
+.iv-act.issued .iv-dot, .iv-act.sent .iv-dot { background: var(--brand); }
+.iv-act.credit .iv-dot { background: var(--status-partial, #B54708); }

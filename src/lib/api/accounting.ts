@@ -815,3 +815,26 @@ export async function createAccount(
   });
   if (error) throw error;
 }
+
+/**
+ * The journal entries of one invoice (PRO-166): its sale (VE-<id>, and any
+ * VE-<id>-R… corrections), its payments (REG-<id>) and its credit notes
+ * (AV-<credit note id>), drafts included. Demo mode has no books: [].
+ */
+export async function fetchInvoiceEntries(orgId: string, invoiceId: string, creditNoteIds: string[] = []): Promise<JournalEntry[]> {
+  if (MOCK) return [];
+  const pieces = [`piece.eq.VE-${invoiceId}`, `piece.like.VE-${invoiceId}-R*`, `piece.eq.REG-${invoiceId}`, ...creditNoteIds.map(c => `piece.eq.AV-${c}`)];
+  const { data, error } = await supabase
+    .from('journal_entries')
+    .select(`id, date, piece, label, posted, journals ( code ), entry_lines ( account_num, debit, credit )`)
+    .eq('org_id', orgId)
+    .or(pieces.join(','))
+    .order('date', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(row => {
+    const r = row as Record<string, unknown>;
+    const lines = (r.entry_lines as Array<Record<string, unknown>>) ?? [];
+    const journal = (r.journals as Record<string, unknown>) ?? {};
+    return toJournalEntry({ ...r, journal_code: journal.code }, lines);
+  });
+}
