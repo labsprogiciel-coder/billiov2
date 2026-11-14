@@ -38,6 +38,8 @@ export default function ClientList({ rows, year, selected, onSelect, kyb }: {
   const [ownerFilter, setOwnerFilter] = useState('all');
   const ownerChoices = useMemo(() => ownerOptions(rows), [rows]);
   const shown = useMemo(() => ownerFilter === 'all' ? rows : rows.filter(r => ownerKey(r) === ownerFilter), [rows, ownerFilter]);
+  // Members only see their own records (the database filters them): no « Toute l'équipe » switch or Responsable filter
+  const onlyOwn = userRole === 'member';
   const mine = useMemo(() => ({
     label: 'Mes clients', isMine: (c: ClientRow) => c.ownerId === userId, defaultOn: userRole === 'member',
   }), [userId, userRole]);
@@ -87,8 +89,8 @@ export default function ClientList({ rows, year, selected, onSelect, kyb }: {
       columns={columns}
       filters={filters}
       search={search}
-      mine={mine}
-      toolbarExtra={<OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
+      mine={onlyOwn ? undefined : mine}
+      toolbarExtra={onlyOwn ? undefined : <OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
       onRowClick={c => onSelect(c.code)}
       selectable={managesOrg}
       bulkActions={(sel, clear) => (

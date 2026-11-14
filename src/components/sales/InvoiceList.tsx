@@ -49,6 +49,8 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
     () => ownerFilter === 'all' ? rows : rows.filter(r => ownerKey(r) === ownerFilter),
     [rows, ownerFilter],
   );
+  // Members only see their own records (the database filters them): no « Toute l'équipe » switch or Responsable filter
+  const onlyOwn = userRole === 'member';
   const mine = useMemo(() => ({
     label: 'Mes factures', isMine: (r: { ownerId?: string }) => r.ownerId === userId, defaultOn: userRole === 'member',
   }), [userId, userRole]);
@@ -110,8 +112,8 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
         search={search}
         onRowClick={r => onOpen(r.id)}
         rowActions={rowActions}
-        mine={mine}
-        toolbarExtra={<OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
+        mine={onlyOwn ? undefined : mine}
+        toolbarExtra={onlyOwn ? undefined : <OwnerFilter options={ownerChoices} value={ownerFilter} onChange={setOwnerFilter} />}
         selectable={managesOrg}
         bulkActions={(selected, clear) => (
           <ReassignControl

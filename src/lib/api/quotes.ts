@@ -16,6 +16,7 @@ export function dbToQuote(row: Record<string, unknown>): Quote {
     expSoon: daysLeft > 0 && daysLeft <= 14,
     amount:  Number(row.amount),
     status:  (row.status ?? 'draft') as Quote['status'],
+    invoiceId: row.invoice_id ? String(row.invoice_id) : undefined,
     ownerId:     row.owner_id ? String(row.owner_id) : undefined,
     ownerName:   row.owner_name ? String(row.owner_name) : undefined,
   };
@@ -69,7 +70,7 @@ export async function createQuote(
 export async function updateQuote(
   orgId: string,
   id: string,
-  patch: Partial<Pick<Quote, 'status' | 'subject' | 'client' | 'issued' | 'valid' | 'amount'>>,
+  patch: Partial<Pick<Quote, 'status' | 'subject' | 'client' | 'issued' | 'valid' | 'amount'>> & { invoiceId?: string | null },
 ): Promise<void> {
   if (MOCK) return;
   const dbPatch: Record<string, unknown> = {};
@@ -79,6 +80,7 @@ export async function updateQuote(
   if (patch.issued  !== undefined) dbPatch.issued_at    = patch.issued;
   if (patch.valid   !== undefined) dbPatch.valid_until  = patch.valid;
   if (patch.amount  !== undefined) dbPatch.amount       = patch.amount;
+  if (patch.invoiceId !== undefined) dbPatch.invoice_id = patch.invoiceId;
   const { error } = await supabase.from('quotes').update(dbPatch).eq('org_id', orgId).eq('id', id);
   if (error) throw error;
 }

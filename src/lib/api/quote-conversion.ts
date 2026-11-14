@@ -52,7 +52,8 @@ export async function convertQuoteToInvoice(
   let issued: { firstIssuedAt?: string; number?: string; issuedByName?: string } | null = null;
   try {
     await saveLineItems(orgId, quoteLines, { invoiceId: invId });
-    await updateQuote(orgId, quote.id, { status: 'invoiced' });
+    // The quote keeps a link to the invoice it became
+    await updateQuote(orgId, quote.id, { status: 'invoiced', invoiceId: invId });
     quoteMarked = true;
     issued = await updateInvoice(orgId, invId, { status: 'pending' });
   } catch (err) {
@@ -70,7 +71,7 @@ export async function convertQuoteToInvoice(
     if (stored && stored.status !== 'draft') {
       issued = stored;
     } else {
-      if (quoteMarked) await updateQuote(orgId, quote.id, { status: quote.status }).catch(e => console.error('[rollback] updateQuote failed:', e));
+      if (quoteMarked) await updateQuote(orgId, quote.id, { status: quote.status, invoiceId: quote.invoiceId ?? null }).catch(e => console.error('[rollback] updateQuote failed:', e));
       await deleteLineItems(orgId, { invoiceId: invId }).catch(() => {});
       await removeInvoice(orgId, invId).catch(e => console.error('[rollback] removeInvoice failed:', e));
       throw err;
