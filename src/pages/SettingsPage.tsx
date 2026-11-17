@@ -26,15 +26,14 @@ import { issuedThisMonth } from '@/lib/invoice-limit';
 import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
 import Page from '@/components/Page';
 
-type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'providers' | 'notifications' | 'team' | 'plan';
+type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'notifications' | 'team' | 'plan';
 
 const TABS: { key: SettingsTab; icon: string; label: string }[] = [
   { key: 'profile',       icon: 'user',           label: 'Profil'               },
   { key: 'business',      icon: 'building',        label: 'Entreprise'           },
   { key: 'invoicing',     icon: 'file-invoice',    label: 'Préférences facture'  },
   { key: 'reminders',     icon: 'bell',            label: 'Relances'             },
-  { key: 'payments',      icon: 'credit-card',     label: 'Moyens de paiement'   },
-  { key: 'providers',     icon: 'plug-connected',  label: 'Paiements en ligne'   },
+  { key: 'payments',      icon: 'credit-card',     label: 'Paiements'            },
   { key: 'notifications', icon: 'bell',            label: 'Notifications'        },
   { key: 'team',          icon: 'users',           label: 'Équipe'               },
   { key: 'plan',          icon: 'sparkles',        label: 'Plan & facturation'   },
@@ -200,7 +199,7 @@ function ComplianceChecklist({ seller, orgId }: { seller: SellerInfo; orgId: str
     { key: 'seller-regime', label: 'Régime fiscal' },
     { key: 'seller-division', label: 'Division fiscale' },
     ...(cadastralRequired(seller.country) ? [{ key: 'seller-cadastre', label: 'Référence cadastrale' }] : []),
-    { key: 'seller-bank', label: 'Coordonnées bancaires', hint: 'onglet Moyens de paiement' },
+    { key: 'seller-bank', label: 'Coordonnées bancaires', hint: 'onglet Paiements' },
   ];
   const count = rows.filter(r => missing.has(r.key)).length;
 
@@ -618,11 +617,14 @@ function InvoicingSection() {
 }
 
 /* ─── Payment Methods ───────────────────────────────────────────── */
+// One place for how clients pay: PI-SPI online (a switch and the business's alias; how its payments are confirmed
+// is Billio's decision, PRO-189), then the other ways printed on the invoice and recorded by hand.
 function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
   const { orgId, showToast } = useApp();
   const [settings, setSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
+  const [touched,  setTouched]  = useState(false);
 
   useEffect(() => {
     if (!orgId) return;
@@ -635,13 +637,18 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
     setSettings(prev => ({ ...prev, [key]: value }));
   }
 
+  const online = settings.onlineMode !== 'off';
+  const aliasError = online ? aliasProblem(settings.pispiAlias) : null;
+
   async function handleSave() {
     if (!orgId) return;
+    setTouched(true);
+    if (aliasError) { showToast(aliasError, true); return; }
     setSaving(true);
     try {
-      await upsertPaymentSettings(orgId, settings);
+      await upsertPaymentSettings(orgId, { ...settings, pispiAlias: settings.pispiAlias.trim().toLowerCase() });
       posthog.capture('settings_saved', { section: 'payments' });
-      showToast('Moyens de paiement enregistrés');
+      showToast('Paiements enregistrés');
       onSave();
     } catch (err) {
       console.error('[PaymentMethods] save:', err);
@@ -654,10 +661,39 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
   return (
     <div className="s-card">
       <div className="s-card-head">
-        <div className="s-card-title">Moyens de paiement</div>
-        <div className="s-card-desc">Les méthodes activées s'affichent sur la facture envoyée au client.</div>
+        <div className="s-card-title">Paiements</div>
+        <div className="s-card-desc">Comment vos clients vous paient. Les moyens activés s’affichent sur la facture.</div>
       </div>
       <div className="s-card-body">
+        <div className="s-row">
+          <div className="s-row-ico"><Icon name="qrcode" size={17} /></div>
+          <div className="s-row-main">
+            <div className="s-row-title" id="online-toggle">PI-SPI · paiement en ligne</div>
+            <div className="s-row-sub">Le client scanne le QR code de la facture et paie depuis son application.</div>
+          </div>
+          <div className="s-row-aside" aria-labelledby="online-toggle">
+            <Toggle on={online} onChange={v => { patch('onlineMode', v ? 'alias' : 'off'); if (!v) setTouched(false); }} />
+          </div>
+        </div>
+        {online && (
+          <div className="s-row s-row-sub-item">
+            <div className="s-row-ico" aria-hidden="true" />
+            <div className="s-row-main">
+              <label className="s-row-title" htmlFor="pispi-alias">Alias PI-SPI</label>
+              <div className="s-row-sub">Identifiant de votre compte, fourni par votre banque.</div>
+              {touched && aliasError && <div className="s-field-error" role="alert">{aliasError}</div>}
+            </div>
+            <div className="s-row-aside">
+              <input id="pispi-alias" className="form-input" style={{ width: 300 }} placeholder="3497a720-ab11-4973-9619-534e04f263a1" spellCheck={false}
+                value={settings.pispiAlias} disabled={loading} aria-invalid={touched && !!aliasError}
+                onChange={e => patch('pispiAlias', e.target.value)} onBlur={() => setTouched(true)} />
+              <select className="form-input" style={{ width: 150 }} aria-label="Pays du compte" value={settings.pispiCountry} disabled={loading}
+                onChange={e => patch('pispiCountry', e.target.value as PispiCountry)}>
+                {PISPI_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
         <div className="s-row">
           <div className="s-row-ico"><Icon name="device-mobile" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Mobile Money — MTN</div><div className="s-row-sub">Recevez les paiements sur votre compte MTN MoMo.</div></div>
@@ -715,91 +751,6 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
   );
 }
 
-/* ─── Paiements en ligne (PRO-189) ─────────────────────────────── */
-// One switch, and the business's PI-SPI alias. How a payment is confirmed (on the alias, or by Billio through its
-// payment gateway) is Billio's decision (paygate_status), not shown here.
-function OnlinePaymentsSection({ onSave }: { onSave: () => void }) {
-  const { orgId, showToast } = useApp();
-  const [settings, setSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [touched, setTouched] = useState(false);
-
-  useEffect(() => {
-    if (!orgId) return;
-    fetchPaymentSettings(orgId)
-      .then(s => { setSettings(s); setLoading(false); })
-      .catch(err => { console.error('[OnlinePayments] fetch:', err); setLoading(false); });
-  }, [orgId]);
-
-  const patch = <K extends keyof PaymentSettings>(key: K, value: PaymentSettings[K]) => setSettings(prev => ({ ...prev, [key]: value }));
-  const enabled = settings.onlineMode !== 'off';
-  const aliasError = enabled ? aliasProblem(settings.pispiAlias) : null;
-
-  async function handleSave() {
-    if (!orgId) return;
-    setTouched(true);
-    if (aliasError) { showToast(aliasError, true); return; }
-    setSaving(true);
-    try {
-      await upsertPaymentSettings(orgId, { onlineMode: settings.onlineMode, pispiAlias: settings.pispiAlias.trim().toLowerCase(), pispiCountry: settings.pispiCountry });
-      posthog.capture('settings_saved', { section: 'online_payments', enabled });
-      showToast(enabled ? 'Paiement en ligne activé' : 'Paiement en ligne désactivé');
-      onSave();
-    } catch (err) {
-      console.error('[OnlinePayments] save:', err);
-      showToast('Erreur lors de l\'enregistrement', true);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="s-card">
-      <div className="s-card-head">
-        <div className="s-card-title">Paiements en ligne</div>
-        <div className="s-card-desc">Vos clients paient par PI-SPI en scannant le QR code de la facture.</div>
-      </div>
-      <div className="s-card-body">
-        <div className="s-row">
-          <div className="s-row-ico"><Icon name="qrcode" size={17} /></div>
-          <div className="s-row-main">
-            <div className="s-row-title" id="online-toggle">Paiement en ligne</div>
-            <div className="s-row-sub">{enabled ? 'Activé sur vos factures émises.' : 'Désactivé.'}</div>
-          </div>
-          <div className="s-row-aside" aria-labelledby="online-toggle">
-            <Toggle on={enabled} onChange={v => { patch('onlineMode', v ? 'alias' : 'off'); if (!v) setTouched(false); }} />
-          </div>
-        </div>
-
-        {enabled && (
-          <div className="s-row">
-            <div className="s-row-ico"><Icon name="building-bank" size={17} /></div>
-            <div className="s-row-main">
-              <label className="s-row-title" htmlFor="pispi-alias">Alias PI-SPI</label>
-              <div className="s-row-sub">Identifiant de votre compte, fourni par votre banque.</div>
-              {touched && aliasError && <div className="s-field-error" role="alert">{aliasError}</div>}
-            </div>
-            <div className="s-row-aside">
-              <input id="pispi-alias" className="form-input" style={{ width: 300 }} placeholder="3497a720-ab11-4973-9619-534e04f263a1" spellCheck={false}
-                value={settings.pispiAlias} disabled={loading} aria-invalid={touched && !!aliasError}
-                onChange={e => patch('pispiAlias', e.target.value)} onBlur={() => setTouched(true)} />
-              <select className="form-input" style={{ width: 150 }} aria-label="Pays du compte" value={settings.pispiCountry} disabled={loading}
-                onChange={e => patch('pispiCountry', e.target.value as PispiCountry)}>
-                {PISPI_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="s-card-foot">
-        <button className="btn btn-primary" onClick={handleSave} disabled={loading || saving}>
-          {saving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 const AV_CLASSES = ['av-a', 'av-b', 'av-c', 'av-d', 'av-e', 'av-f'] as const;
 
@@ -1438,7 +1389,7 @@ function PlanSection() {
 }
 
 /* ─── Main component ────────────────────────────────────────────── */
-const ORG_TABS: SettingsTab[] = ['business', 'invoicing', 'payments', 'providers'];
+const ORG_TABS: SettingsTab[] = ['business', 'invoicing', 'payments'];
 
 function LegacySettingsPage() {
   const { showToast } = useApp();
@@ -1447,6 +1398,7 @@ function LegacySettingsPage() {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<SettingsTab>(() => {
     const t = searchParams.get('tab');
+    if (t === 'providers') return 'payments'; // « Paiements en ligne » is part of « Paiements » now
     return TABS.some(x => x.key === t) ? (t as SettingsTab) : 'profile';
   });
   const onSave = () => showToast('Paramètres enregistrés');
@@ -1492,7 +1444,6 @@ function LegacySettingsPage() {
               {tab === 'business'      && <BusinessSection />}
               {tab === 'invoicing'     && <InvoicingSection />}
               {tab === 'payments'      && <PaymentMethodsSection onSave={onSave} />}
-              {tab === 'providers'     && <OnlinePaymentsSection onSave={onSave} />}
             </fieldset>
             {tab === 'team'          && <TeamSection />}
             {tab === 'plan'          && <PlanSection />}
@@ -1515,26 +1466,26 @@ export default function SettingsPage() {
 }
 
 /* ─── New interface (PRO-171) ───────────────────────────────────── */
-type SectionV2 = 'business' | 'compliance' | 'invoicing' | 'payments' | 'providers' | 'team' | 'automation' | 'plan';
+type SectionV2 = 'business' | 'compliance' | 'invoicing' | 'payments' | 'team' | 'automation' | 'plan';
 
 const SECTIONS_V2: { key: SectionV2; icon: string; label: string }[] = [
   { key: 'business',   icon: 'building',       label: 'Entreprise' },
   { key: 'compliance', icon: 'shield-check',   label: 'Conformité DGI' },
   { key: 'invoicing',  icon: 'file-invoice',   label: 'Facturation par défaut' },
-  { key: 'payments',   icon: 'credit-card',    label: 'Moyens de paiement' },
-  { key: 'providers',  icon: 'plug-connected', label: 'Paiements en ligne' },
+  { key: 'payments',   icon: 'credit-card',    label: 'Paiements' },
   { key: 'team',       icon: 'users',          label: 'Équipe et accès' },
   { key: 'automation', icon: 'bell',           label: 'Automatisation' },
   { key: 'plan',       icon: 'sparkles',       label: 'Abonnement' },
 ];
 /** Sections whose fields the DGI checklist reads: it sits beside them */
-const WITH_CHECKLIST: SectionV2[] = ['business', 'invoicing', 'payments', 'providers'];
-const ORG_SECTIONS: SectionV2[] = ['business', 'invoicing', 'payments', 'providers'];
+const WITH_CHECKLIST: SectionV2[] = ['business', 'invoicing', 'payments'];
+const ORG_SECTIONS: SectionV2[] = ['business', 'invoicing', 'payments'];
 
 /** Old ?tab= links (from the invoice editor and elsewhere) to the new sections. */
 function sectionFromParam(t: string | null): SectionV2 | 'profile' {
   if (t === 'profile') return 'profile';
   if (t === 'reminders' || t === 'notifications') return 'automation';
+  if (t === 'providers') return 'payments'; // « Paiements en ligne » is part of « Paiements » now
   return SECTIONS_V2.some(s => s.key === t) ? (t as SectionV2) : 'business';
 }
 
@@ -1664,7 +1615,7 @@ function SettingsPageV2() {
     await actionsRef.current.save();
   }
 
-  const onPaymentsSaved = () => { showToast('Moyens de paiement enregistrés'); loadPayments(); };
+  const onPaymentsSaved = () => { showToast('Paiements enregistrés'); loadPayments(); };
   const seller: SellerInfo = draft ?? {
     name: orgSettings.name, address: orgSettings.address, city: orgSettings.city, country: orgSettings.country,
     ifu: orgSettings.ifu, rccm: orgSettings.rccm, taxRegime: orgSettings.taxRegime, divisionFiscale: orgSettings.divisionFiscale,
@@ -1709,7 +1660,6 @@ function SettingsPageV2() {
               {section === 'business'  && <BusinessSection onDraft={setDraft} />}
               {section === 'invoicing' && <InvoicingSection />}
               {section === 'payments'  && <PaymentMethodsSection onSave={onPaymentsSaved} />}
-              {section === 'providers' && <OnlinePaymentsSection onSave={onPaymentsSaved} />}
             </fieldset>
             {section === 'compliance' && (rows
               ? <DgiChecklist rows={rows} onFix={fix} large />

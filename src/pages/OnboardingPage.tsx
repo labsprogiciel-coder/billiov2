@@ -478,11 +478,11 @@ export default function OnboardingPage() {
         .eq('id', targetOrgId);
       if (orgErr) throw orgErr;
 
-      // Bank details printed on invoices (Paramètres → Moyens de paiement)
+      // Bank details printed on invoices (Paramètres → Paiements)
       if (iban.trim()) {
         await upsertPaymentSettings(targetOrgId, { methodBankEnabled: true, methodBankIban: iban.trim() }).catch(err => {
           console.warn('Bank details save error:', err);
-          showToast("Les coordonnées bancaires n'ont pas pu être enregistrées. Ajoutez-les dans Paramètres → Moyens de paiement.", true);
+          showToast("Les coordonnées bancaires n'ont pas pu être enregistrées. Ajoutez-les dans Paramètres → Paiements.", true);
         });
       }
 
@@ -802,7 +802,7 @@ export default function OnboardingPage() {
                   <div className="ob-field">
                     <label className="ob-field-label" htmlFor="ob-iban">RIB / IBAN</label>
                     <input id="ob-iban" className={`ob-input${errCls('iban')}`} type="text" value={iban} placeholder="BF00 0000 0000 0000 0000 0000 000" onChange={e => setIban(e.target.value)} />
-                    <div className="ob-field-hint">Le virement bancaire sera activé dans Paramètres → Moyens de paiement.</div>
+                    <div className="ob-field-hint">Le virement bancaire sera activé dans Paramètres → Paiements.</div>
                   </div>
                 </div>
               </section>

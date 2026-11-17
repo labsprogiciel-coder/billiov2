@@ -2801,3 +2801,4 @@ html[data-ui="v2"] .page-section { display: none; }
 .incoming-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .incoming-ref, .incoming-detail { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
 .incoming .table-wrap { overflow-x: auto; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); background: var(--color-background-primary); }
+.s-row-sub-item .s-row-ico { background: transparent; box-shadow: none; border: none; }

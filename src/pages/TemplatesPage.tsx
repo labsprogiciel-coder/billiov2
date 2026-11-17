@@ -254,7 +254,7 @@ const LOCKED_SECTIONS: { label: string; badge: 'Obligatoire' | 'Si certifiée'; 
   { label: 'Total en lettres',              badge: 'Obligatoire',  from: 'Calculé à partir du total' },
   { label: 'Date, heure et opérateur',      badge: 'Obligatoire',  from: 'Ajoutés à l’émission de la facture' },
   { label: 'Référence cadastrale',          badge: 'Obligatoire',  from: 'Paramètres › Entreprise' },
-  { label: 'Coordonnées bancaires',         badge: 'Obligatoire',  from: 'Paramètres › Moyens de paiement' },
+  { label: 'Coordonnées bancaires',         badge: 'Obligatoire',  from: 'Paramètres › Paiements' },
   { label: 'Bloc SECeF (code et QR)',       badge: 'Si certifiée', from: 'Ajouté à la certification de la facture' },
 ];
 
