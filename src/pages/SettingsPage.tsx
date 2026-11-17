@@ -698,9 +698,9 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
           <div className="s-row-ico"><Icon name="device-mobile" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Mobile Money — MTN</div><div className="s-row-sub">Recevez les paiements sur votre compte MTN MoMo.</div></div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 160 }} type="tel" placeholder="70 12 34 56"
+            {settings.methodMtnEnabled && <input className="form-input" style={{ width: 160 }} type="tel" placeholder="70 12 34 56" aria-label="Numéro MTN MoMo"
               value={settings.methodMtnPhone} disabled={loading}
-              onChange={e => patch('methodMtnPhone', e.target.value)} />
+              onChange={e => patch('methodMtnPhone', e.target.value)} />}
             <Toggle on={settings.methodMtnEnabled} onChange={v => patch('methodMtnEnabled', v)} />
           </div>
         </div>
@@ -708,9 +708,9 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
           <div className="s-row-ico"><Icon name="device-mobile" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Mobile Money — Orange</div><div className="s-row-sub">Recevez les paiements sur votre compte Orange Money.</div></div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 160 }} type="tel" placeholder="76 98 76 54"
+            {settings.methodOrangeEnabled && <input className="form-input" style={{ width: 160 }} type="tel" placeholder="76 98 76 54" aria-label="Numéro Orange Money"
               value={settings.methodOrangePhone} disabled={loading}
-              onChange={e => patch('methodOrangePhone', e.target.value)} />
+              onChange={e => patch('methodOrangePhone', e.target.value)} />}
             <Toggle on={settings.methodOrangeEnabled} onChange={v => patch('methodOrangeEnabled', v)} />
           </div>
         </div>
@@ -718,21 +718,21 @@ function PaymentMethodsSection({ onSave }: { onSave: () => void }) {
           <div className="s-row-ico"><Icon name="wave" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Wave</div><div className="s-row-sub">Acceptez les paiements par QR Wave et lien.</div></div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 160 }} type="tel" placeholder="Numéro Wave"
+            {settings.methodWaveEnabled && <input className="form-input" style={{ width: 160 }} type="tel" placeholder="Numéro Wave" aria-label="Numéro Wave"
               value={settings.methodWavePhone} disabled={loading}
-              onChange={e => patch('methodWavePhone', e.target.value)} />
+              onChange={e => patch('methodWavePhone', e.target.value)} />}
             <Toggle on={settings.methodWaveEnabled} onChange={v => patch('methodWaveEnabled', v)} />
           </div>
         </div>
         <div className="s-row">
           <div className="s-row-ico"><Icon name="building-bank" size={17} /></div>
           <div className="s-row-main"><div className="s-row-title">Virement bancaire</div>
-            <div className="s-row-sub">{settings.methodBankIban || 'IBAN non configuré'}</div>
+            <div className="s-row-sub">Recevez les virements sur votre compte bancaire.</div>
           </div>
           <div className="s-row-aside">
-            <input className="form-input" style={{ width: 220 }} placeholder="BF76 0001 2345 6789"
+            {settings.methodBankEnabled && <input className="form-input" style={{ width: 220 }} placeholder="BF76 0001 2345 6789" aria-label="IBAN"
               value={settings.methodBankIban} disabled={loading}
-              onChange={e => patch('methodBankIban', e.target.value)} />
+              onChange={e => patch('methodBankIban', e.target.value)} />}
             <Toggle on={settings.methodBankEnabled} onChange={v => patch('methodBankEnabled', v)} />
           </div>
         </div>
