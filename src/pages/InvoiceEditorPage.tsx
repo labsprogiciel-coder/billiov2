@@ -54,7 +54,9 @@ import { contactValue } from '@/lib/share-links';
 import { invoiceRef } from '@/lib/invoice-number';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { paperBands } from '@/lib/invoice-template';
-import { VAT_LABEL, VAT_RATE, chargesVat } from '@/lib/vat';
+import { chargesVat } from '@/lib/vat';
+import { TAX_GROUPS, defaultTaxGroup, lineGroup, productTaxGroup, vatRows, type TaxGroupCode } from '@/lib/tax-groups';
+import TaxGroupSelect from '@/components/TaxGroupSelect';
 import { SERVICE_WITHHOLDING_RATE_LABEL } from '@/lib/tax-bf';
 import { fmt, newLineItem } from '@/data';
 import type { Activity, Invoice, LineItem, Product, Quote } from '@/lib/schemas';
@@ -62,7 +64,7 @@ import type { Activity, Invoice, LineItem, Product, Quote } from '@/lib/schemas'
 const UNITS = ['unité', 'heure', 'jour', 'mois', 'an', 'projet', 'article', 'licence'];
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 /** What a line is, without its id: to tell unsaved changes */
-const lineKey = (ls: LineItem[]) => filledLines(ls).map(l => [l.desc, l.unit, l.qty, l.price, l.productId ?? '']);
+const lineKey = (ls: LineItem[]) => filledLines(ls).map(l => [l.desc, l.unit, l.qty, l.price, l.productId ?? '', l.taxGroup ?? '']);
 const timeOf = (d: Date) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 /** A saved draft saves itself this long after the last change */
 const AUTOSAVE_MS = 3000;
@@ -237,9 +239,10 @@ export default function InvoiceEditorPage({ doc = 'invoice' }: { doc?: 'invoice'
   const focusLine = (lid: string) => requestAnimationFrame(() => sheetRef.current?.querySelector<HTMLInputElement>(`[data-line="${lid}"]`)?.focus());
   const updateLine = (lid: string, field: 'desc' | 'unit' | 'qty' | 'price', val: string) =>
     setLines(prev => prev.map(l => l.id !== lid ? l : { ...l, [field]: field === 'desc' || field === 'unit' ? val : (parseFloat(val) || 0) }));
+  const setLineGroup = (lid: string, taxGroup: TaxGroupCode) => setLines(prev => prev.map(l => l.id !== lid ? l : { ...l, taxGroup }));
   const removeLine = (lid: string) => setLines(prev => prev.length > 1 ? prev.filter(l => l.id !== lid) : [newLineItem()]);
   const addLine = (desc = '') => {
-    const l = { ...newLineItem(), desc };
+    const l = { ...newLineItem(), desc, taxGroup: defaultTaxGroup(vatOn) };
     setLines(prev => [...prev.filter(x => filledLines([x]).length > 0 || x.desc.startsWith('/')), l]);
     focusLine(l.id);
   };
@@ -252,7 +255,7 @@ export default function InvoiceEditorPage({ doc = 'invoice' }: { doc?: 'invoice'
   const pickProduct = (lid: string, pid: string) => {
     const p = products.find(x => x.id === pid);
     if (!p) return;
-    setLines(prev => prev.map(l => l.id !== lid ? l : { ...l, desc: p.name, price: p.price, unit: p.unit, productId: p.id }));
+    setLines(prev => prev.map(l => l.id !== lid ? l : { ...l, desc: p.name, price: p.price, unit: p.unit, productId: p.id, taxGroup: productTaxGroup(p.tax, vatOn) }));
     setCatHi(0);
   };
   const onDescKey = (l: LineItem, e: KeyboardEvent<HTMLInputElement>) => {
@@ -279,7 +282,7 @@ export default function InvoiceEditorPage({ doc = 'invoice' }: { doc?: 'invoice'
     const service = ['heure', 'jour', 'mois', 'an', 'projet'].includes(l.unit ?? '');
     const item: Product = {
       id: crypto.randomUUID(), name, sku: '—', type: service ? 'service' : 'product', unit: l.unit ?? 'unité', price: l.price,
-      tax: vatOn ? Math.round(VAT_RATE * 100) : 0, used: 0, ico: service ? 'briefcase' : 'tag', color: service ? 'ico-blue' : 'ico-green',
+      tax: vatOn ? Math.round(TAX_GROUPS[lineGroup(l, vatOn)].rate * 100) : 0, used: 0, ico: service ? 'briefcase' : 'tag', color: service ? 'ico-blue' : 'ico-green',
     };
     setCataloguing(l.id);
     try {
@@ -836,7 +839,9 @@ export default function InvoiceEditorPage({ doc = 'invoice' }: { doc?: 'invoice'
                       </td>
                       <td className="r"><input className="ie-field num ie-price" type="number" min="0" step="any" value={l.price || ''} placeholder="0" disabled={locked}
                         aria-label={`Prix unitaire HT, ligne ${i + 1}`} onChange={e => updateLine(l.id, 'price', e.target.value)} /></td>
-                      <td className="r ie-muted">{vatOn ? `${Math.round(VAT_RATE * 100)} %` : '—'}</td>
+                      <td className="r ie-muted">{vatOn
+                        ? <TaxGroupSelect value={lineGroup(l, vatOn)} onChange={g => setLineGroup(l.id, g)} disabled={locked} label={`Groupe de taxe, ligne ${i + 1}`} />
+                        : '—'}</td>
                       <td className="r ie-amt">{fmt(l.qty * l.price)}</td>
                       <td>
                         <button type="button" className="li-del" onClick={() => removeLine(l.id)} disabled={locked} aria-label={`Supprimer la ligne ${i + 1}`}>✕</button>
@@ -862,7 +867,7 @@ export default function InvoiceEditorPage({ doc = 'invoice' }: { doc?: 'invoice'
                     {totals.discount > 0 && <>− {fmt(totals.discount)} F CFA</>}
                   </span>
                 </div>
-                {vatOn && <div className="tot-row"><span>{VAT_LABEL}</span><span className="tv">{fmt(totals.tax)} F CFA</span></div>}
+                {vatOn && vatRows(totals.groups).map(r => <div key={r.key} className="tot-row"><span>{r.label}</span><span className="tv">{fmt(r.amount)} F CFA</span></div>)}
                 {totals.withholding !== null && clientRec?.withholdingScenario && (<>
                   <div className="tot-row"><span>{vatOn ? 'Total TTC' : 'Total'}</span><span className="tv">{fmt(totals.total)} F CFA</span></div>
                   <div className="tot-row ie-withholding">

@@ -40,7 +40,8 @@ import { formatCadastralRef } from '@/lib/cadastral';
 import { invoiceTotalMention } from '@/lib/amount-in-words';
 import { contactValue } from '@/lib/share-links';
 import { paperBands } from '@/lib/invoice-template';
-import { VAT_LABEL, VAT_RATE, chargesVat } from '@/lib/vat';
+import { VAT_RATE, chargesVat } from '@/lib/vat';
+import { groupShort, lineGroup, vatRows } from '@/lib/tax-groups';
 import { fmt, fmtDateLong } from '@/data';
 import type { Activity, CreditNote, Invoice, LineItem } from '@/lib/schemas';
 
@@ -474,7 +475,7 @@ export default function CreditNoteEditorPage() {
                     </td>
                     <td>{l.unit ?? 'unité'}</td>
                     <td className="r">{fmt(l.price)}</td>
-                    <td className="r ie-muted">{vatCharged ? `${Math.round(VAT_RATE * 100)} %` : '—'}</td>
+                    <td className="r ie-muted">{vatCharged ? groupShort(lineGroup(l, true)) : '—'}</td>
                     <td className="r ie-amt">{fmt(q * l.price)}</td>
                   </tr>
                 );
@@ -509,7 +510,7 @@ export default function CreditNoteEditorPage() {
             <div className="pp-totals-inner">
               <div className="tot-row"><span>Sous-total HT</span><span className="tv">{fmt(totals.subtotal)} F CFA</span></div>
               {totals.discount > 0 && <div className="tot-row"><span>Remise de la facture ({invoice.discountPct} %)</span><span className="tv">− {fmt(totals.discount)} F CFA</span></div>}
-              {vatCharged && <div className="tot-row"><span>{VAT_LABEL}</span><span className="tv">{fmt(totals.tax)} F CFA</span></div>}
+              {vatCharged && vatRows(totals.groups).map(r => <div key={r.key} className="tot-row"><span>{r.label}</span><span className="tv">{fmt(r.amount)} F CFA</span></div>)}
               <div className={`tot-row grand${totals.total > max ? ' cn-over' : ''}`}><span>Total de l’avoir</span><span className="tv">{fmt(totals.total)} F CFA</span></div>
             </div>
           </div>

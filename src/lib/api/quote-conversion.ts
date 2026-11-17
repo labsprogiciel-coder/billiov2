@@ -3,7 +3,7 @@ import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-i
 import { updateQuote } from '@/lib/api/quotes';
 import { recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import type { Invoice, Quote } from '@/lib/schemas';
-import { splitTtc } from '@/lib/vat';
+import { splitDocument } from '@/lib/tax-groups';
 
 /**
  * The invoice may or may not have been issued (the request failed and its
@@ -83,7 +83,8 @@ export async function convertQuoteToInvoice(
     firstIssuedAt: issued?.firstIssuedAt ?? new Date().toISOString(),
   };
 
-  const { ht: htAmount, tva: tvaAmount } = splitTtc(quote.amount, opts.canInvoiceTVA);
+  // Split as the quote's lines are taxed (PRO-138): several rates give another VAT than 18 % of the whole
+  const { ht: htAmount, tva: tvaAmount } = splitDocument(quote.amount, quoteLines, quote.discountPct ?? 0, opts.canInvoiceTVA);
   let accountingOk = true;
   try {
     await recordInvoiceIssuanceEntry(orgId, { invoiceId: invId, htAmount, tvaAmount, date: today, clientName: opts.clientName });

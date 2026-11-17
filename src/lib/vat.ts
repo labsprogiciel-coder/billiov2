@@ -28,8 +28,9 @@ export function splitTtc(ttc: number, applies: boolean): { ht: number; tva: numb
  * issued). Falls back to `fallback` when the total can't tell, e.g. an empty
  * document.
  */
-export function documentHasVat(storedTotal: number, ht: number, fallback: boolean): boolean {
-  const withVat = ht + vatOn(ht, true);
+export function documentHasVat(storedTotal: number, ht: number, fallback: boolean, withVatTotal?: number): boolean {
+  // `withVatTotal`: what the document comes to with its VAT, when its lines have several rates (PRO-138)
+  const withVat = withVatTotal ?? ht + vatOn(ht, true);
   if (!(storedTotal > 0) || withVat === ht) return fallback;
   return Math.abs(storedTotal - withVat) < Math.abs(storedTotal - ht);
 }

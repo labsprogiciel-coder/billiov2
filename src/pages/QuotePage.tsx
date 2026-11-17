@@ -18,7 +18,9 @@ import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
 import { fmt, fmtDateLong, newLineItem } from '@/data';
 import type { LineItem } from '@/lib/schemas';
-import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import TaxGroupSelect from '@/components/TaxGroupSelect';
+import { lineGroup, productTaxGroup, taxSummary, vatRows } from '@/lib/tax-groups';
+import { chargesVat } from '@/lib/vat';
 import Page from '@/components/Page';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -89,23 +91,20 @@ export default function QuotePage() {
   }
 
   const client       = clientsMap[quote.client] ?? { name: quote.client, city: '—', av: 'av-a' };
-  const subtotal     = lines.reduce((s, li) => s + li.qty * li.price, 0);
   // Invoice-level discount, set in the editor (PRO-185); 0 on older quotes
   const discountPct  = quote.discountPct ?? 0;
-  const discountAmt  = Math.round(subtotal * (discountPct / 100));
   const canInvoiceTVA = chargesVat(orgSettings.taxRegime);
-  const tax          = vatOn(subtotal - discountAmt, canInvoiceTVA);
-  const total        = subtotal - discountAmt + tax;
+  // Totals per DGI tax group (PRO-138)
+  const sums         = taxSummary(lines, discountPct, canInvoiceTVA);
+  const { subtotal, discount: discountAmt, total } = sums;
 
   const quoteUrl    = window.location.href;
   const isTerminal  = ['invoiced', 'declined', 'expired'].includes(quote.status);
   const canConvert  = !isTerminal && canWrite(userRole);
   const canEdit     = !isTerminal && canWrite(userRole);
 
-  const eSubtotal = eLines.reduce((s, l) => s + l.qty * l.price, 0);
-  const eDiscount = Math.round(eSubtotal * (discountPct / 100));
-  const eTax      = vatOn(eSubtotal - eDiscount, canInvoiceTVA);
-  const eTotal    = eSubtotal - eDiscount + eTax;
+  const eSums     = taxSummary(eLines, discountPct, canInvoiceTVA);
+  const { subtotal: eSubtotal, total: eTotal } = eSums;
 
   const filteredProducts = products.filter(p => !pickerQuery || p.name.toLowerCase().includes(pickerQuery.toLowerCase()));
 
@@ -361,9 +360,9 @@ export default function QuotePage() {
               <div className="pp-totals-inner">
                 <div className="tot-row"><span>Sous-total</span><span className="tv">{fmt(subtotal)} F CFA</span></div>
                 {discountAmt > 0 && <div className="tot-row"><span>Remise ({discountPct} %)</span><span className="tv">− {fmt(discountAmt)} F CFA</span></div>}
-                {canInvoiceTVA && (
-                  <div className="tot-row"><span>{VAT_LABEL}</span><span className="tv">{fmt(tax)} F CFA</span></div>
-                )}
+                {canInvoiceTVA && vatRows(sums.groups).map(r => (
+                  <div key={r.key} className="tot-row"><span>{r.label}</span><span className="tv">{fmt(r.amount)} F CFA</span></div>
+                ))}
                 <div className="tot-row grand"><span>Total estimé</span><span className="tv">{fmt(total)} F CFA</span></div>
               </div>
             </div>
@@ -496,17 +495,18 @@ export default function QuotePage() {
         </div>
 
         <div className="subhead">Lignes</div>
-        <div className="line-items-head">
+        <div className={`line-items-head${canInvoiceTVA ? ' with-tax' : ''}`}>
           <div className="li-col">Description</div>
           <div className="li-col">Unité</div>
           <div className="li-col right">Qté</div>
           <div className="li-col right">Prix</div>
+          {canInvoiceTVA && <div className="li-col">TVA</div>}
           <div />
         </div>
 
         {eLines.map(li => (
           <div key={li.id} className="line-item">
-            <div className="line-item-row">
+            <div className={`line-item-row${canInvoiceTVA ? ' with-tax' : ''}`}>
               <input className="li-input" placeholder="Description du service" value={li.desc}
                 onChange={e => updateELine(li.id, 'desc', e.target.value)} />
               <select className="li-input" value={li.unit ?? 'unité'}
@@ -519,6 +519,8 @@ export default function QuotePage() {
                 onChange={e => updateELine(li.id, 'qty', e.target.value)} />
               <input className="li-input num" type="number" min="0" value={li.price || ''}
                 placeholder="0" onChange={e => updateELine(li.id, 'price', e.target.value)} />
+              {canInvoiceTVA && <TaxGroupSelect className="li-input" value={lineGroup(li, true)} label="Groupe de taxe"
+                onChange={g => setELines(prev => prev.map(l => l.id === li.id ? { ...l, taxGroup: g } : l))} />}
               <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label="Supprimer la ligne">
                 <Icon name="trash" size={15} ariaHidden />
               </button>
@@ -543,7 +545,7 @@ export default function QuotePage() {
                     ? <div className="picker-empty">Aucun produit trouvé</div>
                     : filteredProducts.map(p => (
                         <div key={p.id} className="picker-item" onClick={() => {
-                          setELines(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
+                          setELines(prev => [...prev, { ...newLineItem(p.name, 1, p.price, p.unit, p.id), taxGroup: productTaxGroup(p.tax, canInvoiceTVA) }]);
                           setShowPicker(false); setPickerQuery('');
                         }}>
                           <div>
@@ -562,7 +564,7 @@ export default function QuotePage() {
 
         <div className="total-block">
           <div className="total-row"><span>Sous-total HT</span><span>{fmt(eSubtotal)} F CFA</span></div>
-          {canInvoiceTVA && <div className="total-row"><span>{VAT_LABEL}</span><span>{fmt(eTax)} F CFA</span></div>}
+          {canInvoiceTVA && vatRows(eSums.groups).map(r => <div key={r.key} className="total-row"><span>{r.label}</span><span>{fmt(r.amount)} F CFA</span></div>)}
           <div className="total-row final"><span>Total estimé</span><span>{fmt(eTotal)} F CFA</span></div>
         </div>
       </div>

@@ -7,7 +7,8 @@ const line = (id: string, desc: string, qty: number, price: number): LineItem =>
 describe('editorTotals', () => {
   it('applies the discount before VAT and ignores empty lines', () => {
     const t = editorTotals([line('a', 'Conseil', 2, 50_000), line('b', '', 1, 0)], 10, true);
-    expect(t).toEqual({ subtotal: 100_000, discount: 10_000, net: 90_000, tax: 16_200, total: 106_200, withholding: null, toPay: 106_200 });
+    expect(t).toEqual({ subtotal: 100_000, discount: 10_000, net: 90_000, tax: 16_200, total: 106_200, withholding: null, toPay: 106_200,
+      groups: [{ code: 'B', label: 'TVA taxable 1', rate: 0.18, base: 90_000, tax: 16_200 }] });
   });
   it('takes the service withholding off what is to pay, on the amount after discount (as the PDF)', () => {
     const t = editorTotals([line('a', 'Conseil', 2, 50_000)], 10, true, 'resident-with-ifu');
