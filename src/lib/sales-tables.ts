@@ -176,6 +176,18 @@ export const PAY_METHOD_LABEL: Record<PayMethod, string> = {
   momo: 'Mobile Money', wire: 'Virement', cash: 'Espèces', cheque: 'Chèque', pispi: 'PI-SPI',
 };
 
+// ── Rapprochement (PRO-175) ─────────────────────────────────────────────────────
+
+/** Where a payment stands against the statement: only a completed payment is matched or not. */
+export function reconcileStatus(p: Pick<Payment, 'status' | 'reconciledAt'>): 'none' | 'to_match' | 'matched' {
+  if (p.status !== 'completed') return 'none';
+  return p.reconciledAt ? 'matched' : 'to_match';
+}
+export const RECONCILE_STATUS: Record<'to_match' | 'matched', RowStatus> = {
+  to_match: { label: 'À rapprocher', tone: 'wait' },
+  matched:  { label: 'Rapproché',    tone: 'paid' },
+};
+
 export const PAYMENT_STATUS: Record<Payment['status'], RowStatus> = {
   completed: { label: 'Effectué',   tone: 'paid' },
   pending:   { label: 'En attente', tone: 'wait' },

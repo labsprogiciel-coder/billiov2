@@ -19,11 +19,12 @@ import type { Payment, PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 import Page from '@/components/Page';
 import PaymentList from '@/components/sales/PaymentList';
 import IncomingPayments from '@/components/sales/IncomingPayments';
-import { paymentAuthor } from '@/lib/sales-tables';
+import { paymentAuthor, reconcileStatus } from '@/lib/sales-tables';
+import ReconcileCell from '@/components/sales/ReconcileCell';
 import { useCommandIntent } from '@/lib/command-intent';
 import { UI_V2 } from '@/lib/features';
 
-type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending';
+type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending' | 'to_match' | 'matched';
 
 const METHOD_META: Record<PayMethod, { label: string; icon: string; cls: string; sub: string }> = {
   cash:   { label: 'Cash',         icon: 'cash',          cls: 'm-cash',   sub: 'En personne'     },
@@ -48,6 +49,8 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'cheque',  label: 'Chèque'        },
   { key: 'cash',    label: 'Cash'          },
   { key: 'pending', label: 'En attente'    },
+  { key: 'to_match', label: 'À rapprocher' },
+  { key: 'matched',  label: 'Rapproché'    },
 ];
 
 const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
@@ -101,6 +104,8 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     momo:   payments.filter(p => p.method === 'momo').length,
     cheque: payments.filter(p => p.method === 'cheque').length,
     pending: payments.filter(p => p.status === 'pending').length,
+    to_match: payments.filter(p => reconcileStatus(p) === 'to_match').length,
+    matched:  payments.filter(p => reconcileStatus(p) === 'matched').length,
   };
 
   // Payments point to the invoice's internal id; show its legal number
@@ -111,6 +116,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
 
   const filtered = useMemo(() => {
     if (filter === 'pending') return payments.filter(p => p.status === 'pending');
+    if (filter === 'to_match' || filter === 'matched') return payments.filter(p => reconcileStatus(p) === filter);
     if (filter === 'online')  return payments.filter(p => p.source === 'online');
     if (filter !== 'all')     return payments.filter(p => p.method === filter);
     return payments;
@@ -126,9 +132,10 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     if (listed.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
     const rows = listed.map(p => [
       p.date, invRef(p.inv), clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status], paymentAuthor(p),
+      reconcileStatus(p) === 'matched' ? 'Rapproché' : reconcileStatus(p) === 'to_match' ? 'À rapprocher' : '',
     ]);
     downloadBlob(
-      csvBlob(['Date', 'Facture', 'Client', 'Méthode', 'Référence', 'Montant (F CFA)', 'Statut', 'Saisi par'], rows),
+      csvBlob(['Date', 'Facture', 'Client', 'Méthode', 'Référence', 'Montant (F CFA)', 'Statut', 'Saisi par', 'Rapprochement'], rows),
       `releve-paiements-${todayISO()}.csv`,
     );
   }
@@ -300,11 +307,13 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
             <div className="recon-banner">
               <div className="rb-ico"><Icon name="bolt" size={18} /></div>
               <div className="rb-text">
-                <b>Les paiements en ligne se rapprochent automatiquement</b>
+                <b>Les paiements en ligne s’enregistrent automatiquement</b>
                 Chaque paiement en ligne (PI-SPI) est enregistré sur sa facture automatiquement.
               </div>
             </div>
           )}
+
+          <IncomingPayments />
 
           {/* Payments table */}
           <div className="pay-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'payments') } : {})}>
@@ -377,6 +386,7 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
                       {isOnline && p.status === 'completed' && (
                         <span className="auto-chip"><Icon name="bolt" size={11} /> Auto</span>
                       )}
+                      <ReconcileCell payment={p} />
                     </div>
 
                     {/* Actions */}
@@ -428,8 +438,9 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
 
           {/* Invoice */}
           <div className="form-group">
-            <label className="form-label">Facture</label>
+            <label className="form-label" htmlFor="pay-invoice">Facture</label>
             <select
+              id="pay-invoice"
               className="form-input"
               value={invId}
               onChange={e => handlePickInvoice(e.target.value)}
@@ -479,8 +490,9 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
 
           {/* Date */}
           <div className="form-group">
-            <label className="form-label">Date de réception</label>
+            <label className="form-label" htmlFor="pay-date">Date de réception</label>
             <input
+              id="pay-date"
               className="form-input"
               type="date"
               value={date}
