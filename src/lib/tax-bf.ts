@@ -474,3 +474,19 @@ export function isRegimeCaducite(
     default:               return false;
   }
 }
+
+// ─── Timbre quittance (CGI art. 519–520) ─────────────────────────────────────
+
+/**
+ * Stamp duty on a receipt paid in cash, by the CGI's scale (art. 519): 30 F from 1 000 to 5 000 F, 50 F up to
+ * 10 000 F, 100 F up to 50 000 F, then 50 F more per started block of 50 000 F. None below 1 000 F, and none
+ * when paid by cheque or bank transfer (art. 520), so an invoice states it « en cas de règlement en espèces ».
+ */
+export function cashReceiptStamp(amount: number): number {
+  const a = Math.round(amount);
+  if (a < 1000) return 0;
+  if (a <= 5000) return 30;
+  if (a <= 10000) return 50;
+  if (a <= 50000) return 100;
+  return 100 + 50 * Math.ceil((a - 50000) / 50000);
+}
