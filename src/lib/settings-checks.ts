@@ -51,7 +51,7 @@ export function complianceChecklist(seller: SellerInfo, payments: PaymentSetting
     ...(cadastralRequired(seller.country) ? [row('seller-cadastre', 'Référence cadastrale', { tab: 'business', field: FIELD_IDS.cadastre })] : []),
     payments === null
       ? { key: 'seller-bank', label: 'Coordonnées bancaires', state: 'unknown' as const, hint: 'Non vérifiées : les moyens de paiement n’ont pas pu être chargés.', fix: { tab: 'payments' as const } }
-      : row('seller-bank', 'Coordonnées bancaires', { tab: 'payments' }, 'Moyens de paiement'),
+      : row('seller-bank', 'Coordonnées bancaires', { tab: 'payments' }, 'Paiements'),
     { key: 'numbering', label: 'Numérotation continue par exercice', state: 'auto' },
     { key: 'mentions', label: 'Total en lettres, date, heure et opérateur', state: 'auto' },
   ];
