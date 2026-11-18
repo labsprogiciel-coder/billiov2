@@ -22,6 +22,7 @@ import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes, createCreditNote, nextCreditNoteId, creditNoteIssueError } from '@/lib/api/credit-notes';
 import { CREDIT_NATURES, type CreditNature } from '@/lib/credit-note';
+import { renderCreditNotePdf, showPdf } from '@/lib/credit-note-pdf';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
@@ -129,6 +130,7 @@ export default function InvoicePage() {
   const [avoirAmount,  setAvoirAmount]  = useState(0);
   const [avoirSaving,  setAvoirSaving]  = useState(false);
   const [avoirNature,  setAvoirNature]  = useState<CreditNature | ''>('');
+  const [creditPdfFor, setCreditPdfFor] = useState<string | null>(null);
   const [creditNotes,  setCreditNotes]  = useState<CreditNote[]>([]);
   // Goes up once a posting to the books has finished, so the side panel reads the entries again
   const [ledgerTick, setLedgerTick] = useState(0);
@@ -336,6 +338,22 @@ export default function InvoicePage() {
     setInvoices(prev => prev.filter(i => i.id !== invoice.id));
     showToast('Facture supprimée');
     navigate('/invoices');
+  };
+
+  // The « FACTURE D'AVOIR » PDF of an issued credit note (PRO-143); the new look has it in InvoiceSide
+  const openCreditPdf = async (cn: CreditNote, chargedVat: boolean) => {
+    if (creditPdfFor) return;
+    const tab = window.open('', '_blank');
+    setCreditPdfFor(cn.id);
+    try {
+      showPdf(await renderCreditNotePdf({ creditNote: cn, invoice, chargedVat, client: clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' }, biz: orgSettings, template: invoiceTemplate }), tab);
+    } catch (err) {
+      tab?.close();
+      console.error('[creditNotePdf]', err);
+      showToast('Le PDF de l’avoir n’a pas pu être généré. Réessayez.', true);
+    } finally {
+      setCreditPdfFor(null);
+    }
   };
 
   const openAvoir = () => {
@@ -839,6 +857,13 @@ export default function InvoicePage() {
                   <div>
                     <div className="tl-text">Avoir {creditNoteRef(cn)} — {fmt(cn.amount)} F CFA</div>
                     <div className="tl-time">{fmtDateLong(cn.issued)} · {cn.reason}</div>
+                    {cn.status === 'issued' && (
+                      <button type="button" className="dt-linkcell" style={{ fontSize: 12 }} disabled={creditPdfFor !== null}
+                        onClick={() => openCreditPdf(cn, documentHasVat(invoice.amount, discountedSub, canInvoiceTVA))}
+                        aria-label={`PDF de l’avoir ${creditNoteRef(cn)}`}>
+                        {creditPdfFor === cn.id ? 'Génération…' : 'PDF de l’avoir'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

@@ -19,6 +19,11 @@ export const CREDIT_NATURES: readonly { code: CreditNature; label: string; hint:
   { code: 'RRR', label: 'Rabais, remise, ristourne', hint: 'Un geste commercial accordé après coup' },
 ];
 
+/** The mention the DGI's annex prints for each nature (PRO-143). */
+export const NATURE_MENTION: Record<CreditNature, string> = { COR: 'Correction', RAN: 'Annulation', RAM: 'Avoir suite reprise', RRR: 'RRR' };
+/** What the credit note PDF prints as its nature: the code and the DGI's mention. */
+export const printedNature = (code: CreditNature): string => code === 'RRR' ? 'RRR' : `${code} · ${NATURE_MENTION[code]}`;
+
 export const natureLabel = (code: CreditNature): string => {
   const n = CREDIT_NATURES.find(x => x.code === code);
   return n ? `${n.code} · ${n.label}` : code;

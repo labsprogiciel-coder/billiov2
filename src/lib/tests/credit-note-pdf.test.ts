@@ -57,6 +57,9 @@ describe('credit note PDF', () => {
     // In words
     expect(t).toContain('Arrêté le présent avoir à la somme de dix mille francs CFA.');
     expect(t.join(' ')).not.toMatch(/10 001|dix mille un/);
+    // DGI annex: the nature's printed mention, and the original invoice
+    expect(t.join(' ')).toContain('COR · Correction');
+    expect(t.join(' ')).toContain('FACT-2026-0001 du');
   }, 30000);
   it('prints the VAT of each tax group, and each line its group, when rates are mixed (PRO-138)', async () => {
     const invoice: Invoice = { id: 'F-2', number: 'FACT-2026-0002', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 168_000, status: 'pending', discountPct: 0 };
@@ -72,5 +75,21 @@ describe('credit note PDF', () => {
     expect(t).toMatch(/Exonéré · A \| 0 F CFA/);
     expect(t).toMatch(/TVA 18 % · B \| 18 000 F CFA/);
     expect(t).toMatch(/168 000/);
+  }, 60000);
+
+  it('prints the DGI mention of each nature, and « RRR » as the original reference of a discount (PRO-143)', async () => {
+    const invoice: Invoice = { id: 'F-1', number: 'FACT-2026-0001', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 118_000, status: 'pending', discountPct: 0 };
+    const render = (nature: CreditNote['nature']) => renderCreditNotePdf({
+      creditNote: { id: 'AV-2', invoiceId: 'F-1', subject: 'Remise', client: 'TK', issued: '2026-11-20', amount: 5_000, reason: 'Geste commercial', status: 'issued', nature, lines: [], discountPct: 0, number: 'AV-2026-0002' },
+      invoice, chargedVat: false, client: { name: 'TechKonsult', city: 'Ouagadougou' },
+      biz: { name: 'Studio Wend', country: 'Burkina Faso', taxRegime: 'RNI' } as never, template: undefined,
+    }).then(() => printed.texts.join(' '));
+    const ram = await render('RAM');
+    expect(ram).toContain('RAM · Avoir suite reprise');
+    const rrr = await render('RRR');
+    expect(rrr).toMatch(/Facture d’origine RRR/);
+    expect(rrr).not.toContain('FACT-2026-0001 du');
+    // the balance is still reduced on the invoice it was given against
+    expect(rrr).toContain('FACT-2026-0001');
   }, 60000);
 });
