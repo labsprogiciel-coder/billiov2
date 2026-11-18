@@ -25,7 +25,9 @@ import {
 } from '@/data';
 import type { FilterKey, Status, LineItem } from '@/data';
 import type { Activity, Invoice } from '@/lib/schemas';
-import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import TaxGroupSelect from '@/components/TaxGroupSelect';
+import { lineGroup, productTaxGroup, taxSummary, vatRows } from '@/lib/tax-groups';
+import { chargesVat } from '@/lib/vat';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import Page from '@/components/Page';
@@ -86,7 +88,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   function addFromProduct(productId: string) {
     const p = products.find(pr => pr.id === productId);
     if (!p) return;
-    setLineItems(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
+    setLineItems(prev => [...prev, { ...newLineItem(p.name, 1, p.price, p.unit, p.id), taxGroup: productTaxGroup(p.tax, canInvoiceTVA) }]);
     setShowPicker(false);
     setPickerQuery('');
   }
@@ -107,11 +109,9 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
   }, [invoices]);
 
   const canInvoiceTVA   = chargesVat(orgSettings.taxRegime);
-  const subtotal        = useMemo(() => lineItems.reduce((s, li) => s + li.qty * li.price, 0), [lineItems]);
-  const discountAmt     = Math.round(subtotal * (fDiscount / 100));
-  const discountedSub   = subtotal - discountAmt;
-  const tax             = vatOn(discountedSub, canInvoiceTVA);
-  const total           = discountedSub + tax;
+  // Totals per DGI tax group (PRO-138)
+  const sums            = taxSummary(lineItems, fDiscount, canInvoiceTVA);
+  const { subtotal, discount: discountAmt, net: discountedSub, tax, total } = sums;
 
   // Dates the panel opened with, so only a change counts as unsaved input
   const panelDefaults = useRef({ date: '', due: '' });
@@ -516,17 +516,18 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
           </div>
 
           <div className="subhead"><span>Lignes de facturation</span></div>
-          <div className="line-items-head">
+          <div className={`line-items-head${canInvoiceTVA ? ' with-tax' : ''}`}>
             <div className="li-col">Description</div>
             <div className="li-col">Unité</div>
             <div className="li-col right">Qté</div>
             <div className="li-col right">Prix</div>
+            {canInvoiceTVA && <div className="li-col">TVA</div>}
             <div />
           </div>
 
           {lineItems.map((li, idx) => (
             <div key={li.id} className="line-item">
-              <div className="line-item-row">
+              <div className={`line-item-row${canInvoiceTVA ? ' with-tax' : ''}`}>
                 <input className="li-input" placeholder="Description du service" value={li.desc}
                   aria-label={`Description, ligne ${idx + 1}`}
                   onChange={e => updateLine(li.id, 'desc', e.target.value)} />
@@ -543,6 +544,8 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
                 <input className="li-input num" type="number" min="0" value={li.price || ''}
                   placeholder="0" aria-label={`Prix unitaire, ligne ${idx + 1}`}
                   onChange={e => updateLine(li.id, 'price', e.target.value)} />
+                {canInvoiceTVA && <TaxGroupSelect className="li-input" value={lineGroup(li, true)} label="Groupe de taxe"
+                  onChange={g => setLineItems(prev => prev.map(l => l.id === li.id ? { ...l, taxGroup: g } : l))} />}
                 <button className="li-del" onClick={() => removeLine(li.id)} aria-label={`Supprimer la ligne ${idx + 1}`}>
                   <Icon name="trash" size={15} ariaHidden />
                 </button>
@@ -599,7 +602,7 @@ export default function InvoicesPage({ tabs }: { tabs?: ReactNode }) {
               />
             </div>
             {fDiscount > 0 && <div className="total-row" style={{ color: 'var(--color-text-secondary)' }}><span>Montant remise</span><span>−{fmt(discountAmt)} F CFA</span></div>}
-            {canInvoiceTVA && <div className="total-row"><span>{VAT_LABEL}</span><span>{fmt(tax)} F CFA</span></div>}
+            {canInvoiceTVA && vatRows(sums.groups).map(r => <div key={r.key} className="total-row"><span>{r.label}</span><span>{fmt(r.amount)} F CFA</span></div>)}
             <div className="total-row final"><span>Total à payer</span><span>{fmt(total)} F CFA</span></div>
           </div>
 

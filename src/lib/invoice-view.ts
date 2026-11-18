@@ -77,8 +77,8 @@ export function clientBalance(code: string, invoices: Invoice[], payments: Payme
 export interface EntryLineView { account: string; label: string; debit: number; credit: number }
 
 /** The sales entry an issued invoice books: 411 at TTC, 706 at HT, 443 for VAT. */
-export function expectedSalesEntry(amountTtc: number, chargesVat: boolean): EntryLineView[] {
-  const { ht, tva } = splitTtc(amountTtc, chargesVat);
+export function expectedSalesEntry(amountTtc: number, chargesVat: boolean, split?: { ht: number; tva: number }): EntryLineView[] {
+  const { ht, tva } = split ?? splitTtc(amountTtc, chargesVat);
   return [
     { account: '411', label: 'Clients', debit: amountTtc, credit: 0 },
     { account: '706', label: 'Prestations de services', debit: 0, credit: ht },

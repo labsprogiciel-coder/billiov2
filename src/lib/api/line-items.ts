@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { LineItem } from '@/lib/schemas';
+import { isTaxGroup } from '@/lib/tax-groups';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -11,6 +12,7 @@ function dbToLineItem(row: Record<string, unknown>): LineItem {
     qty:   Number(row.qty),
     price: Number(row.price),
     ...(row.product_id ? { productId: String(row.product_id) } : {}),
+    ...(isTaxGroup(row.tax_group) ? { taxGroup: row.tax_group } : {}),
   };
 }
 
@@ -43,6 +45,7 @@ export async function saveLineItems(
     unit:        l.unit ?? 'unité',
     qty:         l.qty,
     price:       l.price,
+    tax_group:   l.taxGroup      ?? null,
   }));
   const { error } = await supabase.from('line_items').insert(rows);
   if (error) throw error;

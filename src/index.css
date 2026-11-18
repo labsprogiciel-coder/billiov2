@@ -510,6 +510,12 @@ select.form-input {
 .li-col.right { text-align: right; }
 .line-item { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 9px 10px; margin-bottom: 8px; }
 .line-item-row { display: grid; grid-template-columns: 1fr 72px 52px 88px 28px; gap: 8px; align-items: center; }
+/* With a tax group column (PRO-138), the description takes its own row */
+.line-items-head.with-tax, .line-item-row.with-tax { grid-template-columns: 72px 52px minmax(0, 1fr) 72px 28px; }
+.line-item-row.with-tax > :first-child { grid-column: 1 / -2; }
+.line-item-row.with-tax > .li-del { grid-row: 1; grid-column: -2 / -1; }
+.line-item-row.with-tax > :nth-child(5), .line-items-head.with-tax > :nth-child(5) { grid-column: 4 / -1; }
+.line-items-head.with-tax > :first-child, .line-items-head.with-tax > :last-child { display: none; }
 .li-input {
   padding: 6px 9px; border: 0.5px solid var(--color-border-secondary); border-radius: 6px;
   font-size: 12px; font-family: var(--font-sans);

@@ -61,6 +61,21 @@ describe('credit note PDF', () => {
     expect(t.join(' ')).toContain('COR · Correction');
     expect(t.join(' ')).toContain('FACT-2026-0001 du');
   }, 30000);
+  it('prints the VAT of each tax group, and each line its group, when rates are mixed (PRO-138)', async () => {
+    const invoice: Invoice = { id: 'F-2', number: 'FACT-2026-0002', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 168_000, status: 'pending', discountPct: 0 };
+    await renderCreditNotePdf({
+      creditNote: { id: 'AV-3', invoiceId: 'F-2', subject: 'Annulation', client: 'TK', issued: '2026-11-20', amount: 168_000, reason: 'Erreur', status: 'issued', nature: 'COR', discountPct: 0, number: 'AV-2026-0003',
+        lines: [{ id: 'l1', desc: 'Conseil', unit: 'jour', qty: 1, price: 100_000, taxGroup: 'B' }, { id: 'l2', desc: 'Formation', unit: 'jour', qty: 1, price: 50_000, taxGroup: 'A' }] },
+      invoice, chargedVat: true, client: { name: 'TechKonsult', city: 'Ouagadougou' },
+      biz: { name: 'Studio Wend', country: 'Burkina Faso', taxRegime: 'RNI' } as never, template: undefined,
+    });
+    const t = printed.texts.join(' | ');
+    expect(t).toContain('Conseil (B)');
+    expect(t).toContain('Formation (A)');
+    expect(t).toMatch(/Exonéré · A \| 0 F CFA/);
+    expect(t).toMatch(/TVA 18 % · B \| 18 000 F CFA/);
+    expect(t).toMatch(/168 000/);
+  }, 60000);
 
   it('prints the DGI mention of each nature, and « RRR » as the original reference of a discount (PRO-143)', async () => {
     const invoice: Invoice = { id: 'F-1', number: 'FACT-2026-0001', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 118_000, status: 'pending', discountPct: 0 };

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { isTaxGroup } from '@/lib/tax-groups';
 import type { CreditNote } from '@/lib/schemas';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
@@ -21,7 +22,7 @@ function dbToCreditNote(row: Record<string, unknown>): CreditNote {
     number:    row.number ? String(row.number) : undefined,
     status:    row.status === 'draft' ? 'draft' : 'issued',
     nature:    (row.nature ?? undefined) as CreditNote['nature'],
-    lines:     lines.map(l => ({ id: String(l.id ?? crypto.randomUUID()), desc: String(l.desc ?? ''), unit: String(l.unit ?? 'unité'), qty: Number(l.qty) || 0, price: Number(l.price) || 0, productId: l.productId ?? undefined, sourceId: l.sourceId ?? undefined })),
+    lines:     lines.map(l => ({ id: String(l.id ?? crypto.randomUUID()), desc: String(l.desc ?? ''), unit: String(l.unit ?? 'unité'), qty: Number(l.qty) || 0, price: Number(l.price) || 0, productId: l.productId ?? undefined, sourceId: l.sourceId ?? undefined, ...(isTaxGroup(l.taxGroup) ? { taxGroup: l.taxGroup } : {}) })),
     discountPct: Number(row.discount_pct ?? 0),
     issuedTs:     row.issued_ts ? String(row.issued_ts) : undefined,
     issuedByName: row.issued_by_name ? String(row.issued_by_name) : undefined,
@@ -86,7 +87,7 @@ function toRow(f: CreditNoteFields) {
     amount:       f.amount,
     reason:       f.reason,
     nature:       f.nature ?? null,
-    lines:        f.lines.map(l => ({ id: l.id, desc: l.desc, unit: l.unit, qty: l.qty, price: l.price, productId: l.productId, sourceId: l.sourceId })),
+    lines:        f.lines.map(l => ({ id: l.id, desc: l.desc, unit: l.unit, qty: l.qty, price: l.price, productId: l.productId, sourceId: l.sourceId, taxGroup: l.taxGroup })),
     discount_pct: f.discountPct,
   };
 }

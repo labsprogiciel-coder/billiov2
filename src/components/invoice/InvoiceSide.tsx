@@ -28,7 +28,7 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
   );
 }
 
-export default function InvoiceSide({ invoice, total, paid, credited, amountDue, creditNotes, client, vatOnInvoice, refreshKey = 0 }: {
+export default function InvoiceSide({ invoice, total, paid, credited, amountDue, creditNotes, client, vatOnInvoice, salesSplit, refreshKey = 0 }: {
   invoice: Invoice;
   /** TTC of the invoice (its lines for a draft). */
   total: number;
@@ -39,6 +39,8 @@ export default function InvoiceSide({ invoice, total, paid, credited, amountDue,
   client: { code: string; name: string; contact?: string; email?: string; phone?: string };
   /** Whether this invoice carries VAT (for the expected entry). */
   vatOnInvoice: boolean;
+  /** HT and VAT of the invoice from its lines' tax groups (PRO-138); else split at one rate */
+  salesSplit?: { ht: number; tva: number };
   /** Goes up once a payment, issue, credit note or edit has been posted: entries are read again. */
   refreshKey?: number;
 }) {
@@ -178,7 +180,7 @@ export default function InvoiceSide({ invoice, total, paid, credited, amountDue,
                 <p className="dt-muted iv-note">Aucune écriture trouvée pour cette facture. L’écriture de vente attendue :</p>
                 <table className="iv-lines">
                   <thead><tr><th scope="col">Compte</th><th scope="col" className="num">Débit</th><th scope="col" className="num">Crédit</th></tr></thead>
-                  <tbody>{expectedSalesEntry(invoice.amount, vatOnInvoice).map(l => (
+                  <tbody>{expectedSalesEntry(invoice.amount, vatOnInvoice, salesSplit).map(l => (
                     <tr key={l.account}><td title={l.label}>{l.account} {l.label}</td><td className="num">{l.debit ? fmt(l.debit) : ''}</td><td className="num">{l.credit ? fmt(l.credit) : ''}</td></tr>
                   ))}</tbody>
                 </table>

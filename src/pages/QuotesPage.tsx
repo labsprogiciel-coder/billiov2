@@ -23,7 +23,9 @@ import { isInvoiceLimitError } from '@/lib/invoice-limit';
 import { saveLineItems, deleteLineItems, fetchLineItems } from '@/lib/api/line-items';
 import { fmt, fmtCompact, fmtDate, newLineItem, clientInitials } from '@/data';
 import type { Activity, LineItem, QuoteStatus } from '@/lib/schemas';
-import { VAT_LABEL, chargesVat, vatOn } from '@/lib/vat';
+import TaxGroupSelect from '@/components/TaxGroupSelect';
+import { lineGroup, productTaxGroup, taxSummary, vatRows } from '@/lib/tax-groups';
+import { chargesVat } from '@/lib/vat';
 import Page from '@/components/Page';
 import QuoteList from '@/components/sales/QuoteList';
 import { useCommandIntent } from '@/lib/command-intent';
@@ -100,15 +102,15 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
   function addFromProduct(productId: string) {
     const p = products.find(pr => pr.id === productId);
     if (!p) return;
-    setLines(prev => [...prev, newLineItem(p.name, 1, p.price, p.unit, p.id)]);
+    setLines(prev => [...prev, { ...newLineItem(p.name, 1, p.price, p.unit, p.id), taxGroup: productTaxGroup(p.tax, canInvoiceTVA) }]);
     setShowPicker(false);
     setPickerQuery('');
   }
 
   const canInvoiceTVA = chargesVat(orgSettings.taxRegime);
-  const subtotal = lines.reduce((s, li) => s + li.qty * li.price, 0);
-  const tax      = vatOn(subtotal, canInvoiceTVA);
-  const total    = subtotal + tax;
+  // Totals per DGI tax group (PRO-138)
+  const sums     = taxSummary(lines, 0, canInvoiceTVA);
+  const { subtotal, total } = sums;
 
   // Metrics
   const quotedStatuses: QuoteStatus[] = ['sent', 'accepted', 'declined', 'expired', 'invoiced'];
@@ -537,17 +539,18 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
 
           {/* Line items */}
           <div className="subhead">Lignes</div>
-          <div className="line-items-head">
+          <div className={`line-items-head${canInvoiceTVA ? ' with-tax' : ''}`}>
             <div className="li-col">Description</div>
             <div className="li-col">Unité</div>
             <div className="li-col right">Qté</div>
             <div className="li-col right">Prix</div>
+            {canInvoiceTVA && <div className="li-col">TVA</div>}
             <div />
           </div>
 
           {lines.map(li => (
             <div key={li.id} className="line-item">
-              <div className="line-item-row">
+              <div className={`line-item-row${canInvoiceTVA ? ' with-tax' : ''}`}>
                 <input
                   type="text"
                   className="li-input"
@@ -578,6 +581,8 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
                   value={li.price}
                   onChange={e => updateLine(li.id, 'price', e.target.value)}
                 />
+                {canInvoiceTVA && <TaxGroupSelect className="li-input" value={lineGroup(li, true)} label="Groupe de taxe"
+                  onChange={g => setLines(prev => prev.map(l => l.id === li.id ? { ...l, taxGroup: g } : l))} />}
                 <button className="li-del" onClick={() => removeLine(li.id)} aria-label="Supprimer">
                   <Icon name="trash" size={14} />
                 </button>
@@ -627,12 +632,12 @@ export default function QuotesPage({ tabs }: { tabs?: ReactNode }) {
               <span>Sous-total HT</span>
               <span>{fmt(subtotal)} F CFA</span>
             </div>
-            {canInvoiceTVA && (
-              <div className="total-row">
-                <span>{VAT_LABEL}</span>
-                <span>{fmt(tax)} F CFA</span>
+            {canInvoiceTVA && vatRows(sums.groups).map(r => (
+              <div key={r.key} className="total-row">
+                <span>{r.label}</span>
+                <span>{fmt(r.amount)} F CFA</span>
               </div>
-            )}
+            ))}
             <div className="total-row final">
               <span>Total estimé</span>
               <span>{fmt(total)} F CFA</span>

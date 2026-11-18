@@ -1,6 +1,8 @@
 // What a printed document adds up to (InvoicePDF), kept apart so it can be tested.
 
 import { vatOn } from '@/lib/vat';
+import { taxSummary } from '@/lib/tax-groups';
+import type { LineItem } from '@/lib/schemas';
 
 /**
  * Discount, VAT and total of a document. A credit note passes its stored total
@@ -17,4 +19,28 @@ export function documentAmounts(subtotal: number, discountPct: number, showVat: 
     else { discountedSub = storedTotal; discountAmt = subtotal - storedTotal; }
   }
   return { discountAmt, discountedSub, tax, total: discountedSub + tax };
+}
+
+/**
+ * The same, per DGI tax group (PRO-138), from the document's lines. A credit note's stored total
+ * is printed as it is: the leftover goes on the VAT of its largest taxed group (or on the discount,
+ * without VAT).
+ */
+export function documentTaxes(lines: Pick<LineItem, 'qty' | 'price' | 'taxGroup'>[], discountPct: number, showVat: boolean, storedTotal?: number) {
+  const s = taxSummary(lines, discountPct, showVat);
+  let { discount, net, tax } = s;
+  const groups = s.groups.map(g => ({ ...g }));
+  if (storedTotal !== undefined && storedTotal !== net + tax) {
+    const taxed = groups.filter(g => g.rate > 0);
+    if (showVat && taxed.length > 0) {
+      const gap = storedTotal - net - tax;
+      taxed.reduce((a, b) => b.base > a.base ? b : a).tax += gap;
+      tax += gap;
+    } else {
+      // Without VAT the leftover is a discount: shown on the totals, the groups keep their bases
+      discount = s.subtotal - storedTotal; net = storedTotal;
+      if (groups.length === 1) groups[0].base = storedTotal;
+    }
+  }
+  return { subtotal: s.subtotal, discountAmt: discount, discountedSub: net, tax, total: net + tax, groups };
 }
