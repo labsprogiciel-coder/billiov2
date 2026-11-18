@@ -1,5 +1,5 @@
 // What each role sees on the invoice list and the invoice page (PRO-174): rendered to HTML for each
-// role, with the app's data from the demo set (the invoice page as production shows it, classic UI).
+// role, with the app's data from the demo set (the new interface, the default since PRO-179).
 // No screen may offer an action the database refuses.
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
@@ -11,7 +11,7 @@ import type { CreditNote } from '@/lib/schemas';
 const state = vi.hoisted(() => ({ role: 'admin' as UserRole }));
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
-vi.mock('@/lib/features', async (orig) => ({ ...(await orig<typeof import('@/lib/features')>()), ACCOUNTING_ENABLED: true, UI_V2: false }));
+vi.mock('@/lib/features', async (orig) => ({ ...(await orig<typeof import('@/lib/features')>()), ACCOUNTING_ENABLED: true, UI_V2: true }));
 vi.mock('@/context/AppContext', async () => {
   const data = await import('@/data');
   const { DEFAULT_CONFIG } = await import('@/lib/invoice-template');
@@ -80,7 +80,8 @@ describe('invoice page per role (PRO-174)', () => {
     const draft = data.INITIAL_INVOICES.find(i => i.status === 'draft');
     if (!draft) return;
     const html = await renderInvoice(role, draft.id);
-    expect(html.includes('Supprimer la facture'), 'delete a draft').toBe(role === 'admin');
+    // « Supprimer la facture » (admins) is in the « Autres actions » menu, which renders its items once opened
+    expect(html.includes('Autres actions'), 'more actions').toBe(role !== 'observer');
     expect(html.includes('Émettre la facture'), 'issue').toBe(role !== 'observer');
   });
 });
