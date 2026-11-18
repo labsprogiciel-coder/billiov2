@@ -924,3 +924,27 @@ export async function fetchInvoiceEntries(orgId: string, invoiceId: string, cred
     return toJournalEntry({ ...r, journal_code: journal.code }, lines);
   });
 }
+
+/**
+ * The invoices whose sales entry is posted (piece VE-<id>, or a correction VE-<id>-R<n>): the
+ * « Comptabilité » column of the invoice list (PRO-174). An issued invoice missing here wasn't booked.
+ */
+export async function fetchBookedInvoiceIds(orgId: string): Promise<Set<string>> {
+  const idOf = (piece: string) => piece.slice(3).replace(/-R\d+$/, '');
+  if (MOCK) return new Set([...ENTRIES, ...mockEntries].filter(e => e.posted && e.piece.startsWith('VE-')).map(e => idOf(e.piece)));
+  const out = new Set<string>();
+  let after: string | null = null;
+  for (;;) {
+    let query = supabase.from('journal_entries').select('id, piece')
+      .eq('org_id', orgId).eq('posted', true).like('piece', 'VE-%')
+      .order('id', { ascending: true }).limit(PAGE);
+    if (after) query = query.gt('id', after);
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = (data ?? []) as Array<{ id: string; piece: string }>;
+    for (const r of page) out.add(idOf(String(r.piece)));
+    if (page.length < PAGE) break;
+    after = String(page[page.length - 1].id);
+  }
+  return out;
+}

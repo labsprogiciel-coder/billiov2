@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { canWrite, canDelete } from '@/lib/permissions';
+import { canWrite, canDelete, canCredit } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import InvoiceClientSelect from '@/components/InvoiceClientSelect';
@@ -92,6 +92,8 @@ export default function InvoicePage() {
   const navigate = useNavigate();
   const { invoices, quotes, setQuotes, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
   const writable = canWrite(userRole);
+  // Credit notes: admins and accountants only (PRO-174)
+  const credits = canCredit(userRole);
   const compliance = useComplianceGuard();
   const { lines: paymentMethods, status: paymentMethodsStatus, online } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
@@ -559,7 +561,7 @@ export default function InvoicePage() {
             <Icon name="send" ariaHidden /> {isOverdue ? 'Relancer' : 'Envoyer'}
           </button>
         )}
-        {writable && invoice.status !== 'draft' && creditable > 0 && (
+        {credits && invoice.status !== 'draft' && creditable > 0 && (
           <button className="btn" onClick={openAvoir}>
             <Icon name="file-minus" ariaHidden /> Créer un avoir
           </button>
@@ -830,7 +832,7 @@ export default function InvoicePage() {
                   <button className="btn btn-block btn-ghost btn-danger" onClick={handleDelete}>
                     <Icon name="trash" ariaHidden /> Supprimer la facture
                   </button>
-                ) : (
+                ) : (credits &&
                   <button className="btn btn-block btn-ghost btn-danger" onClick={openAvoir}>
                     <Icon name="file-minus" ariaHidden /> Émettre un avoir
                   </button>
