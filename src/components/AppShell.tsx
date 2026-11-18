@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar';
 import TopNav from '@/components/TopNav';
 import Icon from '@/components/Icon';
 import { useToast } from '@/context/ToastContext';
+import { useApp } from '@/context/AppContext';
 import { ASSISTANT_ENABLED, UI_V2 } from '@/lib/features';
 
 // Its own chunk, and only built when the assistant is switched on: with the
@@ -13,11 +14,18 @@ const Assistant = ASSISTANT_ENABLED ? lazy(() => import('@/components/Assistant'
 
 export default function AppShell({ onLogout }: { onLogout: () => void }) {
   const { toastMsg, toastVisible, toastError } = useToast();
+  const { userRole, loading } = useApp();
 
   return (
     <div className="app">
       {UI_V2 ? <TopNav onLogout={onLogout} /> : <Sidebar onLogout={onLogout} />}
       <div className="main-rel">
+        {/* Observers (PRO-174): every page opens, nothing changes */}
+        {!loading && userRole === 'observer' && (
+          <div className="readonly-banner" role="status">
+            <Icon name="eye" size={14} ariaHidden /> <b>Lecture seule</b> · vous pouvez tout consulter et exporter.
+          </div>
+        )}
         <Outlet />
         {Assistant && <Suspense fallback={null}><Assistant /></Suspense>}
         <div

@@ -43,7 +43,7 @@ export default function InvoiceSide({ invoice, total, paid, credited, amountDue,
   refreshKey?: number;
 }) {
   const { invoices, payments, quotes, orgId, activity: teamActivity, clientsMap, orgSettings, invoiceTemplate, showToast } = useApp();
-  const { postable, writable } = usePermissions();
+  const { postable, credits } = usePermissions();
   const navigate = useNavigate();
   // null while loading; 'error' when the entries couldn't be read (not the same as none)
   const [entries, setEntries] = useState<JournalEntry[] | 'error' | null>(null);
@@ -146,7 +146,7 @@ export default function InvoiceSide({ invoice, total, paid, credited, amountDue,
                   <small>{cn.reason || 'sans motif'}</small>
                 </div>
                 <span className="iv-credit-amt">− {fmt(cn.amount)}</span>
-                {writable && <button type="button" className="dt-linkcell" onClick={() => navigate(`/credit-notes/${cn.id}/edit`)}>Reprendre</button>}
+                {credits && <button type="button" className="dt-linkcell" onClick={() => navigate(`/credit-notes/${cn.id}/edit`)}>Reprendre</button>}
               </li>
             ))}
           </ul>

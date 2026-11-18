@@ -51,7 +51,7 @@ export default function CreditNoteEditorPage() {
   const { id: invoiceParam, cnId } = useParams();
   const navigate = useNavigate();
   const { orgId, loading, invoices, setInvoices, payments, clientsMap, orgSettings, invoiceTemplate, setActivity, showToast, userRole } = useApp();
-  const { writable, postable } = usePermissions();
+  const { postable, credits } = usePermissions();
 
   // ── Load: the draft (if any), its invoice, the invoice's lines and issued credit notes ──
   const [draft, setDraft] = useState<CreditNote | null>(null);
@@ -340,8 +340,8 @@ export default function CreditNoteEditorPage() {
   useDismiss(moreRef, moreOpen, closeMore);
 
   if (loading || !ready || !invoice) return <PageSkeleton title="Avoir" variant="document" rows={4} />;
-  if (!writable) {
-    return <Page title="Avoir" back={{ label: 'Retour à la facture', onClick: () => navigate(`/invoices/${invoice.id}`) }}><p className="dt-muted">Votre rôle ne permet pas de créer des avoirs.</p></Page>;
+  if (!credits) {
+    return <Page title="Avoir" back={{ label: 'Retour à la facture', onClick: () => navigate(`/invoices/${invoice.id}`) }}><p className="dt-muted">Seuls les administrateurs et les comptables émettent des avoirs.</p></Page>;
   }
 
   const locked = busy !== null;

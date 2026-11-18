@@ -21,5 +21,11 @@ export const canDelete = (role: UserRole) => role === 'admin';
 /** Post journal entries (owner, admin, accountant: my_posting_org_ids). */
 export const canPost = (role: UserRole) => role === 'admin' || role === 'accountant';
 
+/**
+ * Issue credit notes (PRO-174): the roles that post entries, since a credit note books one
+ * (owner, admin, accountant; credit_notes write policies).
+ */
+export const canCredit = (role: UserRole) => canPost(role);
+
 /** Change the organisation's settings and manage the team. */
 export const canManageOrg = (role: UserRole) => role === 'admin';

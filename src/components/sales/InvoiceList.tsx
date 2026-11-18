@@ -3,7 +3,7 @@
 // the actions (open, send, remind, PDF) stay in the page. Credit notes are
 // listed with the invoices (PRO-168), each just above the invoice it credits.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import DataTable, { SummaryStrip, type Column, type RowAction, type StatusFilter } from '@/components/DataTable';
 import { useApp } from '@/context/AppContext';
 import { OwnerFilter, ReassignControl } from '@/components/owner/OwnerControls';
@@ -15,9 +15,11 @@ import { useNavigate } from 'react-router-dom';
 import { useCreditNoteDrafts, useCreditNotes } from '@/lib/use-credit-notes';
 import { creditNoteRef, invoiceRef } from '@/lib/invoice-number';
 import { CREDIT_NATURES } from '@/lib/credit-note';
-import { docRows, invoiceFigures, invoiceRowStatus, invoiceRows, ownerKey, ownerOptions, type DocRow } from '@/lib/sales-tables';
+import { bookingStatus, docRows, invoiceFigures, invoiceRowStatus, invoiceRows, ownerKey, ownerOptions, type DocRow } from '@/lib/sales-tables';
 import { fmt, fmtCompact, fmtDate } from '@/data';
 import StatusPill from '@/components/sales/StatusPill';
+import { fetchBookedInvoiceIds } from '@/lib/api/accounting';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 
 const FILTERS: StatusFilter<DocRow>[] = [
   { key: 'draft',   label: 'Brouillons', match: r => r.kind === 'credit' ? r.creditNote.status === 'draft' : r.status === 'draft' },
@@ -40,7 +42,7 @@ export interface InvoiceListProps {
 }
 
 export default function InvoiceList({ writable, onOpen, onSend, onDownload, downloading, showLate = 0 }: InvoiceListProps) {
-  const { invoices, payments, clientsMap, userId, userRole } = useApp();
+  const { invoices, payments, clientsMap, userId, userRole, orgId } = useApp();
   const creditNotes = useCreditNotes();
   const creditDrafts = useCreditNoteDrafts();
   const navigate = useNavigate();
@@ -57,7 +59,7 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
       && (typeFilter !== 'credit' || natureFilter === 'all' || (r.kind === 'credit' && r.creditNote.nature === natureFilter)));
   }, [invRows, creditDrafts, creditNotes, invoices, typeFilter, natureFilter]);
   // « Responsable » (PRO-172): members start on their own records
-  const { managesOrg } = usePermissions();
+  const { managesOrg, credits, postable } = usePermissions();
   const team = useTeam(managesOrg);
   const { reassign, busy: reassigning } = useReassign();
   const [ownerFilter, setOwnerFilter] = useState('all');
@@ -66,6 +68,21 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
     () => ownerFilter === 'all' ? rows : rows.filter(r => ownerKey(r) === ownerFilter),
     [rows, ownerFilter],
   );
+  // « Comptabilité » (PRO-174): for the roles that post entries, when accounting is on
+  const showBooks = postable && ACCOUNTING_ENABLED;
+  const [booked, setBooked] = useState<Set<string> | null>(null);
+  const issuedKey = useMemo(() => invoices.filter(i => i.status !== 'draft').map(i => i.id).join(','), [invoices]);
+  useEffect(() => {
+    if (!showBooks || !orgId) return;
+    let live = true;
+    fetchBookedInvoiceIds(orgId)
+      .then(ids => { if (live) setBooked(ids); })
+      .catch(err => console.error('[fetchBookedInvoiceIds]', err));
+    return () => { live = false; };
+  }, [showBooks, orgId, issuedKey]);
+  const filters = useMemo(() => showBooks
+    ? [...FILTERS, { key: 'unbooked', label: 'À comptabiliser', match: (r: DocRow) => bookingStatus(r, booked)?.tone === 'wait' }]
+    : FILTERS, [showBooks, booked]);
   // Members only see their own records (the database filters them): no « Toute l'équipe » switch or Responsable filter
   const onlyOwn = userRole === 'member';
   const mine = useMemo(() => ({
@@ -82,7 +99,7 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
   const openRow = (r: DocRow) => {
     if (r.kind === 'invoice') { onOpen(r.id); return; }
     const cn = r.creditNote;
-    if (cn.status === 'draft' && writable) navigate(`/credit-notes/${cn.id}/edit`);
+    if (cn.status === 'draft' && credits) navigate(`/credit-notes/${cn.id}/edit`);
     else navigate(`/invoices/${cn.invoiceId}`);
   };
 
@@ -120,10 +137,14 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
         ? <StatusPill tone={r.creditNote.status === 'draft' ? 'draft' : 'muted'} label={r.creditNote.status === 'draft' ? 'Brouillon' : 'Avoir émis'} />
         : <StatusPill {...invoiceRowStatus(r)} />,
     },
+    ...(showBooks ? [{
+      key: 'books', header: 'Comptabilité',
+      cell: (r: DocRow) => { const b = bookingStatus(r, booked); return b ? <StatusPill {...b} /> : <span className="dt-muted">—</span>; },
+    }] : []),
   ];
 
   const rowActions = (r: DocRow): RowAction<DocRow>[] => r.kind === 'credit' ? [
-    r.creditNote.status === 'draft' && writable
+    r.creditNote.status === 'draft' && credits
       ? { label: 'Reprendre', icon: 'edit', onSelect: () => openRow(r) }
       : { label: 'Ouvrir la facture', icon: 'eye', onSelect: () => openRow(r) },
   ] : [
@@ -156,7 +177,7 @@ export default function InvoiceList({ writable, onOpen, onSend, onDownload, down
           : r.status === 'draft' ? `le brouillon ${r.subject}` : `la facture ${invoiceRef(r)}`}
         noun={typeFilter === 'credit' ? { one: 'avoir', many: 'avoirs' } : typeFilter === 'invoice' ? { one: 'facture', many: 'factures' } : { one: 'document', many: 'documents' }}
         columns={columns}
-        filters={FILTERS}
+        filters={filters}
         search={search}
         onRowClick={openRow}
         rowActions={rowActions}

@@ -223,3 +223,12 @@ export function paymentAuthorOptions(payments: Pick<Payment, 'source' | 'created
   const rank = (n: string) => (n === 'En ligne' ? 1 : n === 'Inconnu' ? 2 : 0);
   return names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'fr')).map(n => ({ key: n, label: n }));
 }
+
+/**
+ * Whether an issued invoice is booked (PRO-174): its sales entry is posted. Null for a draft or a
+ * credit note (nothing of its own to show), and while the entries are not read yet.
+ */
+export function bookingStatus(r: DocRow, booked: Set<string> | null): RowStatus | null {
+  if (!booked || r.kind !== 'invoice' || r.status === 'draft') return null;
+  return booked.has(r.id) ? { label: 'Comptabilisée', tone: 'paid' } : { label: 'À comptabiliser', tone: 'wait' };
+}
