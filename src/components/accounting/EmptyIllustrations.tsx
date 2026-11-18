@@ -61,32 +61,6 @@ export function ChartOfAccountsEmptyIllustration({ size = 96 }: { size?: number 
   );
 }
 
-/** Invoice document with a small truck — Suppliers table */
-export function SuppliersEmptyIllustration({ size = 96 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 96 96" fill="none" aria-hidden="true">
-      {/* invoice paper */}
-      <path d="M14 10 L62 10 L72 20 L72 86 L14 86 Z" fill="#FFF7ED" stroke="#FB923C" strokeWidth="1.5"/>
-      {/* folded corner */}
-      <path d="M62 10 L62 20 L72 20" fill="#FED7AA" stroke="#FB923C" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* header bar */}
-      <rect x="14" y="10" width="48" height="12" rx="0" fill="#FFEDD5" stroke="none"/>
-      {/* line items — dashed empty */}
-      <line x1="22" y1="34" x2="64" y2="34" stroke="#FED7AA" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round"/>
-      <line x1="22" y1="42" x2="64" y2="42" stroke="#FED7AA" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round"/>
-      <line x1="22" y1="50" x2="64" y2="50" stroke="#FED7AA" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round"/>
-      <line x1="22" y1="58" x2="52" y2="58" stroke="#FED7AA" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round"/>
-      {/* total line */}
-      <rect x="22" y="66" width="42" height="10" rx="2" fill="#FFEDD5" stroke="#FB923C" strokeWidth="1" strokeDasharray="3 2"/>
-      {/* truck silhouette at bottom right */}
-      <rect x="54" y="72" width="24" height="14" rx="2" fill="#FB923C" opacity="0.15" stroke="#FB923C" strokeWidth="1.5"/>
-      <rect x="64" y="68" width="14" height="8" rx="2" fill="#FB923C" opacity="0.2" stroke="#FB923C" strokeWidth="1.5"/>
-      <circle cx="58" cy="86" r="3" fill="white" stroke="#FB923C" strokeWidth="1.5"/>
-      <circle cx="72" cy="86" r="3" fill="white" stroke="#FB923C" strokeWidth="1.5"/>
-    </svg>
-  );
-}
-
 /** Building facade with empty shelves — Fixed assets table */
 export function FixedAssetsEmptyIllustration({ size = 96 }: { size?: number }) {
   return (

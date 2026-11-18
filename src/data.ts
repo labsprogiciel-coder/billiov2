@@ -14,7 +14,6 @@ import type {
 
 export type { InvoiceStatus as Status, Client, Invoice, ActivityKind, ActivityPart, Activity, LineItem } from '@/lib/schemas';
 
-export type FilterKey = 'all' | InvoiceStatus;
 
 // ---------------------------------------------------------------------------
 // Mock clients — source of truth for MOCK mode; also used to seed CLIENTS lookup
@@ -147,11 +146,6 @@ export function fmtDateLong(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-/** Format an ISO date string as "Éch. 15 juin". */
-export function fmtDue(iso: string): string {
-  return `Éch. ${fmtDate(iso)}`;
 }
 
 // ---------------------------------------------------------------------------

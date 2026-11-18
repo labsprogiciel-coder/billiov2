@@ -1,7 +1,6 @@
 import { cadastralRequired, formatCadastralRef, parseCadastralRef } from '@/lib/cadastral';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Navigate, useBlocker, useSearchParams } from 'react-router-dom';
-import { UI_V2 } from '@/lib/features';
 import { SaveBarContext, useSaveBar, type SaveBarActions, type SaveBarApi, type SaveBarState } from '@/lib/use-save-bar';
 import { FIELD_IDS, cadastralProblem, checklistMissing, complianceChecklist, ifuProblem, type ChecklistFix, type ChecklistRow } from '@/lib/settings-checks';
 import { canManageOrg } from '@/lib/permissions';
@@ -26,18 +25,6 @@ import { issuedThisMonth } from '@/lib/invoice-limit';
 import BillingPeriodSwitch from '@/components/BillingPeriodSwitch';
 import Page from '@/components/Page';
 
-type SettingsTab = 'profile' | 'business' | 'invoicing' | 'reminders' | 'payments' | 'notifications' | 'team' | 'plan';
-
-const TABS: { key: SettingsTab; icon: string; label: string }[] = [
-  { key: 'profile',       icon: 'user',           label: 'Profil'               },
-  { key: 'business',      icon: 'building',        label: 'Entreprise'           },
-  { key: 'invoicing',     icon: 'file-invoice',    label: 'Préférences facture'  },
-  { key: 'reminders',     icon: 'bell',            label: 'Relances'             },
-  { key: 'payments',      icon: 'credit-card',     label: 'Paiements'            },
-  { key: 'notifications', icon: 'bell',            label: 'Notifications'        },
-  { key: 'team',          icon: 'users',           label: 'Équipe'               },
-  { key: 'plan',          icon: 'sparkles',        label: 'Plan & facturation'   },
-];
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -1388,83 +1375,6 @@ function PlanSection() {
   );
 }
 
-/* ─── Main component ────────────────────────────────────────────── */
-const ORG_TABS: SettingsTab[] = ['business', 'invoicing', 'payments'];
-
-function LegacySettingsPage() {
-  const { showToast } = useApp();
-  const { managesOrg } = usePermissions();
-  // ?tab= opens a section directly (e.g. links from the invoice compliance warning)
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<SettingsTab>(() => {
-    const t = searchParams.get('tab');
-    if (t === 'providers') return 'payments'; // « Paiements en ligne » is part of « Paiements » now
-    return TABS.some(x => x.key === t) ? (t as SettingsTab) : 'profile';
-  });
-  const onSave = () => showToast('Paramètres enregistrés');
-
-  return (
-    <Page
-      title="Paramètres"
-      subtitle="Gérez vos préférences de workspace et de facturation"
-      actions={<>
-        <button className="btn btn-primary" onClick={onSave} disabled={ORG_TABS.includes(tab) && !managesOrg}>
-          <Icon name="check" size={15} /> Enregistrer
-        </button>
-      </>}
-    >
-        <div className="s-grid">
-          {/* Sub-nav */}
-          <nav className="s-nav">
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                className={'s-nav-item' + (tab === t.key ? ' active' : '')}
-                onClick={() => setTab(t.key)}
-              >
-                <Icon name={t.icon} size={18} />
-                {t.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Content */}
-          <div className="s-col">
-            {tab === 'profile'       && <ProfileSection />}
-            {ORG_TABS.includes(tab) && !managesOrg && (
-              <div className="s-card">
-                <div className="s-card-body" style={{ color: 'var(--color-text-secondary)', display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <Icon name="lock" size={16} ariaHidden />
-                  Seuls les administrateurs peuvent modifier ces paramètres.
-                </div>
-              </div>
-            )}
-            {/* Read-only for non-admins: the database only lets owners and admins change the organisation */}
-            <fieldset disabled={!managesOrg} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: 'contents' }}>
-              {tab === 'business'      && <BusinessSection />}
-              {tab === 'invoicing'     && <InvoicingSection />}
-              {tab === 'payments'      && <PaymentMethodsSection onSave={onSave} />}
-            </fieldset>
-            {tab === 'team'          && <TeamSection />}
-            {tab === 'plan'          && <PlanSection />}
-            {(tab === 'reminders' || tab === 'notifications') && (
-              <div className="s-card">
-                <div className="s-card-body" style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: '48px 20px' }}>
-                  <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
-                  <div style={{ fontWeight: 600 }}>Bientôt disponible</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-    </Page>
-  );
-}
-
-export default function SettingsPage() {
-  return UI_V2 ? <SettingsPageV2 /> : <LegacySettingsPage />;
-}
-
 /* ─── New interface (PRO-171) ───────────────────────────────────── */
 type SectionV2 = 'business' | 'compliance' | 'invoicing' | 'payments' | 'team' | 'automation' | 'plan';
 
@@ -1531,7 +1441,7 @@ function DgiChecklist({ rows, onFix, large = false }: { rows: ChecklistRow[]; on
   );
 }
 
-function SettingsPageV2() {
+export default function SettingsPage() {
   const { orgId, orgSettings, showToast } = useApp();
   const { managesOrg } = usePermissions();
   const [searchParams] = useSearchParams();

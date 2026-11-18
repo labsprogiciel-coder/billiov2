@@ -1,5 +1,5 @@
 // Factures in the ERP look (PRO-165): summary strip and the shared dense table.
-// InvoicesPage renders this instead of its cards and list when VITE_UI_V2 is on;
+// InvoicesPage renders this;
 // the actions (open, send, remind, PDF) stay in the page. Credit notes are
 // listed with the invoices (PRO-168), each just above the invoice it credits.
 

@@ -1,5 +1,5 @@
-// The ERP top bar (PRO-161), shown instead of the side menu when VITE_UI_V2
-// is on. Areas across the top; Facturation and Comptabilité open a menu of
+// The ERP top bar (PRO-161), the app's navigation since the side menu went (PRO-179).
+// Areas across the top; Facturation and Comptabilité open a menu of
 // their pages on hover, on focus, or with the ▾ button (touch and keyboard).
 // Settings, templates and sign-out live in the account menu.
 

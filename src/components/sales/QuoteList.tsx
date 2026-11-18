@@ -1,5 +1,5 @@
 // Devis in the ERP look (PRO-165): summary strip and the shared dense table.
-// QuotesPage renders this instead of its cards and list when VITE_UI_V2 is on;
+// QuotesPage renders this;
 // converting, reminding, duplicating and deleting stay in the page.
 
 import { useMemo, useState } from 'react';

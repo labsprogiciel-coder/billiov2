@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
-import { EmptyState } from '@/components/EmptyState';
-import { TemplatesEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import InvoicePaper from '@/components/InvoicePaper';
-import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle, BizInfo } from '@/components/InvoicePaper';
+import type { PaperConfig, PaperLayout, PaperDensity, TableStyle, TotalStyle } from '@/components/InvoicePaper';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { usePermissions } from '@/lib/use-permissions';
 import { BAND_COLORS, BANDED_LAYOUTS, DEFAULT_CONFIG, FONT_FAMILIES, PRESETS, normalizeConfig } from '@/lib/invoice-template';
-import { UI_V2 } from '@/lib/features';
 import { useBlocker } from 'react-router-dom';
 import { createTemplate, fetchTemplates, setDefaultTemplate, updateTemplate, type SavedTemplate } from '@/lib/api/invoice-templates';
 import { fetchPaymentSettings } from '@/lib/api/payment-settings';
@@ -146,110 +143,6 @@ const LAYOUT_DIAGRAMS: Record<PaperLayout, React.ReactNode> = {
   ),
 };
 
-// ---------------------------------------------------------------------------
-// Thumbnail scale helper
-// ---------------------------------------------------------------------------
-function thumbScale(layout: PaperLayout) {
-  return layout === 'receipt' ? 0.57 : 0.37;
-}
-
-// ---------------------------------------------------------------------------
-// Template card
-// ---------------------------------------------------------------------------
-function TemplateCard({
-  tpl, biz, payLines, paymentTerms, canEdit, busy, onEdit, onUse, onToggleStar,
-}: {
-  tpl: Template;
-  biz: BizInfo;
-  payLines?: PaymentMethodLine[];
-  paymentTerms: string;
-  canEdit: boolean;
-  busy: boolean;
-  onEdit: () => void;
-  onUse: () => void;
-  onToggleStar: () => void;
-}) {
-  const scale = thumbScale(tpl.config.layout);
-  const paperWidth = tpl.config.layout === 'receipt' ? 462 : 720;
-  const scaledW = paperWidth * scale;
-  const offsetX = tpl.config.layout === 'receipt' ? Math.max(0, (264 - scaledW) / 2) : 0;
-
-  return (
-    <div className="tpl-card">
-      {/* Thumbnail */}
-      <div className="tpl-thumb" onClick={onEdit}>
-        <div
-          className="tp-paper-wrap"
-          style={{ transform: `scale(${scale})`, left: offsetX }}
-        >
-          <InvoicePaper config={tpl.config} biz={biz} paymentMethods={payLines} paymentTerms={paymentTerms} />
-        </div>
-
-        {tpl.isDefault && <div className="tpl-badge default-badge">Défaut</div>}
-        {!tpl.isDefault && (
-          <div className="tpl-badge">
-            <Icon name="layout-grid" size={13} ariaHidden />
-            {LAYOUTS.find(l => l.key === tpl.config.layout)?.label}
-          </div>
-        )}
-
-        <div className="tpl-hoverbtn">
-          <button className="btn" onClick={e => { e.stopPropagation(); onEdit(); }}>
-            <Icon name={canEdit ? 'edit' : 'eye'} size={14} ariaHidden />
-            {canEdit ? 'Personnaliser' : 'Aperçu'}
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="tpl-body">
-        <div className="tpl-name-row">
-          <div
-            className="tpl-pic"
-            style={{ background: tpl.config.color }}
-          >
-            <Icon name="file-invoice" size={16} ariaHidden />
-          </div>
-          <div>
-            <div className="tpl-name">{tpl.name}</div>
-            <div className="tpl-purpose">{tpl.purpose}</div>
-          </div>
-        </div>
-        <div className="tpl-meta">
-          {tpl.chips.map(c => <span key={c} className="tpl-chip">{c}</span>)}
-        </div>
-        <div className="tpl-foot">
-          {canEdit && (
-            <button className="btn btn-sm tpl-star" onClick={onToggleStar} disabled={busy}
-              aria-label={tpl.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'} title={tpl.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
-              <Icon name={tpl.starred ? 'star-filled' : 'star'} size={15} ariaHidden />
-            </button>
-          )}
-          <button className="btn btn-sm" onClick={onEdit}>
-            <Icon name={canEdit ? 'edit' : 'eye'} size={14} ariaHidden />
-            {canEdit ? 'Modifier' : 'Aperçu'}
-          </button>
-          {canEdit && !tpl.isDefault && (
-            <button className="btn btn-sm btn-primary" onClick={onUse} disabled={busy}>
-              <Icon name="check" size={14} ariaHidden />
-              Utiliser
-            </button>
-          )}
-          {tpl.isDefault && <span className="tpl-chip">Utilisé pour vos factures</span>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Editor controls panel
-// ---------------------------------------------------------------------------
-/**
- * Sections every invoice prints, whatever the template (CGI art. 562): shown
- * locked so it is clear they can't be hidden. The SECeF block only once the
- * organisation's invoices are certified.
- */
 const LOCKED_SECTIONS: { label: string; badge: 'Obligatoire' | 'Si certifiée'; from: string }[] = [
   { label: 'Total en lettres',              badge: 'Obligatoire',  from: 'Calculé à partir du total' },
   { label: 'Date, heure et opérateur',      badge: 'Obligatoire',  from: 'Ajoutés à l’émission de la facture' },
@@ -522,12 +415,12 @@ export default function TemplatesPage() {
   const editingId = view === 'gallery' ? null : view.id;
   const defaultId = templates.find(t => t.isDefault)?.id ?? templates[0]?.id;
   useEffect(() => {
-    if (UI_V2 && saved !== null && view === 'gallery' && defaultId) openEditor(defaultId);
+    if (saved !== null && view === 'gallery' && defaultId) openEditor(defaultId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open once the list is there
   }, [saved, defaultId, view]);
 
   const editedTpl = editingId && editingId !== 'new' ? templates.find(t => t.id === editingId) : null;
-  const dirty = UI_V2 && editingId !== null && (
+  const dirty = editingId !== null && (
     editingId === 'new' || !editedTpl
       ? true
       : savedName(edName) !== editedTpl.name || JSON.stringify(normalizeConfig(edConfig)) !== JSON.stringify(normalizeConfig(editedTpl.config))
@@ -550,10 +443,6 @@ export default function TemplatesPage() {
     setEdName(tpl.name);
     setView({ kind: 'editor', id });
     setZoom(100);
-  }
-
-  function closeEditor() {
-    setView('gallery');
   }
 
   function resetEditor() {
@@ -601,11 +490,11 @@ export default function TemplatesPage() {
     void run(async () => {
       if (id === 'new') {
         const row = await createTemplate(orgId, { name, config });
-        if (UI_V2) setView({ kind: 'editor', id: row.id });
+        setView({ kind: 'editor', id: row.id });
       } else {
         const tpl = templates.find(t => t.id === id)!;
         const row = await ensureSaved(tpl, { name, config });
-        if (UI_V2) setView({ kind: 'editor', id: row.id });
+        setView({ kind: 'editor', id: row.id });
         // Editing the template in use changes the next PDFs straight away.
         // The standard template is only implicitly in use: save it as the
         // default, or PDFs would fall back to the unedited one after a reload.
@@ -615,14 +504,7 @@ export default function TemplatesPage() {
         }
       }
       showToast('Modèle enregistré');
-      if (!UI_V2) setView('gallery');
     }, "Le modèle n'a pas pu être enregistré. Réessayez.");
-  }
-
-  function toggleStar(id: string) {
-    const tpl = templates.find(t => t.id === id);
-    if (!tpl) return;
-    void run(async () => { await ensureSaved(tpl, { starred: !tpl.starred }); }, "Le favori n'a pas pu être enregistré.");
   }
 
   function applyTemplate(id: string) {
@@ -631,7 +513,7 @@ export default function TemplatesPage() {
     void run(async () => {
       const row = await ensureSaved(tpl);
       // A preset saved here gets a row of its own: the editor follows it
-      if (UI_V2 && editorId === tpl.id && row.id !== tpl.id) setView({ kind: 'editor', id: row.id });
+      if (editorId === tpl.id && row.id !== tpl.id) setView({ kind: 'editor', id: row.id });
       await setDefaultTemplate(orgId, row.id);
       setInvoiceTemplate(row.config);
       posthog.capture('template_changed', { template_name: row.name, layout: row.config.layout });
@@ -654,7 +536,7 @@ export default function TemplatesPage() {
     openEditor(id);
   }
 
-  if (UI_V2) return (
+  return (
     <Page
       title="Modèles de facture"
       subtitle="Le modèle par défaut s’applique aux PDF de vos factures, avoirs et devis."
@@ -718,153 +600,6 @@ export default function TemplatesPage() {
           </aside>
         )}
       </div>
-    </Page>
-  );
-
-  if (view !== 'gallery') return (
-    <div className="main" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-      {/* ===== EDITOR VIEW ===== */}
-      {(
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          {/* Editor topbar */}
-          <div className="topbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-              <button className="crumb-back" onClick={closeEditor} aria-label="Retour aux modèles">
-                <Icon name="arrow-left" ariaHidden />
-              </button>
-              <div>
-                <input
-                  className="ed-name-input"
-                  value={edName}
-                  onChange={e => setEdName(e.target.value)}
-                  maxLength={NAME_MAX}
-                  aria-label="Nom du modèle"
-                  spellCheck={false}
-                />
-                <div className="ed-sub">
-                  {editorTpl ? `Modification de "${editorTpl.name}"` : 'Nouveau modèle'}
-                </div>
-              </div>
-            </div>
-            <div className="topbar-actions">
-              {managesOrg && (
-                <>
-                  <button className="btn" onClick={resetEditor} disabled={busy}>
-                    <Icon name="arrow-down-left" size={15} ariaHidden />
-                    Réinitialiser
-                  </button>
-                  <button className="btn btn-primary" onClick={saveTemplate} disabled={busy}>
-                    <Icon name="check" size={15} ariaHidden />
-                    {busy ? 'Enregistrement…' : 'Enregistrer'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Editor body */}
-          <div className="ed-body">
-            {managesOrg && <EditorControls cfg={edConfig} onChange={setEdConfig} />}
-
-            {/* Preview */}
-            <div className="ed-preview">
-              <div className="ed-preview-bar">
-                <span style={{ flex: 1, textAlign: 'left' }}>
-                  {LAYOUTS.find(l => l.key === edConfig.layout)?.label} · {edConfig.density}
-                </span>
-                <button className="zoom-btn" onClick={() => zoomStep(-1)} aria-label="Zoom arrière">−</button>
-                <span className="zoom-val">{zoom}%</span>
-                <button className="zoom-btn" onClick={() => zoomStep(1)} aria-label="Zoom avant">+</button>
-              </div>
-              <div className="ed-stage">
-                <div
-                  className="ed-paper-shadow"
-                  style={{
-                    transformOrigin: 'top center',
-                    transform: `scale(${zoom / 100})`,
-                    transition: 'transform .15s',
-                    display: 'inline-block',
-                  }}
-                >
-                  <InvoicePaper config={edConfig} biz={orgSettings} paymentMethods={payLines} paymentTerms={orgSettings.paymentTerms} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <Page
-      title="Modèles de facture"
-      subtitle="Choisissez un design prêt à l'emploi ou créez le vôtre"
-      actions={managesOrg && (
-        <button className="btn btn-primary" onClick={() => openEditor('new')}>
-          <Icon name="plus" size={16} ariaHidden />
-          Créer un modèle
-        </button>
-      )}
-      mainStyle={{ display: 'flex', flexDirection: 'column', height: '100%' }}
-    >
-            <div className="gallery-wrap">
-              {/* Intro banner */}
-              <div className="gallery-intro">
-                <div className="gi-ico"><Icon name="sparkles" size={19} ariaHidden /></div>
-                <div>
-                  <div className="gi-title">Vos factures, à votre image</div>
-                  <div className="gi-sub">
-                    Le modèle utilisé s'applique à toutes vos factures et devis en PDF. Personnalisez la mise en page, les couleurs et la police : les mentions obligatoires (identifiants fiscaux, quantités, TVA, modes de paiement) restent toujours affichées.
-                  </div>
-                  {!managesOrg && <div className="gi-sub" style={{ marginTop: 6 }}>Seuls les administrateurs peuvent changer de modèle.</div>}
-                  {loadError && <div className="gi-sub" role="alert" style={{ marginTop: 6, color: 'var(--color-danger, #B42318)' }}>Vos modèles enregistrés n'ont pas pu être chargés. <button className="btn btn-sm" onClick={() => void load()}>Réessayer</button></div>}
-                </div>
-              </div>
-
-              {/* Grid */}
-              <div className="gallery-head">
-                <div className="gallery-title">
-                  Tous les modèles <span className="cnt">{templates.length}</span>
-                </div>
-              </div>
-
-              <div className="tpl-grid">
-                {templates.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <EmptyState
-                      illustration={<TemplatesEmptyIllustration />}
-                      title="Aucun modèle"
-                      description="Vous n'avez pas encore de modèles. Créez-en un pour gagner du temps."
-                    />
-                  </div>
-                )}
-                {templates.map(tpl => (
-                  <TemplateCard
-                    key={tpl.id}
-                    tpl={tpl}
-                    biz={orgSettings}
-                    payLines={payLines}
-                    paymentTerms={orgSettings.paymentTerms}
-                    canEdit={managesOrg}
-                    busy={busy}
-                    onEdit={() => openEditor(tpl.id)}
-                    onUse={() => applyTemplate(tpl.id)}
-                    onToggleStar={() => toggleStar(tpl.id)}
-                  />
-                ))}
-
-                {/* Create blank card */}
-                {managesOrg && <div className="tpl-card create" onClick={() => openEditor('new')}>
-                  <div className="create-inner">
-                    <div className="create-ico"><Icon name="plus" size={26} ariaHidden /></div>
-                    <div className="create-title">Modèle vierge</div>
-                    <div className="create-sub">Partez de zéro et configurez chaque détail</div>
-                  </div>
-                </div>}
-              </div>
-            </div>
     </Page>
   );
 }

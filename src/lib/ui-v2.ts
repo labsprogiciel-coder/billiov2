@@ -1,6 +1,6 @@
 // Switches the page to the ERP look (PRO-160): sets html[data-ui="v2"], which
 // the token overrides in src/index.css key on, and loads its font. Called once
-// at startup when UI_V2 is on. The invoice PDF and the template previews keep
+// at startup. The invoice PDF and the template previews keep
 // their own fonts and styles.
 
 export const UI_V2_FONT_URL =

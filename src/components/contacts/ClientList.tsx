@@ -1,6 +1,5 @@
 // The client list of the ERP look (PRO-169): the shared dense table, next to
-// the selected client's record (ClientRecordPanel). ContactsPage renders it
-// instead of its cards and list when VITE_UI_V2 is on.
+// the selected client's record (ClientRecordPanel), on ContactsPage.
 
 import { useMemo, useState } from 'react';
 import DataTable, { type Column, type StatusFilter } from '@/components/DataTable';

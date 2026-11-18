@@ -1,46 +1,29 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
-import { EmptyState } from '@/components/EmptyState';
-import { ProductsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { createProduct, updateProduct, removeProduct } from '@/lib/api/products';
-import { lastChangeLabel } from '@/lib/change-label';
-import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { ProductType, Product } from '@/lib/schemas';
 import Page from '@/components/Page';
 import ProductTable from '@/components/products/ProductTable';
-import { UI_V2 } from '@/lib/features';
 import { CATALOGUE_CSV_HEADER, catalogueCsvRows } from '@/lib/catalogue';
 import { csvBlob } from '@/lib/csv';
 import { downloadBlob } from '@/lib/download';
 import { todayISO } from '@/lib/invoice-status';
 
-type FilterKey = 'all' | ProductType;
-type ViewMode  = 'list' | 'grid';
 
 
 const UNITS = ['heure', 'jour', 'projet', 'mois', 'an', 'article', 'licence'];
-
-function TypePill({ type }: { type: ProductType }) {
-  return type === 'service'
-    ? <span className="type-pill t-service"><Icon name="briefcase" size="1em" ariaHidden /> Service</span>
-    : <span className="type-pill t-product"><Icon name="tag" size="1em" ariaHidden /> Produit</span>;
-}
 
 export default function ProductsPage() {
   const { writable, deletable } = usePermissions();
   const { showToast, products, setProducts, orgId, loading } = useApp();
 
-  const [filter, setFilter]         = useState<FilterKey>('all');
-  const [view, setView]             = useState<ViewMode>('list');
-  const [search, setSearch]         = useState('');
   const [panelOpen, setPanelOpen]   = useState(false);
   const [editId,    setEditId]      = useState<string | null>(null);
-  const [dotsOpen,  setDotsOpen]    = useState<string | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
 
   // New item form state
@@ -51,30 +34,6 @@ export default function ProductsPage() {
   const [fPrice, setFPrice] = useState(50_000);
   const [fUnit,  setFUnit]  = useState('heure');
   const [fTax,   setFTax]   = useState(18);
-
-  const metrics = useMemo(() => {
-    const services = products.filter(p => p.type === 'service').length;
-    const goods    = products.filter(p => p.type === 'product').length;
-    const revenue  = products.reduce((s, p) => s + p.price * p.used, 0);
-    return { total: products.length, services, goods, revenue };
-  }, [products]);
-
-  const filterCounts = useMemo(() => ({
-    all: products.length,
-    service: products.filter(p => p.type === 'service').length,
-    product: products.filter(p => p.type === 'product').length,
-  }), [products]);
-
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return products.filter(p => {
-      if (filter !== 'all' && p.type !== filter) return false;
-      if (q && !(p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q))) return false;
-      return true;
-    });
-  }, [products, filter, search]);
-
-  const maxUsed = useMemo(() => Math.max(...products.map(p => p.used), 1), [products]);
 
   const openPanel = () => {
     setEditId(null);
@@ -91,7 +50,6 @@ export default function ProductsPage() {
   };
 
   const handleDelete = (p: Product) => {
-    setDotsOpen(null);
     setDeleteProduct(p);
   };
 
@@ -181,192 +139,7 @@ export default function ProductsPage() {
           )}
         </>}
       >
-          {UI_V2 ? (
             <ProductTable writable={writable} deletable={deletable} onEdit={openEdit} onDelete={handleDelete} />
-          ) : <>
-          {/* Metrics */}
-          <div className="metrics">
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico blue"><Icon name="package" size={15} ariaHidden /></div>
-                <div className="metric-label">Articles au catalogue</div>
-              </div>
-              <div className="metric-value tnum">{metrics.total}<span className="metric-unit" /></div>
-              <div className="metric-change"><span className="up"><Icon name="trending-up" size={14} ariaHidden />+2 ce mois</span></div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico violet"><Icon name="briefcase" size={15} ariaHidden /></div>
-                <div className="metric-label">Services</div>
-              </div>
-              <div className="metric-value tnum">{metrics.services}<span className="metric-unit" /></div>
-              <div className="metric-change" style={{ color: 'var(--color-text-secondary)' }}>facturés au temps ou au projet</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico green"><Icon name="tag" size={15} ariaHidden /></div>
-                <div className="metric-label">Produits</div>
-              </div>
-              <div className="metric-value tnum">{metrics.goods}<span className="metric-unit" /></div>
-              <div className="metric-change" style={{ color: 'var(--color-text-secondary)' }}>articles à prix fixe</div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico amber"><Icon name="cash" size={15} ariaHidden /></div>
-                <div className="metric-label">Revenu catalogue</div>
-              </div>
-              <div className="metric-value tnum">{fmtCompact(metrics.revenue)}<span className="metric-unit">F CFA</span></div>
-              <div className="metric-change" style={{ color: 'var(--color-text-secondary)' }}>cumulé, toutes factures</div>
-            </div>
-          </div>
-
-          {/* Toolbar */}
-          <div className="section-header">
-            <div className="section-title">Catalogue</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="search-box">
-                <Icon name="search" ariaHidden />
-                <input
-                  type="text"
-                  placeholder="Rechercher…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
-              </div>
-              <div className="filters">
-                {([['all', 'Tous'], ['service', 'Services'], ['product', 'Produits']] as [FilterKey, string][]).map(([key, label]) => (
-                  <button
-                    key={key}
-                    className={`filter-chip${filter === key ? ' active' : ''}`}
-                    onClick={() => setFilter(key)}
-                  >
-                    {label}<span className="cnt">{filterCounts[key] ?? 0}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="view-toggle">
-                <button
-                  className={view === 'list' ? 'active' : ''}
-                  aria-label="Vue liste"
-                  onClick={() => setView('list')}
-                >
-                  <Icon name="list" ariaHidden />
-                </button>
-                <button
-                  className={view === 'grid' ? 'active' : ''}
-                  aria-label="Vue grille"
-                  onClick={() => setView('grid')}
-                >
-                  <Icon name="layout-grid" ariaHidden />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* List view */}
-          {view === 'list' && (
-            <div className="prod-table">
-              <div className="table-head prod-grid-cols">
-                <div className="th">Article</div>
-                <div className="th">Type</div>
-                <div className="th">Unité</div>
-                <div className="th right">Prix unitaire</div>
-                <div className="th">Utilisé</div>
-                <div className="th" />
-              </div>
-              {visible.length === 0 ? (
-                <EmptyState
-                  illustration={<ProductsEmptyIllustration />}
-                  title="Aucun article trouvé"
-                  description="Aucun article ne correspond à la recherche. Modifiez vos filtres."
-                />
-              ) : visible.map(p => (
-                <div key={p.id} className="prod-row prod-grid-cols">
-                  <div className="prod-name-cell">
-                    <div className={`prod-ico ${p.color}`}>
-                      <Icon name={p.ico} ariaHidden />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="prod-name">{p.name}</div>
-                      <div className="prod-sku">{p.sku}</div>
-                      {lastChangeLabel(p, fmtDate) && <div className="prod-changed">{lastChangeLabel(p, fmtDate)}</div>}
-                    </div>
-                  </div>
-                  <div><TypePill type={p.type} /></div>
-                  <div className="cell-unit">par {p.unit}</div>
-                  <div className="price tnum" style={{ textAlign: 'right' }}>
-                    {fmt(p.price)}<span className="cur">F CFA</span>
-                  </div>
-                  <div className="used-cell">
-                    <div className="used-top tnum">{p.used}× <span>utilisé</span></div>
-                    <div className="bar-track">
-                      <div className="bar-fill" style={{ width: `${Math.round((p.used / maxUsed) * 100)}%` }} />
-                    </div>
-                  </div>
-                  <div className="row-actions" style={{ position: 'relative' }}>
-                    {writable && (
-                      <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
-                        <Icon name="edit" size={15} ariaHidden />
-                      </button>
-                    )}
-                    {deletable && (
-                      <button className="icon-btn" aria-label="Plus" onClick={e => { e.stopPropagation(); setDotsOpen(dotsOpen === p.id ? null : p.id); }}>
-                        <Icon name="dots" size={15} ariaHidden />
-                      </button>
-                    )}
-                    {deletable && dotsOpen === p.id && (
-                      <div className="dropdown-menu" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 10 }}>
-                        <button className="dropdown-item danger" onClick={() => handleDelete(p)}>
-                          <Icon name="trash" size={14} ariaHidden /> Supprimer
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Grid view */}
-          {view === 'grid' && (
-            <div className="prod-grid">
-              {visible.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <EmptyState
-                    illustration={<ProductsEmptyIllustration />}
-                    title="Aucun article trouvé"
-                    description="Aucun article ne correspond à la recherche. Modifiez vos filtres."
-                  />
-                </div>
-              ) : visible.map(p => (
-                <div key={p.id} className="prod-card">
-                  <div className="pc-top">
-                    <div className={`prod-ico ${p.color}`}><Icon name={p.ico} ariaHidden /></div>
-                    <TypePill type={p.type} />
-                  </div>
-                  <div className="pc-name">{p.name}</div>
-                  <div className="pc-sku">{p.sku}</div>
-                  {lastChangeLabel(p, fmtDate) && <div className="prod-changed">{lastChangeLabel(p, fmtDate)}</div>}
-                  <div className="pc-price tnum">
-                    {fmt(p.price)}<span className="cur">F CFA</span>
-                    <span className="per"> / {p.unit}</span>
-                  </div>
-                  <div className="pc-foot">
-                    <div className="pc-used"><b className="tnum">{p.used}×</b> sur factures</div>
-                    {writable && (
-                      <button className="icon-btn" aria-label="Modifier" onClick={e => { e.stopPropagation(); openEdit(p); }}>
-                        <Icon name="edit" size={15} ariaHidden />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          </>}
       </Page>
 
       {/* Slide-over: New item */}

@@ -96,9 +96,6 @@ export function taxSummary(lines: Pick<LineItem, 'qty' | 'price' | 'taxGroup'>[]
   return { subtotal, discount, net, tax, total: net + tax, groups };
 }
 
-/** Whether a document mixes VAT rates (then a summary per group is printed). */
-export const mixedRates = (s: TaxSummary): boolean => s.groups.length > 1;
-
 /**
  * Splits a VAT-inclusive amount (a credit note, a quote's total) into pre-tax and VAT parts, in the
  * document's own proportions. With one group this is the usual split at that group's rate.

@@ -4,8 +4,7 @@ import { usePermissions } from '@/lib/use-permissions';
 import { useSearchParams } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
-import { EmptyState, EmptyInline } from '@/components/EmptyState';
-import { ClientsEmptyIllustration } from '@/components/PageEmptyIllustrations';
+import { EmptyInline } from '@/components/EmptyState';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import FiscalDivisionSelect, { fiscalDivisionLabel } from '@/components/FiscalDivisionSelect';
@@ -25,11 +24,9 @@ import { kybItems, kybSummary } from '@/lib/kyb';
 import { todayISO } from '@/lib/invoice-status';
 import { invoiceRows } from '@/lib/sales-tables';
 import { clientDocuments, clientRows } from '@/lib/client-table';
-import { UI_V2 } from '@/lib/features';
 
 // ─── Clients sub-components ───────────────────────────────────────────────────
 
-type ClientFilterKey = 'all' | 'active' | 'lead' | 'balance';
 type MiniInv = { id: string; ref: string; sub: string; amt: number; status: InvoiceStatus };
 
 const CLIENT_STATUS_LABEL: Record<ClientStatus, string> = { active: 'Actif', lead: 'Prospect', inactive: 'Inactif' };
@@ -46,10 +43,6 @@ function ClientTypeSelect({ value, onChange }: { value: ClientType; onChange: (t
 }
 const ifuHint = (t: ClientType | undefined) => clientTypeDef(t ?? 'PP').ifuRequired ? '— requis' : '— optionnel';
 
-const CLIENT_FILTERS: { key: ClientFilterKey; label: string }[] = [
-  { key: 'all', label: 'Tous' }, { key: 'active', label: 'Actifs' }, { key: 'lead', label: 'Prospects' }, { key: 'balance', label: 'Avec solde' },
-];
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
@@ -57,8 +50,6 @@ export default function ContactsPage() {
   const [searchParams] = useSearchParams();
   // Clients data
   const { clients, setClients, invoices, quotes, payments, orgId, showToast, loading: clientsLoading } = useApp();
-  const [clientFilter, setClientFilter] = useState<ClientFilterKey>('all');
-  const [clientSearch, setClientSearch] = useState('');
   // ?client=CODE opens that client's form (link from the invoice compliance warning)
   const [linkedClient] = useState(() => searchParams.get('client'));
   const [clientPanel, setClientPanel] = useState<null | { kind: 'detail'; code: string } | { kind: 'new' }>(
@@ -69,7 +60,7 @@ export default function ContactsPage() {
   useCommandIntent(intent => {
     if (intent.command === 'open-client') {
       // ERP look: the record opens beside the list (PRO-169)
-      if (UI_V2) setSelectedCode(intent.client); else setClientPanel({ kind: 'detail', code: intent.client });
+      setSelectedCode(intent.client);
       return;
     }
     if (intent.command !== 'new-client' || !writable) return false;
@@ -98,18 +89,6 @@ export default function ContactsPage() {
     return map;
   }, [invoices]);
 
-  const filteredClients = useMemo(() => {
-    let list = clients;
-    if (clientFilter === 'active')  list = list.filter(c => c.status === 'active');
-    if (clientFilter === 'lead')    list = list.filter(c => c.status === 'lead');
-    if (clientFilter === 'balance') list = list.filter(c => (clientStatsMap.get(c.code)?.balance ?? 0) > 0);
-    if (clientSearch.trim()) {
-      const q = clientSearch.toLowerCase();
-      list = list.filter(c => c.name.toLowerCase().includes(q) || c.contact.toLowerCase().includes(q) || c.city.toLowerCase().includes(q));
-    }
-    return list;
-  }, [clients, clientFilter, clientSearch, clientStatsMap]);
-
   // ERP look: each client's figures from the invoices' real balances
   const creditNotes = useCreditNotes();
   const year = new Date().getFullYear();
@@ -126,7 +105,7 @@ export default function ContactsPage() {
   // In the ERP look the side panel is only the edit form: when editing ends,
   // close it and show that client's record beside the list
   useEffect(() => {
-    if (!UI_V2 || clientPanel?.kind !== 'detail' || editMode) return;
+    if (clientPanel?.kind !== 'detail' || editMode) return;
     setSelectedCode(clientPanel.code);
     setClientPanel(null);
   }, [clientPanel, editMode]);
@@ -143,14 +122,6 @@ export default function ContactsPage() {
   }, [linkedClient, clients, writable]);
 
   if (loading) return <PageSkeleton title="Contacts" subtitle="Vos clients" variant="accounting" rows={6} />;
-
-  // ── Clients computed ──────────────────────────────────────────────────────
-  const totalBilled  = Array.from(clientStatsMap.values()).reduce((s, v) => s + v.billed, 0);
-  const outstanding  = Array.from(clientStatsMap.values()).reduce((s, v) => s + v.balance, 0);
-  const activeCount  = clients.filter(c => c.status === 'active').length;
-  const withBalance  = clients.filter(c => (clientStatsMap.get(c.code)?.balance ?? 0) > 0).length;
-  const leadCount    = clients.filter(c => c.status === 'lead').length;
-  const clientCounts = { all: clients.length, active: activeCount, lead: leadCount, balance: withBalance };
 
   const detailClient = clientPanel?.kind === 'detail' ? clients.find(c => c.code === clientPanel.code) ?? null : null;
 
@@ -235,14 +206,6 @@ export default function ContactsPage() {
     }
   }
 
-  // ── Contextual KPIs ───────────────────────────────────────────────────────
-  const kpis = [
-    { icon: 'users',        iconBg: 'var(--brand-tint)', iconColor: 'var(--brand)',  label: 'Clients',          value: clients.length,         sub: `${activeCount} actifs · ${leadCount} prospect${leadCount !== 1 ? 's' : ''}` },
-    { icon: 'user-check',   iconBg: '#EAF3DE',           iconColor: '#3B6D11',       label: 'Actifs',           value: activeCount,             sub: 'relations de facturation' },
-    { icon: 'report-money', iconBg: '#ECE9FB',            iconColor: '#5B45C7',       label: 'Total facturé',    value: fmtCompact(totalBilled), unit: 'F CFA', sub: 'revenu cumulé' },
-    { icon: 'clock-pause',  iconBg: '#FAEEDA',            iconColor: '#8A5207',       label: 'Solde impayé (411)', value: fmtCompact(outstanding), unit: 'F CFA', sub: `${withBalance} client${withBalance !== 1 ? 's' : ''} avec solde` },
-  ];
-
   return (
     <>
       <Page
@@ -255,22 +218,8 @@ export default function ContactsPage() {
         mainStyle={{ position: 'relative' }}
       >
           {/* ── Contextual KPI strip ──────────────────────────────────────── */}
-          {!UI_V2 && <div className="metrics" style={{ marginBottom: 20 }}>
-            {kpis.map(k => (
-              <div key={k.label} className="metric-card">
-                <div className="metric-top">
-                  <div className="metric-ico" style={{ background: k.iconBg, color: k.iconColor }}><Icon name={k.icon} size={15} /></div>
-                  <div className="metric-label">{k.label}</div>
-                </div>
-                <div className="metric-value mono">{k.value}{k.unit ? <span className="metric-unit">{k.unit}</span> : null}</div>
-                <div className="metric-change neutral">{k.sub}</div>
-              </div>
-            ))}
-          </div>}
 
           {/* ── Clients tab, ERP look (PRO-169): list with the record beside it ── */}
-          {UI_V2 && (
-            <>
               <div className="cr-split">
                 <ClientList rows={cRows} year={year} selected={selectedCode} onSelect={setSelectedCode} kyb={kybByClient} />
                 <ClientRecordPanel
@@ -283,84 +232,8 @@ export default function ContactsPage() {
                   onDelete={code => handleDeleteClient(clients.find(c => c.code === code) ?? null)}
                 />
               </div>
-            </>
-          )}
 
           {/* ── Clients tab ──────────────────────────────────────────────── */}
-          {!UI_V2 && (
-            <>
-              <div className="section-header">
-                <div className="section-title">Clients</div>
-                <div className="list-controls">
-                  <div className="search-box">
-                    <Icon name="search" size={15} />
-                    <input type="text" placeholder="Rechercher un client…" value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
-                  </div>
-                  <div className="filters">
-                    {CLIENT_FILTERS.map(f => (
-                      <button key={f.key} className={'filter-chip' + (clientFilter === f.key ? ' active' : '')} onClick={() => setClientFilter(f.key)}>
-                        {f.label}<span className="cnt">{clientCounts[f.key]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="client-table">
-                <div className="table-head client-grid-cols">
-                  <div className="th">Client</div>
-                  <div className="th">Localisation</div>
-                  <div className="th">Factures</div>
-                  <div className="th right">Total facturé</div>
-                  <div className="th">Statut</div>
-                  <div className="th" />
-                </div>
-                {filteredClients.length === 0 ? (
-                  <EmptyState illustration={<ClientsEmptyIllustration />} title="Aucun client trouvé" description="Aucun client ne correspond à votre recherche. Essayez d'autres termes." />
-                ) : filteredClients.map(cl => {
-                    const stats = clientStatsMap.get(cl.code) ?? { count: 0, billed: 0, balance: 0 };
-                    return (
-                      <div key={cl.code} className="client-row client-grid-cols" onClick={() => setClientPanel({ kind: 'detail', code: cl.code })}>
-                        <div className="name-cell">
-                          <div className={`cl-av ${cl.av}`}>{clientInitials(cl.name)}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div className="cl-name">{cl.name}</div>
-                            <div className="cl-contact">{cl.contact}</div>
-                          </div>
-                        </div>
-                        <div className="loc-cell"><Icon name="map-pin" size={14} /><span>{cl.city}</span></div>
-                        <div className="inv-count tnum">{stats.count} <span>facture{stats.count !== 1 ? 's' : ''}</span></div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div className="billed tnum">{fmt(stats.billed)}<span className="cur">F CFA</span></div>
-                          {stats.balance > 0
-                            ? <div className="billed-sub bal">{fmt(stats.balance)} F CFA dû</div>
-                            : stats.billed > 0
-                              ? <div className="billed-sub clear">Tout réglé</div>
-                              : <div className="billed-sub" style={{ color: 'var(--color-text-tertiary)' }}>Aucune facture</div>
-                          }
-                        </div>
-                        <div><span className={`status-pill s-${cl.status}`}>{CLIENT_STATUS_LABEL[cl.status]}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', color: 'var(--color-text-tertiary)' }}>
-                          <Icon name="chevron-right" size={16} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                {/* Table footer */}
-                {filteredClients.length > 0 && (
-                  <div className="dir-foot">
-                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                      {filteredClients.length} sur {clients.length} client{clients.length !== 1 ? 's' : ''}
-                    </span>
-                    <div className="dir-foot-r">
-                      <span>Facturé<b>{fmt(filteredClients.reduce((a, c) => a + (clientStatsMap.get(c.code)?.billed ?? 0), 0))} F CFA</b></span>
-                      <span>Solde impayé<b className={filteredClients.reduce((a, c) => a + (clientStatsMap.get(c.code)?.balance ?? 0), 0) > 0 ? 'due' : ''}>{fmt(filteredClients.reduce((a, c) => a + (clientStatsMap.get(c.code)?.balance ?? 0), 0))} F CFA</b></span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
 
       </Page>
 

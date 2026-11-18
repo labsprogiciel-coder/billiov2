@@ -1,25 +1,19 @@
 import { invoiceRef } from '@/lib/invoice-number';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { canWrite } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate } from 'react-router-dom';
-import { UI_V2 } from '@/lib/features';
 import RichTextView from '@/components/RichTextView';
 import Icon from '@/components/Icon';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { updateQuote } from '@/lib/api/quotes';
-import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
-import { convertQuoteToInvoice, ConversionOutcomeUnknownError } from '@/lib/api/quote-conversion';
-import { useComplianceGuard } from '@/lib/use-compliance-guard';
-import { isInvoiceLimitError } from '@/lib/invoice-limit';
+import { fetchLineItems } from '@/lib/api/line-items';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { downloadBlob } from '@/lib/download';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
-import { fmt, fmtDateLong, newLineItem } from '@/data';
+import { fmt, fmtDateLong } from '@/data';
 import type { LineItem } from '@/lib/schemas';
-import TaxGroupSelect from '@/components/TaxGroupSelect';
-import { lineGroup, productTaxGroup, taxSummary, vatRows } from '@/lib/tax-groups';
+import { taxSummary, vatRows } from '@/lib/tax-groups';
 import { chargesVat } from '@/lib/vat';
 import Page from '@/components/Page';
 
@@ -42,34 +36,10 @@ const BillioLogoSvg = () => (
 export default function QuotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { quotes, invoices, setQuotes, setInvoices, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
-  const compliance = useComplianceGuard();
+  const { quotes, invoices, showToast, clientsMap, orgSettings, invoiceTemplate, orgId, loading, userRole } = useApp();
   const { lines: paymentMethods, status: paymentMethodsStatus } = usePaymentMethods();
   const paymentMethodsReady = paymentMethodsStatus === 'ready';
   const [lines, setLines] = useState<LineItem[]>([]);
-  const [converting, setConverting] = useState(false);
-  const convertingRef = useRef(false);
-
-  // Edit panel state
-  const [editOpen,    setEditOpen]    = useState(false);
-  const [eClient,     setEClient]     = useState('');
-  const [eSubject,    setESubject]    = useState('');
-  const [eDate,       setEDate]       = useState('');
-  const [eValid,      setEValid]      = useState('');
-  const [eLines,      setELines]      = useState<LineItem[]>([]);
-  const [saving,      setSaving]      = useState(false);
-  const [showPicker,  setShowPicker]  = useState(false);
-  const [pickerQuery, setPickerQuery] = useState('');
-  const pickerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showPicker) return;
-    function onClickOutside(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowPicker(false);
-    }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [showPicker]);
 
   useEffect(() => {
     if (id && orgId) fetchLineItems(orgId, { quoteId: id }).then(setLines).catch(err => { console.error('[QuotePage] fetchLineItems error:', err); setLines([]); });
@@ -81,7 +51,7 @@ export default function QuotePage() {
   if (!quote) {
     return (
       <Page
-        back={{ label: "Retour", onClick: () => navigate('/invoices?tab=quotes') }}
+        back={{ label: "Retour", onClick: () => navigate('/quotes') }}
         title="Devis introuvable"
         contentStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}
       >
@@ -103,62 +73,9 @@ export default function QuotePage() {
   const canConvert  = !isTerminal && canWrite(userRole);
   const canEdit     = !isTerminal && canWrite(userRole);
 
-  const eSums     = taxSummary(eLines, discountPct, canInvoiceTVA);
-  const { subtotal: eSubtotal, total: eTotal } = eSums;
+  // Quotes are edited in the invoice editor (PRO-185)
+  const openEdit = () => navigate(`/quotes/${quote.id}/edit`);
 
-  const filteredProducts = products.filter(p => !pickerQuery || p.name.toLowerCase().includes(pickerQuery.toLowerCase()));
-
-  const openEdit = () => {
-    // The ERP look edits quotes in the invoice editor (PRO-185)
-    if (UI_V2) { navigate(`/quotes/${quote.id}/edit`); return; }
-    setEClient(quote.client);
-    setESubject(quote.subject);
-    setEDate(quote.issued);
-    setEValid(quote.valid);
-    setELines(lines.length ? lines.map(l => ({ ...l })) : [newLineItem()]);
-    setEditOpen(true);
-  };
-
-  const updateELine = (lid: string, field: string, val: string) => {
-    const asNum = Number(val);
-    setELines(prev => prev.map(l => l.id === lid
-      ? { ...l, [field]: field === 'qty' || field === 'price' ? (isNaN(asNum) ? 0 : asNum) : val }
-      : l));
-  };
-
-  const handleSaveEdit = async () => {
-    if (!eClient) { showToast('Veuillez sélectionner un client.', true); return; }
-    if (!eDate)   { showToast('La date du devis est requise.', true); return; }
-    if (!eValid)  { showToast('La date de validité est requise.', true); return; }
-    if (eValid < eDate) { showToast('La date de validité doit être après la date du devis.', true); return; }
-    if (eSubtotal <= 0) { showToast('Ajoutez au moins une ligne.', true); return; }
-    setSaving(true);
-    const prevLines = lines;
-    try {
-      await updateQuote(orgId, quote.id, { subject: eSubject.trim() || 'Devis sans titre', client: eClient, issued: eDate, valid: eValid, amount: eTotal });
-      await deleteLineItems(orgId, { quoteId: quote.id });
-      try {
-        await saveLineItems(orgId, eLines, { quoteId: quote.id });
-      } catch (lineErr) {
-        // Restore original lines so the quote is not left empty in the DB
-        if (prevLines.length > 0) {
-          await saveLineItems(orgId, prevLines, { quoteId: quote.id }).catch(() => {});
-        }
-        throw lineErr;
-      }
-      setQuotes(prev => prev.map(q => q.id === quote.id
-        ? { ...q, subject: eSubject.trim() || 'Devis sans titre', client: eClient, issued: eDate, valid: eValid, amount: eTotal }
-        : q));
-      setLines(eLines);
-      setEditOpen(false);
-      showToast('Devis mis à jour');
-    } catch (err) {
-      console.error('Edit quote failed:', err);
-      showToast('Erreur lors de la mise à jour', true);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleCopyLink = () => {
     navigator.clipboard?.writeText(quoteUrl);
@@ -183,11 +100,11 @@ export default function QuotePage() {
 
   const handleDownloadPDF = async () => {
     if (!paymentMethodsReady) { showToast(paymentMethodsNotReadyMessage(paymentMethodsStatus), true); return; }
-    const pdfLines   = editOpen ? eLines : lines;
-    const pdfSubject = editOpen ? (eSubject.trim() || 'Devis sans titre') : quote.subject;
-    const pdfIssued  = editOpen ? eDate : quote.issued;
-    const pdfValid   = editOpen ? eValid : quote.valid;
-    const pdfAmount  = editOpen ? eTotal : total;
+    const pdfLines   = lines;
+    const pdfSubject = quote.subject;
+    const pdfIssued  = quote.issued;
+    const pdfValid   = quote.valid;
+    const pdfAmount  = total;
     try {
       const blob = await renderInvoicePdf({
         template: invoiceTemplate,
@@ -210,59 +127,28 @@ export default function QuotePage() {
     }
   };
 
-  // Converting issues an invoice: check the mandatory mentions first
-  const requestConvert = () => {
-    if (convertingRef.current) return;
-    // The ERP look opens the invoice editor with the quote's data (PRO-167)
-    if (UI_V2) { navigate(`/invoices/new?quote=${encodeURIComponent(quote.id)}`); return; }
-    void compliance.guard(quote.client, () => void handleConvertToInvoice(), { returnTo: `/quotes/${quote.id}` });
-  };
-
-  const handleConvertToInvoice = async () => {
-    if (convertingRef.current) return;
-    convertingRef.current = true;
-    setConverting(true);
-    try {
-      const { invoice, accountingOk } = await convertQuoteToInvoice(orgId, quote, { canInvoiceTVA, clientName: client.name });
-      setInvoices(prev => prev.some(i => i.id === invoice.id) ? prev : [invoice, ...prev]);
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, status: 'invoiced', invoiceId: invoice.id } : q));
-      posthog.capture('quote_converted_to_invoice', { quote_id: quote.id, invoice_id: invoice.id });
-      showToast(`Devis ${quote.id} → Facture #${invoiceRef(invoice)} créée`);
-      if (!accountingOk) showToast('Facture créée, mais l\'écriture comptable a échoué. Vérifiez la comptabilité.', true);
-      navigate(`/invoices/${invoice.id}`);
-    } catch (err) {
-      console.error('[convertToInvoice] failed:', err);
-      if (isInvoiceLimitError(err)) { compliance.showLimit(); return; }
-      if (err instanceof ConversionOutcomeUnknownError) {
-        showToast('La conversion n\'a pas pu être confirmée. Rechargez la page et vérifiez vos factures avant de réessayer.', true);
-        return;
-      }
-      showToast('Erreur lors de la conversion. Aucune facture n\'a été créée — veuillez réessayer.', true);
-    } finally {
-      convertingRef.current = false;
-      setConverting(false);
-    }
-  };
+  // The invoice editor opens with the quote's data (PRO-167); it checks the mandatory mentions at issue
+  const requestConvert = () => navigate(`/invoices/new?quote=${encodeURIComponent(quote.id)}`);
 
   return (
     <>
     <Page
-      back={{ label: "Retour aux devis", onClick: () => navigate('/invoices?tab=quotes') }}
-      title={<><button className="crumb-link" onClick={() => navigate('/invoices?tab=quotes')}>Devis</button>{' / '}<b>#{quote.id}</b></>}
+      back={{ label: "Retour aux devis", onClick: () => navigate('/quotes') }}
+      title={<><button className="crumb-link" onClick={() => navigate('/quotes')}>Devis</button>{' / '}<b>#{quote.id}</b></>}
       documentTitle={`Devis ${quote.id}`}
       actions={<>
         <button className="btn" onClick={handleDownloadPDF} disabled={!paymentMethodsReady}>
           <Icon name="printer" ariaHidden /> Télécharger PDF
         </button>
         {canEdit && (
-          <button className="btn" onClick={openEdit} disabled={converting}>
+          <button className="btn" onClick={openEdit}>
             <Icon name="edit" ariaHidden /> Modifier
           </button>
         )}
         {canConvert && (
-          <button className="btn btn-primary" onClick={requestConvert} disabled={converting || compliance.checking}>
+          <button className="btn btn-primary" onClick={requestConvert}>
             <Icon name="arrow-right" ariaHidden />
-            {converting ? 'Conversion…' : 'Créer une facture'}
+            Créer une facture
           </button>
         )}
       </>}
@@ -400,9 +286,9 @@ export default function QuotePage() {
 
               <div className="rail-actions">
                 {canConvert && (
-                  <button className="btn btn-primary btn-block" onClick={requestConvert} disabled={converting || compliance.checking}>
+                  <button className="btn btn-primary btn-block" onClick={requestConvert}>
                     <Icon name="arrow-right" ariaHidden />
-                    {converting ? 'Conversion…' : 'Créer une facture'}
+                    Créer une facture
                   </button>
                 )}
 
@@ -453,132 +339,6 @@ export default function QuotePage() {
         </div>
     </Page>
 
-    {/* Edit panel */}
-    <div className={`scrim${editOpen ? ' open' : ''}`} onClick={() => { if (!saving) setEditOpen(false); }} />
-    <div className={`new-inv-panel${editOpen ? ' open' : ''}`} role="dialog" aria-label="Modifier le devis" aria-modal="true">
-      <div className="panel-slide-head">
-        <div>
-          <div className="panel-slide-title">Modifier le devis</div>
-          <div className="panel-slide-sub">#{quote.id}</div>
-        </div>
-        <button className="icon-btn" onClick={() => setEditOpen(false)} aria-label="Fermer" disabled={saving}>
-          <Icon name="x" size={15} ariaHidden />
-        </button>
-      </div>
-
-      <div className="panel-body">
-        <div className="form-group">
-          <label className="form-label">Client</label>
-          <select className="form-input" value={eClient} onChange={e => setEClient(e.target.value)}>
-            <option value="">Sélectionner un client…</option>
-            {Object.entries(clientsMap).map(([code, c]) => (
-              <option key={code} value={code}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Date du devis</label>
-            <input type="date" className="form-input" value={eDate} onChange={e => setEDate(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Valide jusqu'au</label>
-            <input type="date" className="form-input" value={eValid} onChange={e => setEValid(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Objet</label>
-          <input type="text" className="form-input" placeholder="ex. Refonte site web — périmètre complet"
-            maxLength={255} value={eSubject} onChange={e => setESubject(e.target.value)} />
-        </div>
-
-        <div className="subhead">Lignes</div>
-        <div className={`line-items-head${canInvoiceTVA ? ' with-tax' : ''}`}>
-          <div className="li-col">Description</div>
-          <div className="li-col">Unité</div>
-          <div className="li-col right">Qté</div>
-          <div className="li-col right">Prix</div>
-          {canInvoiceTVA && <div className="li-col">TVA</div>}
-          <div />
-        </div>
-
-        {eLines.map(li => (
-          <div key={li.id} className="line-item">
-            <div className={`line-item-row${canInvoiceTVA ? ' with-tax' : ''}`}>
-              <input className="li-input" placeholder="Description du service" value={li.desc}
-                onChange={e => updateELine(li.id, 'desc', e.target.value)} />
-              <select className="li-input" value={li.unit ?? 'unité'}
-                onChange={e => updateELine(li.id, 'unit', e.target.value)}>
-                {['unité','heure','jour','mois','an','projet','article','licence'].map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-              <input className="li-input num" type="number" min="0" value={li.qty}
-                onChange={e => updateELine(li.id, 'qty', e.target.value)} />
-              <input className="li-input num" type="number" min="0" value={li.price || ''}
-                placeholder="0" onChange={e => updateELine(li.id, 'price', e.target.value)} />
-              {canInvoiceTVA && <TaxGroupSelect className="li-input" value={lineGroup(li, true)} label="Groupe de taxe"
-                onChange={g => setELines(prev => prev.map(l => l.id === li.id ? { ...l, taxGroup: g } : l))} />}
-              <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label="Supprimer la ligne">
-                <Icon name="trash" size={15} ariaHidden />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        <div className="line-actions">
-          <button className="add-line" onClick={() => setELines(prev => [...prev, newLineItem()])}>
-            <Icon name="plus" size={14} ariaHidden /> Ajouter une ligne
-          </button>
-          {products.length > 0 && (
-            <div className="product-picker-wrap" ref={pickerRef}>
-              <button className="catalog-btn" onClick={() => setShowPicker(v => !v)}>
-                <Icon name="package" size={14} ariaHidden /> Depuis le catalogue
-              </button>
-              {showPicker && (
-                <div className="product-picker-dropdown">
-                  <input autoFocus placeholder="Rechercher…" value={pickerQuery}
-                    onChange={e => setPickerQuery(e.target.value)} />
-                  {filteredProducts.length === 0
-                    ? <div className="picker-empty">Aucun produit trouvé</div>
-                    : filteredProducts.map(p => (
-                        <div key={p.id} className="picker-item" onClick={() => {
-                          setELines(prev => [...prev, { ...newLineItem(p.name, 1, p.price, p.unit, p.id), taxGroup: productTaxGroup(p.tax, canInvoiceTVA) }]);
-                          setShowPicker(false); setPickerQuery('');
-                        }}>
-                          <div>
-                            <div className="picker-item-name">{p.name}</div>
-                            <div className="picker-item-meta">{p.unit}</div>
-                          </div>
-                          <div className="picker-item-price">{fmt(p.price)} F</div>
-                        </div>
-                      ))
-                  }
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="total-block">
-          <div className="total-row"><span>Sous-total HT</span><span>{fmt(eSubtotal)} F CFA</span></div>
-          {canInvoiceTVA && vatRows(eSums.groups).map(r => <div key={r.key} className="total-row"><span>{r.label}</span><span>{fmt(r.amount)} F CFA</span></div>)}
-          <div className="total-row final"><span>Total estimé</span><span>{fmt(eTotal)} F CFA</span></div>
-        </div>
-      </div>
-
-      <div className="panel-footer">
-        <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditOpen(false)} disabled={saving}>
-          Annuler
-        </button>
-        <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={saving} onClick={handleSaveEdit}>
-          <Icon name="check" ariaHidden /> {saving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </div>
-      {compliance.dialog}
     </>
   );
 }

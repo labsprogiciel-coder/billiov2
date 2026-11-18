@@ -11,7 +11,7 @@ import type { CreditNote } from '@/lib/schemas';
 const state = vi.hoisted(() => ({ role: 'admin' as UserRole }));
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
-vi.mock('@/lib/features', async (orig) => ({ ...(await orig<typeof import('@/lib/features')>()), ACCOUNTING_ENABLED: true, UI_V2: true }));
+vi.mock('@/lib/features', async (orig) => ({ ...(await orig<typeof import('@/lib/features')>()), ACCOUNTING_ENABLED: true }));
 vi.mock('@/context/AppContext', async () => {
   const data = await import('@/data');
   const { DEFAULT_CONFIG } = await import('@/lib/invoice-template');

@@ -1,6 +1,5 @@
 // The catalogue of the ERP look (PRO-170): summary strip and the shared dense
-// table. ProductsPage renders it instead of its cards, list and grid when
-// VITE_UI_V2 is on; the item form stays in the page.
+// table, on ProductsPage; the item form stays in the page.
 
 import { useMemo } from 'react';
 import DataTable, { SummaryStrip, type Column, type RowAction, type StatusFilter } from '@/components/DataTable';
