@@ -17,7 +17,22 @@ export function dbToPayment(row: Record<string, unknown>): Payment {
     status: (row.status ?? 'completed') as Payment['status'],
     source: (row.source ?? 'manual') as Payment['source'],
     createdByName: row.created_by_name ? String(row.created_by_name) : undefined,
+    reconciledAt: row.reconciled_at ? String(row.reconciled_at) : undefined,
+    reconciledByName: row.reconciled_by_name ? String(row.reconciled_by_name) : undefined,
   };
+}
+
+/**
+ * Marks a payment as matched with the bank or Mobile Money statement, or not (PRO-175). The database stamps who
+ * and when, and refuses anyone but the owner, an admin or an accountant, and any payment that isn't completed.
+ */
+export async function setPaymentReconciled(orgId: string, payment: Payment, reconciled: boolean): Promise<Payment> {
+  if (MOCK) return { ...payment, reconciledAt: reconciled ? new Date().toISOString() : undefined, reconciledByName: reconciled ? 'Démo' : undefined };
+  const { data, error } = await supabase.from('payments')
+    .update({ reconciled_at: reconciled ? new Date().toISOString() : null })
+    .eq('org_id', orgId).eq('id', payment.id).select('*').single();
+  if (error) throw error;
+  return dbToPayment(data as Record<string, unknown>);
 }
 
 export async function nextPaymentId(orgId: string): Promise<string> {

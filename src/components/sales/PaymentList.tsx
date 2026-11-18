@@ -8,7 +8,8 @@ import DataTable, { SummaryStrip, type Column, type StatusFilter } from '@/compo
 import StatusPill from '@/components/sales/StatusPill';
 import { useApp } from '@/context/AppContext';
 import { invoiceRef } from '@/lib/invoice-number';
-import { PAYMENT_STATUS, PAY_METHOD_LABEL, paymentAuthor, paymentAuthorOptions, paymentFigures } from '@/lib/sales-tables';
+import { PAYMENT_STATUS, PAY_METHOD_LABEL, paymentAuthor, paymentAuthorOptions, paymentFigures, reconcileStatus } from '@/lib/sales-tables';
+import ReconcileCell from '@/components/sales/ReconcileCell';
 import { OwnerFilter } from '@/components/owner/OwnerControls';
 import { fmt, fmtCompact, fmtDate } from '@/data';
 import type { Payment } from '@/lib/schemas';
@@ -20,6 +21,8 @@ const FILTERS: StatusFilter<Payment>[] = [
   { key: 'cheque',  label: 'Chèque',       match: p => p.method === 'cheque' },
   { key: 'online',  label: 'En ligne',     match: p => p.source === 'online' },
   { key: 'pending', label: 'En attente',   match: p => p.status === 'pending' },
+  { key: 'to_match', label: 'À rapprocher', match: p => reconcileStatus(p) === 'to_match' },
+  { key: 'matched',  label: 'Rapproché',    match: p => reconcileStatus(p) === 'matched' },
 ];
 
 export default function PaymentList({ onShownChange }: { onShownChange: (shown: Payment[]) => void }) {
@@ -60,6 +63,7 @@ export default function PaymentList({ onShownChange }: { onShownChange: (shown: 
     { key: 'by', header: 'Saisi par', cell: p => p.source === 'online' || !p.createdByName ? <span className="dt-muted">{paymentAuthor(p)}</span> : p.createdByName },
     { key: 'amount', header: 'Montant', align: 'right', cell: p => <b className={p.status === 'completed' ? undefined : 'dt-muted'}>{fmt(p.amount)}</b> },
     { key: 'status', header: 'Statut', cell: p => <StatusPill {...PAYMENT_STATUS[p.status]} /> },
+    { key: 'reco', header: 'Rapprochement', cell: p => <ReconcileCell payment={p} /> },
   ];
 
   return (

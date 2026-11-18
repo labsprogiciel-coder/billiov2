@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '@/components/Icon';
 import { useApp } from '@/context/AppContext';
-import { adoptOpeningBalances, fetchOpeningBalanceAdopted, fetchOpeningBalances, openingPiece } from '@/lib/api/accounting';
+import { adoptOpeningBalances, balanceOpeningBalances, fetchOpeningBalanceAdopted, fetchOpeningBalances, openingPiece } from '@/lib/api/accounting';
+import { usePermissions } from '@/lib/use-permissions';
 import { exerciseYear } from '@/lib/period';
 import Page from '@/components/Page';
 import {
@@ -15,7 +16,8 @@ interface OBLine { id: number; acct: string; d: number; c: number }
 /** A blank start: two empty lines (amounts are never made up) */
 const BLANK: OBLine[] = [{ id: 1, acct: '', d: 0, c: 0 }, { id: 2, acct: '', d: 0, c: 0 }];
 
-const AUTO_BALANCE_ACCT = '110';
+// The gap goes to the suspense account, where it shows until an OD entry moves it to the right account (PRO-121)
+const AUTO_BALANCE_ACCT = '471';
 let nextId = 100;
 
 function grp(n: number): string {
@@ -31,6 +33,24 @@ function parseAmt(s: string): number {
 }
 
 /* ─── sub-components ─────────────────────────────────────────────────────── */
+
+/** À-nouveaux adopted unbalanced (before PRO-121): the gap, and how to clear it. */
+function UnbalancedAdopted({ gap, canFix, fixing, onFix }: { gap: number; canFix: boolean; fixing: boolean; onFix: () => void }) {
+  return (
+    <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', marginBottom: 16, borderRadius: 'var(--border-radius-lg)', background: '#FCF3E8', color: '#8A5A12', border: '0.5px solid #F0D9B5' }}>
+      <Icon name="alert-triangle" size={20} style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, fontSize: 13, lineHeight: 1.5 }}>
+        <b>Vos à-nouveaux sont déséquilibrés de {grp(Math.abs(gap))} F CFA</b> ({gap > 0 ? 'trop au débit' : 'trop au crédit'}) : la balance générale ne s’équilibre pas.
+        {' '}{canFix ? 'Mettez l’écart sur 471 (compte d’attente), puis reclassez-le par une écriture OD.' : 'Un administrateur doit les équilibrer.'}
+      </div>
+      {canFix && (
+        <button className="btn" onClick={onFix} disabled={fixing} style={{ whiteSpace: 'nowrap' }}>
+          {fixing ? 'Équilibrage…' : 'Mettre l’écart sur 471'}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function StepIndicator({ step, adopted }: { step: 1 | 2 | 3; adopted: boolean }) {
   const steps = [
@@ -438,6 +458,7 @@ export default function OpeningBalancesPage() {
       const msg = err instanceof Error ? err.message : '';
       showToast(/is closed/.test(msg) ? 'Janvier est clôturé : les à-nouveaux ne peuvent plus y être passés.'
         : /already adopted/.test(msg) ? 'Les à-nouveaux de cet exercice sont déjà adoptés.'
+        : /unbalanced/.test(msg) ? 'L’écriture est déséquilibrée : équilibrez-la avant de l’adopter.'
         : /not deleted/.test(msg) ? 'Une tentative précédente a laissé un brouillon d’à-nouveaux que votre rôle ne peut pas supprimer : demandez à un administrateur de le supprimer dans Journaux, puis réessayez.'
         : 'Erreur lors de l’adoption des à-nouveaux. Vous pouvez réessayer.', true);
       console.error(err);
@@ -450,6 +471,24 @@ export default function OpeningBalancesPage() {
   const shownLines = saved && saved.length ? saved : lines;
   const bankAmt = useMemo(() => shownLines.filter(x => x.acct.startsWith('52')).reduce((s, l) => s + l.d - l.c, 0), [shownLines]);
   const savedTot = useMemo(() => shownLines.reduce((t, l) => ({ d: t.d + l.d, c: t.c + l.c, n: t.n + (l.acct && (l.d || l.c) ? 1 : 0) }), { d: 0, c: 0, n: 0 }), [shownLines]);
+
+  // À-nouveaux adopted unbalanced before PRO-121: one click puts the gap on 471, so the books balance again
+  const { managesOrg } = usePermissions();
+  const [fixing, setFixing] = useState(false);
+  const fixAdopted = useCallback(async () => {
+    setFixing(true);
+    try {
+      const moved = await balanceOpeningBalances(orgId, year);
+      const ob = await fetchOpeningBalances(orgId, year);
+      setSaved(Object.entries(ob).filter(([, v]) => v).map(([acct, v], i) => ({ id: 3000 + i, acct, d: v > 0 ? v : 0, c: v < 0 ? -v : 0 })));
+      showToast(moved ? `Écart de ${grp(Math.abs(moved))} F CFA mis sur 471 : reclassez-le par une écriture OD` : 'Les à-nouveaux sont équilibrés');
+    } catch (err) {
+      console.error('[balanceOpeningBalances]', err);
+      showToast('Les à-nouveaux n’ont pas pu être équilibrés. Réessayez.', true);
+    } finally {
+      setFixing(false);
+    }
+  }, [orgId, year, showToast]);
 
   /* ── banner content ── */
   const banner = useMemo(() => {
@@ -474,6 +513,9 @@ export default function OpeningBalancesPage() {
           <span className="period-pill"><span className="dot" /> Exercice {year} · ouverture</span>
         </>}
       >
+          {Math.abs(savedTot.d - savedTot.c) >= 0.5 && (
+            <UnbalancedAdopted gap={savedTot.d - savedTot.c} canFix={managesOrg} fixing={fixing} onFix={fixAdopted} />
+          )}
           <SuccessView
             totD={savedTot.d} totC={savedTot.c} lineCount={savedTot.n}
             bankAmt={bankAmt} piece={piece} year={year}
@@ -652,7 +694,7 @@ export default function OpeningBalancesPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#95590A'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#8A5207'; }}
                 >
-                  <Icon name="arrows-exchange" size={14} /> Auto-balance to 110
+                  <Icon name="arrows-exchange" size={14} /> Mettre l’écart sur 471 (compte d’attente)
                 </button>
               )}
             </div>
@@ -661,16 +703,16 @@ export default function OpeningBalancesPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
               {!balanced && (
                 <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Icon name="alert-triangle" size={14} /> Écriture déséquilibrée — vous pouvez tout de même adopter
+                  <Icon name="alert-triangle" size={14} /> Équilibrez l’écriture avant de l’adopter
                 </span>
               )}
               <span style={{ flex: 1 }} />
               <button className="btn" onClick={() => navigate('/accounting/journals')}>Annuler</button>
               <button
                 className="btn btn-primary btn-lg"
-                disabled={saving}
+                disabled={saving || !balanced}
                 onClick={handleAdopt}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '11px 18px', fontSize: 13.5, fontWeight: 700, opacity: saving ? 0.5 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '11px 18px', fontSize: 13.5, fontWeight: 700, opacity: saving || !balanced ? 0.5 : 1, cursor: saving || !balanced ? 'not-allowed' : 'pointer' }}
               >
                 <Icon name="check" /> {saving ? 'Enregistrement…' : 'Adopter comme position d\'ouverture'}
               </button>

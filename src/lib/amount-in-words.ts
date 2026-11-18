@@ -3,6 +3,7 @@
 // one hundred, "et" in 21…71, "quatre-vingts" and "deux cents" plural only at
 // the end of the number, "mille" invariable.
 
+import { cashReceiptStamp } from '@/lib/tax-bf';
 const UNITS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix',
   'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
 const TENS = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante'];
@@ -52,6 +53,15 @@ export function numberInWords(value: number): string {
  * The total in words: "Arrêtée la présente facture à la somme de cent
  * dix-huit mille francs CFA." (a quote: "Arrêté le présent devis …").
  */
+/**
+ * DGI mention s (PRO-142): the receipt stamp due if the invoice is paid in cash, per the CGI's scale. Null when
+ * none is due (under 1 000 F).
+ */
+export function cashStampMention(amount: number): string | null {
+  const stamp = cashReceiptStamp(amount);
+  return stamp ? `Montant timbre quittance en cas de règlement en espèces : ${stamp} F CFA.` : null;
+}
+
 export function invoiceTotalMention(amount: number, document: 'facture' | 'devis' | 'avoir' = 'facture'): string {
   const doc = document === 'devis' ? 'Arrêté le présent devis' : document === 'avoir' ? 'Arrêté le présent avoir' : 'Arrêtée la présente facture';
   return `${doc} à la somme de ${numberInWords(amount)} francs CFA.`;

@@ -112,6 +112,9 @@ export const paymentSchema = z.object({
   source: paySourceSchema.default('manual'),
   /** « Saisi par »: who recorded it (PRO-173), set by the database; none for online payments */
   createdByName: z.string().optional(),
+  /** Matched with the bank or Mobile Money statement (PRO-175): when, and by whom; set by the database */
+  reconciledAt:     z.string().optional(),
+  reconciledByName: z.string().optional(),
 });
 
 export const productSchema = z.object({
