@@ -9,9 +9,9 @@ import SendDocumentDialog, { type SendChannel } from '@/components/SendDocumentD
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { removeInvoice, updateInvoice, createInvoice, newDraftId } from '@/lib/api/invoices';
-import { creditNoteRef, invoiceRef, isIssuedLockedError } from '@/lib/invoice-number';
+import { invoiceRef, isIssuedLockedError } from '@/lib/invoice-number';
 import { createActivity } from '@/lib/api/activities';
-import { deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordCreditNoteEntry, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
+import { deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import { settleInvoicePayment } from '@/lib/api/payments';
 import { updateQuote } from '@/lib/api/quotes';
 import { invoiceBalance, daysOverdue, todayISO } from '@/lib/invoice-status';
@@ -20,67 +20,29 @@ import { filledLines, lineItemsError } from '@/lib/line-validation';
 import { invoiceMessage } from '@/lib/document-messages';
 import { contactValue } from '@/lib/share-links';
 import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
-import { fetchCreditNotes, createCreditNote, nextCreditNoteId, creditNoteIssueError } from '@/lib/api/credit-notes';
-import { CREDIT_NATURES, type CreditNature } from '@/lib/credit-note';
-import { renderCreditNotePdf, showPdf } from '@/lib/credit-note-pdf';
+import { fetchCreditNotes } from '@/lib/api/credit-notes';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
-import { fmt, fmtDate, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
+import { fmt, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { paymentUrlForInvoice } from '@/lib/api/payment-links';
-import PaymentLinkCard from '@/components/PaymentLinkCard';
 import { downloadBlob } from '@/lib/download';
 import { getFiscalIdLabel } from '@/lib/ohada';
-import type { Status } from '@/data';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_RATE_LABEL, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
 import type { Activity, CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
 import TaxGroupSelect from '@/components/TaxGroupSelect';
 import { lineGroup, productTaxGroup, splitDocument, taxSummary, vatRows } from '@/lib/tax-groups';
 import { chargesVat, documentHasVat } from '@/lib/vat';
 import Page from '@/components/Page';
-import { OwnerLine } from '@/components/owner/OwnerControls';
 import InvoiceSide from '@/components/invoice/InvoiceSide';
 import RichTextView from '@/components/RichTextView';
 import MoreMenu from '@/components/MoreMenu';
 import StatusPill from '@/components/sales/StatusPill';
-import { UI_V2 } from '@/lib/features';
 import { paperBands } from '@/lib/invoice-template';
 import { invoiceBadge, fmtDateTime } from '@/lib/invoice-view';
 import { invoiceTotalMention } from '@/lib/amount-in-words';
 import { formatCadastralRef } from '@/lib/cadastral';
 import { clientTypeDef, clientTypeOf } from '@/lib/client-type';
-
-type DotKind = 'paid' | 'sent' | 'overdue' | 'avoir' | '';
-interface TlEntry { dot: DotKind; text: string; time: string; }
-
-function buildTimeline(
-  invoice: { issued: string; due: string; status: Status },
-  clientName: string,
-  payment?: { date: string },
-): TlEntry[] {
-  const issuedStr = fmtDateLong(invoice.issued);
-  const created: TlEntry = { dot: '', text: 'Facture créée', time: issuedStr };
-  if (invoice.status === 'draft') return [created];
-
-  const sent: TlEntry = { dot: 'sent', text: 'Envoyée', time: issuedStr };
-
-  if (invoice.status === 'paid') {
-    const paidEntry: TlEntry = payment
-      ? { dot: 'paid', text: `Paiement reçu de ${clientName}`, time: fmtDateLong(payment.date) }
-      : { dot: 'paid', text: `Paiement reçu de ${clientName}`, time: '—' };
-    return [paidEntry, sent, created];
-  }
-
-  if (invoice.status === 'overdue') {
-    return [
-      { dot: 'overdue', text: 'Passée en retard', time: fmtDateLong(invoice.due) },
-      sent,
-      created,
-    ];
-  }
-
-  return [sent, created];
-}
 
 const BillioLogoSvg = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -127,12 +89,6 @@ export default function InvoicePage() {
   const [showPicker,   setShowPicker]   = useState(false);
   const [pickerQuery,  setPickerQuery]  = useState('');
   const [deleteDialog, setDeleteDialog] = useState(false);
-  const [avoirDialog,  setAvoirDialog]  = useState(false);
-  const [avoirReason,  setAvoirReason]  = useState('');
-  const [avoirAmount,  setAvoirAmount]  = useState(0);
-  const [avoirSaving,  setAvoirSaving]  = useState(false);
-  const [avoirNature,  setAvoirNature]  = useState<CreditNature | ''>('');
-  const [creditPdfFor, setCreditPdfFor] = useState<string | null>(null);
   const [creditNotes,  setCreditNotes]  = useState<CreditNote[]>([]);
   // Goes up once a posting to the books has finished, so the side panel reads the entries again
   const [ledgerTick, setLedgerTick] = useState(0);
@@ -204,8 +160,6 @@ export default function InvoicePage() {
   // Invoices marked paid before payments were tracked per invoice have no payment rows
   const amountDue       = invoice.status === 'paid' ? 0 : balance;
   const creditable      = Math.max(0, invoice.amount - credited);
-  const invoicePayment  = payments.find(p => p.inv === invoice.id);
-  const timeline        = buildTimeline(invoice, client.name, invoicePayment);
 
   // Sending happens from the user's own email/WhatsApp; log it once they pick a channel
   const handleSent = (channel: SendChannel) => {
@@ -342,74 +296,10 @@ export default function InvoicePage() {
     navigate('/invoices');
   };
 
-  // The « FACTURE D'AVOIR » PDF of an issued credit note (PRO-143); the new look has it in InvoiceSide
-  const openCreditPdf = async (cn: CreditNote, chargedVat: boolean) => {
-    if (creditPdfFor) return;
-    const tab = window.open('', '_blank');
-    setCreditPdfFor(cn.id);
-    try {
-      showPdf(await renderCreditNotePdf({ creditNote: cn, invoice, chargedVat, client: clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' }, biz: orgSettings, template: invoiceTemplate }), tab);
-    } catch (err) {
-      tab?.close();
-      console.error('[creditNotePdf]', err);
-      showToast('Le PDF de l’avoir n’a pas pu être généré. Réessayez.', true);
-    } finally {
-      setCreditPdfFor(null);
-    }
-  };
+  // Credit notes are written in the credit note editor (PRO-168)
+  const openAvoir = () => navigate(`/invoices/${invoice.id}/credit-note`);
 
-  const openAvoir = () => {
-    // The new look writes credit notes in the invoice editor (PRO-168)
-    if (UI_V2) { navigate(`/invoices/${invoice.id}/credit-note`); return; }
-    setAvoirReason('');
-    setAvoirNature('');
-    setAvoirAmount(creditable);
-    setAvoirDialog(true);
-  };
 
-  const handleConfirmAvoir = async () => {
-    if (!avoirNature) { showToast('Choisissez la nature de l\'avoir.', true); return; }
-    if (!avoirReason.trim()) { showToast('Saisissez le motif de l\'avoir.', true); return; }
-    if (avoirAmount <= 0 || avoirAmount > creditable) { showToast(`Montant invalide (maximum ${fmt(creditable)} F CFA).`, true); return; }
-    setAvoirSaving(true);
-    try {
-      const avId = await nextCreditNoteId(orgId);
-      const today = new Date().toISOString().slice(0, 10);
-      const cn = await createCreditNote(orgId, avId, {
-        invoiceId: invoice.id,
-        subject:   `Avoir sur ${invoiceRef(invoice)}`,
-        client:    invoice.client,
-        issued:    today,
-        amount:    avoirAmount,
-        reason:    avoirReason.trim(),
-        nature:    avoirNature,
-        lines:     [],
-        discountPct: 0,
-      }, 'issued');
-      setCreditNotes(prev => [cn, ...prev]);
-      // The database marks the invoice paid once nothing is left to collect
-      if ((invoice.status === 'pending' || invoice.status === 'overdue') && balance - avoirAmount <= 0) {
-        setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'paid' as const } : i));
-      }
-      // Accounting: back-calculate HT/TVA from TTC amount
-      const { ht: htAmount, tva: tvaAmount } = splitDocument(avoirAmount, lines, discountPct, canInvoiceTVA);
-      recordCreditNoteEntry(orgId, {
-        creditNoteId: avId,
-        invoiceId:    invoice.id,
-        htAmount,
-        tvaAmount,
-        date:         today,
-        clientName:   client.name,
-      }).catch(err => console.error('Credit note accounting failed:', err)).finally(bumpLedger);
-      setAvoirDialog(false);
-      showToast(`Avoir ${creditNoteRef(cn)} émis`);
-    } catch (err) {
-      console.error('Create credit note failed:', err);
-      showToast(creditNoteIssueError(err) ?? 'Erreur lors de l\'émission de l\'avoir', true);
-    } finally {
-      setAvoirSaving(false);
-    }
-  };
   const REF_PLACEHOLDER: Record<PayMethod, string> = {
     cash: 'Reçu #0212',
     wire: '#WV0000',
@@ -428,7 +318,7 @@ export default function InvoicePage() {
   // Once a credit note was issued on it, its lines stay as credited (PRO-168): corrections go through credit notes
   const canEdit = writable && creditNotes.length === 0 && (invoice.status === 'draft' || invoice.status === 'pending' || invoice.status === 'overdue');
   // Header and footer bands of the organisation's template (PRO-167), in the new look
-  const pageBand = UI_V2 ? paperBands(invoiceTemplate) : null;
+  const pageBand = paperBands(invoiceTemplate);
 
   const openEdit = () => {
     setEClient(invoice.client);
@@ -529,19 +419,17 @@ export default function InvoicePage() {
     <>
     <Page
       back={{ label: "Retour aux factures", onClick: () => navigate('/invoices') }}
-      title={UI_V2
-        ? <span className="iv-title"><span>Facture {invoice.status === 'draft' ? 'brouillon' : invoiceRef(invoice)}</span><StatusPill {...invoiceBadge(invoice, amountDue, paid)} /></span>
-        : <><button className="crumb-link" onClick={() => navigate('/invoices')}>Factures</button>{' / '}<b>#{invoiceRef(invoice)}</b></>}
-      subtitle={UI_V2 ? (
+      title={<span className="iv-title"><span>Facture {invoice.status === 'draft' ? 'brouillon' : invoiceRef(invoice)}</span><StatusPill {...invoiceBadge(invoice, amountDue, paid)} /></span>}
+      subtitle={(
         <span className="iv-sub">
           <span>{client.name}</span>
           <span>{invoice.status === 'draft' ? 'Pas encore émise' : <>Émise le {invoice.firstIssuedAt ? fmtDateTime(invoice.firstIssuedAt) : fmtDateLong(invoice.issued)}{invoice.issuedByName && <> par {invoice.issuedByName}</>}</>}</span>
           <span>Échéance {fmtDateLong(invoice.due)}</span>
           {invoice.ownerName && <span>Responsable {invoice.ownerName}</span>}
         </span>
-      ) : undefined}
+      )}
       documentTitle={`Facture ${invoiceRef(invoice)}`}
-      actions={UI_V2 ? <>
+      actions={<>
         <button className="btn" onClick={handleDownloadPDF} disabled={linesLoading || !paymentMethodsReady}>
           <Icon name="printer" ariaHidden /> PDF
         </button>
@@ -577,25 +465,6 @@ export default function InvoicePage() {
             ...(invoice.status === 'draft' && canDelete(userRole) ? [{ label: 'Supprimer la facture', icon: 'trash', danger: true, run: handleDelete }] : []),
           ]} />
         )}
-      </> : <>
-        <button className="btn" onClick={handleDownloadPDF} disabled={linesLoading || !paymentMethodsReady}>
-          <Icon name="printer" ariaHidden /> Télécharger PDF
-        </button>
-        {canEdit && (
-          <button className="btn" onClick={openEdit}>
-            <Icon name="edit" ariaHidden /> Modifier
-          </button>
-        )}
-        {writable && invoice.status === 'draft' && (
-          <button className="btn btn-primary" onClick={requestIssue} disabled={busyAction !== null || linesLoading || compliance.checking}>
-            <Icon name="send" ariaHidden /> {busyAction === 'issue' ? 'Émission…' : 'Émettre la facture'}
-          </button>
-        )}
-        {writable && (isOverdue || invoice.status === 'pending') && (
-          <button className="btn btn-primary" onClick={() => setSendKind(isOverdue ? 'reminder' : 'send')} disabled={!paymentMethodsReady}>
-            <Icon name="send" ariaHidden /> {isOverdue ? 'Envoyer une relance' : 'Envoyer au client'}
-          </button>
-        )}
       </>}
     >
         <div className="detail-grid">
@@ -615,7 +484,7 @@ export default function InvoicePage() {
                     {(orgSettings.taxRegime || orgSettings.divisionFiscale) && (
                       <><br />{[orgSettings.taxRegime && `${orgSettings.taxRegime}`, orgSettings.divisionFiscale && `${orgSettings.divisionFiscale}`].filter(Boolean).join(' · ')}</>
                     )}
-                    {UI_V2 && orgSettings.cadastralRef && (
+                    {orgSettings.cadastralRef && (
                       <><br />Réf. cadastrale {formatCadastralRef(orgSettings.cadastralRef)}</>
                     )}
                     {(orgSettings.email || orgSettings.phone) && (
@@ -635,7 +504,7 @@ export default function InvoicePage() {
               <div>
                 <div className="pp-block-label">Facturé à</div>
                 <div className="pp-client-name">{client.name}</div>
-                {UI_V2 && <div className="pp-client-meta">{clientTypeDef(clientTypeOf(client)).mention}</div>}
+                {<div className="pp-client-meta">{clientTypeDef(clientTypeOf(client)).mention}</div>}
                 <div className="pp-client-meta">{[client.city, client.country].filter(Boolean).join(', ')}</div>
                 {(client.contact || client.email || client.phone) && (
                   <div className="pp-client-meta" style={{ marginTop: 2 }}>
@@ -657,8 +526,8 @@ export default function InvoicePage() {
                 <div className="pp-block-label">Détails</div>
                 <div className="pp-meta-grid">
                   <div className="k">Émis le</div>
-                  <div className="v">{UI_V2 && invoice.firstIssuedAt ? fmtDateTime(invoice.firstIssuedAt) : fmtDateLong(invoice.issued)}</div>
-                  {UI_V2 && invoice.issuedByName && (<>
+                  <div className="v">{invoice.firstIssuedAt ? fmtDateTime(invoice.firstIssuedAt) : fmtDateLong(invoice.issued)}</div>
+                  {invoice.issuedByName && (<>
                     <div className="k">Émise par</div>
                     <div className="v">{invoice.issuedByName}</div>
                   </>)}
@@ -721,7 +590,7 @@ export default function InvoicePage() {
               </div>
             </div>
 
-            {UI_V2 && (invoice.status === 'draft' ? total : invoice.amount) > 0 && (
+            {(invoice.status === 'draft' ? total : invoice.amount) > 0 && (
               <p className="pp-words">{invoiceTotalMention(invoice.status === 'draft' ? total : invoice.amount)}</p>
             )}
 
@@ -755,7 +624,6 @@ export default function InvoicePage() {
               </div>
             </div>
 
-            {UI_V2 && (
               <div className="pp-mentions" aria-label="Mentions obligatoires">
                 <div className="pp-block-label">Mentions obligatoires (DGI)</div>
                 <ul>
@@ -766,7 +634,6 @@ export default function InvoicePage() {
                   <li>Timbre fiscal (paiement en espèces) : barème à confirmer</li>
                 </ul>
               </div>
-            )}
 
             {/* The template's footer text, as the PDF prints it */}
             <div className="pp-foot">
@@ -775,7 +642,6 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {UI_V2 ? (
             <InvoiceSide
               key={`${orgId}:${invoice.id}`}
               refreshKey={ledgerTick}
@@ -788,99 +654,9 @@ export default function InvoicePage() {
               client={{ code: invoice.client, name: client.name, contact: client.contact, email: client.email, phone: client.phone }}
               vatOnInvoice={vatOnInvoice}
               salesSplit={lines.length ? splitDocument(invoice.amount, lines, discountPct, vatOnInvoice) : undefined}
+              showPaymentLink={online !== 'off' && (isOverdue || invoice.status === 'pending')}
             />
-          ) : (<>
-          {/* Rail */}
-          <aside className="rail">
-            <div className="rail-card">
-              <div className="rail-due-label">Montant dû</div>
-              <div className="rail-due-amt tnum">
-                {fmt(invoice.status === 'draft' ? total : amountDue)}<span className="cur">F CFA</span>
-              </div>
-              {isOverdue && (
-                <div className="rail-due-sub">
-                  <Icon name="alert-triangle" ariaHidden />
-                  {daysOverdue(invoice.due)} jour{daysOverdue(invoice.due) > 1 ? 's' : ''} de retard · éch. {fmtDate(invoice.due)}
-                </div>
-              )}
-              <div className="rail-actions">
-                {writable && (isOverdue || invoice.status === 'pending') && (<>
-                  <button className="btn btn-primary btn-block" onClick={() => { setPayRef(''); setPayMethod('cash'); setTvaRetenue(0); setServiceWithholding(0); setPayAmount(balance); setPayDialog(true); }}>
-                    <Icon name="cash" ariaHidden /> Enregistrer un paiement
-                  </button>
-                  <button className="btn btn-block" onClick={() => setSendKind(isOverdue ? 'reminder' : 'send')} disabled={!paymentMethodsReady}>
-                    <Icon name="send" ariaHidden /> {isOverdue ? 'Envoyer une relance' : 'Envoyer au client'}
-                  </button>
-                </>)}
-                {writable && invoice.status === 'draft' && (
-                  <button className="btn btn-primary btn-block" onClick={requestIssue} disabled={busyAction !== null || linesLoading || compliance.checking}>
-                    <Icon name="send" ariaHidden /> {busyAction === 'issue' ? 'Émission…' : 'Émettre la facture'}
-                  </button>
-                )}
-                <button className="btn btn-block" onClick={handleDownloadPDF} disabled={linesLoading || !paymentMethodsReady}>
-                  <Icon name="printer" ariaHidden /> Télécharger PDF
-                </button>
-                {online !== 'off' && (isOverdue || invoice.status === 'pending') && (
-                  <PaymentLinkCard orgId={orgId} invoiceId={invoice.id} writable={writable} onToast={showToast} />
-                )}
-                {writable && (<>
-                <div className="rail-divider" />
-                <button className="btn btn-block" onClick={handleDuplicate} disabled={busyAction !== null || linesLoading}>
-                  <Icon name="copy" ariaHidden /> {busyAction === 'duplicate' ? 'Duplication…' : 'Dupliquer'}
-                </button>
-                {invoice.status === 'draft' ? (canDelete(userRole) &&
-                  <button className="btn btn-block btn-ghost btn-danger" onClick={handleDelete}>
-                    <Icon name="trash" ariaHidden /> Supprimer la facture
-                  </button>
-                ) : (credits &&
-                  <button className="btn btn-block btn-ghost btn-danger" onClick={openAvoir}>
-                    <Icon name="file-minus" ariaHidden /> Émettre un avoir
-                  </button>
-                )}
-                </>)}
-              </div>
-            </div>
 
-            <div className="rail-card">
-              <OwnerLine table="invoices" id={invoice.id} ownerId={invoice.ownerId} ownerName={invoice.ownerName} />
-              {(() => {
-                const from = quotes.find(q => q.invoiceId === invoice.id);
-                return from ? (
-                  <p className="doc-link">Issue du devis <button type="button" className="dt-linkcell" onClick={() => navigate(`/quotes/${from.id}`)}>{from.id}</button></p>
-                ) : null;
-              })()}
-            </div>
-
-            <div className="rail-card">
-              <div className="rail-title">Activité</div>
-              {creditNotes.map(cn => (
-                <div key={cn.id} className="tl-item">
-                  <div className="tl-dot avoir" />
-                  <div>
-                    <div className="tl-text">Avoir {creditNoteRef(cn)} — {fmt(cn.amount)} F CFA</div>
-                    <div className="tl-time">{fmtDateLong(cn.issued)} · {cn.reason}</div>
-                    {cn.status === 'issued' && (
-                      <button type="button" className="dt-linkcell" style={{ fontSize: 12 }} disabled={creditPdfFor !== null}
-                        onClick={() => openCreditPdf(cn, documentHasVat(invoice.amount, discountedSub, canInvoiceTVA))}
-                        aria-label={`PDF de l’avoir ${creditNoteRef(cn)}`}>
-                        {creditPdfFor === cn.id ? 'Génération…' : 'PDF de l’avoir'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {timeline.map((entry, i) => (
-                <div key={i} className="tl-item">
-                  <div className={`tl-dot${entry.dot ? ` ${entry.dot}` : ''}`} />
-                  <div>
-                    <div className="tl-text">{entry.text}</div>
-                    <div className="tl-time">{entry.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
-          </>)}
         </div>
     </Page>
 
@@ -1180,56 +956,6 @@ export default function InvoicePage() {
         />
       )}
 
-      {avoirDialog && (
-        <div className="inv-overlay" onClick={() => !avoirSaving && setAvoirDialog(false)}>
-          <div className="inv-modal" onClick={e => e.stopPropagation()}>
-            <div className="inv-modal-head">
-              <div className="inv-modal-title">
-                <Icon name="file-minus" size={16} ariaHidden />
-                Émettre un avoir
-              </div>
-              <button className="btn btn-icon" onClick={() => setAvoirDialog(false)} aria-label="Fermer" disabled={avoirSaving}>
-                <Icon name="x" size={16} ariaHidden />
-              </button>
-            </div>
-            <div className="inv-modal-body">
-              <label className="form-label" htmlFor="avoir-nature">Nature de l'avoir <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-              <select id="avoir-nature" className="form-input" value={avoirNature} onChange={e => setAvoirNature(e.target.value as CreditNature)} style={{ marginBottom: 12 }}>
-                <option value="">Choisir…</option>
-                {CREDIT_NATURES.map(n => <option key={n.code} value={n.code} disabled={n.code === 'RAN' && paid > 0}>{n.code} · {n.label}</option>)}
-              </select>
-              <div className="form-label">Motif de l'avoir <span style={{ color: 'var(--color-danger)' }}>*</span></div>
-              <input
-                className="form-input"
-                placeholder="Ex : erreur de tarif, annulation partielle…"
-                value={avoirReason}
-                onChange={e => setAvoirReason(e.target.value)}
-              />
-              <div className="form-label" style={{ marginTop: 12 }}>Montant TTC à annuler (max {fmt(creditable)} F CFA)</div>
-              <input
-                className="form-input"
-                type="number"
-                min={1}
-                max={creditable}
-                step={1}
-                value={avoirAmount}
-                onChange={e => setAvoirAmount(Number(e.target.value))}
-              />
-              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8 }}>
-                Conforme SYSCOHADA — un avoir génère une écriture comptable de contre-passation (AV-) dans le journal des ventes. La facture originale reste dans l'historique.
-              </p>
-            </div>
-            <div className="inv-modal-foot">
-              <button className="btn" onClick={() => setAvoirDialog(false)} disabled={avoirSaving}>
-                Annuler
-              </button>
-              <button className="btn btn-primary" onClick={handleConfirmAvoir} disabled={avoirSaving}>
-                {avoirSaving ? 'Émission…' : 'Émettre l\'avoir'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {compliance.dialog}
     </>
   );

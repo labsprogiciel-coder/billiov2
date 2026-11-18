@@ -14,17 +14,12 @@ import {
   fetchOpeningBalances,
   fetchJournalEntries,
   fetchFixedAssets,
-  fetchSupplierBills,
   postJournalEntry,
   deleteJournalEntry,
   createManualJournalEntry,
   createFixedAsset as apiCreateFixedAsset,
-  markBillPaid as apiBillPaid,
-  createSupplierBill as apiCreateBill,
   createAccount as apiCreateAccount,
   closeFiscalPeriod as apiClosePeriod,
-  recordSupplierBillEntry,
-  recordSupplierBillPaymentEntry,
 } from '@/lib/api/accounting';
 import type { FiscalPeriod, AccountBalance } from '@/lib/api/accounting';
 import {
@@ -280,62 +275,6 @@ export function useFixedAssets() {
 }
 
 // ─── Suppliers ────────────────────────────────────────────────────────────────
-
-/** `enabled: false` skips the query (e.g. while the accounting module is switched off). */
-export function useSupplierBills(enabled = true) {
-  const { orgId } = useApp();
-  const result = useAsyncData<SupplierBill[]>(
-    enabled ? `supplier-bills:${orgId}` : 'supplier-bills:disabled',
-    () => enabled ? fetchSupplierBills(orgId) : Promise.resolve([]),
-    [orgId, enabled],
-  );
-
-  const markPaid = useCallback(async (billId: string) => {
-    const bill = result.data?.find(b => b.id === billId);
-    result.setData(prev => prev?.map(b =>
-      b.id === billId ? { ...b, status: 'paid' as const } : b
-    ) ?? null);
-    try {
-      await apiBillPaid(billId);
-      if (bill) {
-        await recordSupplierBillPaymentEntry(orgId, {
-          piece:         bill.piece,
-          total:         bill.htAmount + bill.tvaAmount,
-          date:          new Date().toISOString().slice(0, 10),
-          supplierName:  bill.supplier,
-          paymentMethod: bill.paymentMethod,
-        });
-      }
-    } finally {
-      result.reload();
-    }
-  }, [orgId, result]);
-
-  const createBill = useCallback(async (bill: Omit<SupplierBill, 'id' | 'acctLines'>) => {
-    await apiCreateBill(orgId, bill);
-    await recordSupplierBillEntry(orgId, {
-      piece:        bill.piece,
-      htAmount:     bill.htAmount,
-      tvaAmount:    bill.tvaAmount,
-      date:         bill.date,
-      supplierName: bill.supplier,
-    });
-    result.reload();
-  }, [orgId, result]);
-
-  // Realtime: reload on any supplier_bills change for this org
-  useEffect(() => {
-    if (MOCK || !orgId) return;
-    const ch = supabase
-      .channel(`supplier_bills:${orgId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'supplier_bills', filter: `org_id=eq.${orgId}` },
-        () => result.reload())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { ...result, markPaid, createBill };
-}
 
 // ─── Tax ──────────────────────────────────────────────────────────────────────
 

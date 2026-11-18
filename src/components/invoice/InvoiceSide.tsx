@@ -4,6 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OwnerLine } from '@/components/owner/OwnerControls';
+import PaymentLinkCard from '@/components/PaymentLinkCard';
 import { useApp } from '@/context/AppContext';
 import { usePermissions } from '@/lib/use-permissions';
 import { fetchInvoiceEntries } from '@/lib/api/accounting';
@@ -28,7 +29,7 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
   );
 }
 
-export default function InvoiceSide({ invoice, total, paid, credited, amountDue, creditNotes, client, vatOnInvoice, salesSplit, refreshKey = 0 }: {
+export default function InvoiceSide({ invoice, total, paid, credited, amountDue, creditNotes, client, vatOnInvoice, salesSplit, showPaymentLink = false, refreshKey = 0 }: {
   invoice: Invoice;
   /** TTC of the invoice (its lines for a draft). */
   total: number;
@@ -41,11 +42,13 @@ export default function InvoiceSide({ invoice, total, paid, credited, amountDue,
   vatOnInvoice: boolean;
   /** HT and VAT of the invoice from its lines' tax groups (PRO-138); else split at one rate */
   salesSplit?: { ht: number; tva: number };
+  /** The invoice's online payment link (PRO-187): an open invoice, with online payment switched on */
+  showPaymentLink?: boolean;
   /** Goes up once a payment, issue, credit note or edit has been posted: entries are read again. */
   refreshKey?: number;
 }) {
   const { invoices, payments, quotes, orgId, activity: teamActivity, clientsMap, orgSettings, invoiceTemplate, showToast } = useApp();
-  const { postable, credits } = usePermissions();
+  const { postable, credits, writable } = usePermissions();
   const navigate = useNavigate();
   // null while loading; 'error' when the entries couldn't be read (not the same as none)
   const [entries, setEntries] = useState<JournalEntry[] | 'error' | null>(null);
@@ -127,6 +130,8 @@ export default function InvoiceSide({ invoice, total, paid, credited, amountDue,
           <div className="iv-due"><dt>Reste dû</dt><dd className={invoice.status === 'overdue' && amountDue > 0 ? 'dt-late' : undefined}>{fmt(invoice.status === 'draft' ? total : amountDue)} F CFA</dd></div>
         </dl>
       </Card>
+
+      {showPaymentLink && <PaymentLinkCard orgId={orgId} invoiceId={invoice.id} writable={writable} onToast={showToast} />}
 
       {invoice.status !== 'draft' && (creditNotes.length > 0 || creditDrafts.length > 0) && (
         <Card title="Avoirs">

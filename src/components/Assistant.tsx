@@ -24,8 +24,8 @@ async function authHeaders(): Promise<Record<string, string>> {
 const PAGES = {
   tableau_de_bord: '/dashboard',
   factures: '/invoices',
-  devis: '/invoices?tab=quotes',
-  paiements: '/invoices?tab=payments',
+  devis: '/quotes',
+  paiements: '/payments',
   clients: '/contacts',
   produits: '/products',
   parametres: '/settings',

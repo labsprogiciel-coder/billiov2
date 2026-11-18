@@ -1,7 +1,6 @@
 // The dashboard of the ERP look (PRO-164): figures over a month, quarter or
 // year to date, cash collected per period, the invoices to chase, and the
-// latest invoices. App.tsx renders it instead of DashboardPage when
-// VITE_UI_V2 is on. Members see their own records only (the database
+// latest invoices. Members see their own records only (the database
 // filters them), so their dashboard is theirs.
 
 import { useMemo, useState } from 'react';

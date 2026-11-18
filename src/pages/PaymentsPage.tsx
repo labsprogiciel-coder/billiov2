@@ -1,12 +1,9 @@
 import { invoiceRef } from '@/lib/invoice-number';
-import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePermissions } from '@/lib/use-permissions';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
-import { EmptyState } from '@/components/EmptyState';
-import { PaymentsEmptyIllustration } from '@/components/PageEmptyIllustrations';
 import { PageSkeleton } from '@/components/SkeletonLoader';
-import { tabPanelId, tabId } from '@/lib/tab-ids';
 import { useApp } from '@/context/AppContext';
 import { settleInvoicePayment } from '@/lib/api/payments';
 import { fetchCreditNotes } from '@/lib/api/credit-notes';
@@ -14,17 +11,13 @@ import { invoiceBalance, todayISO } from '@/lib/invoice-status';
 import { csvBlob } from '@/lib/csv';
 import { confirmDiscard } from '@/lib/confirm-discard';
 import { downloadBlob } from '@/lib/download';
-import { fmt, fmtCompact, fmtDate, clientInitials } from '@/data';
+import { fmt } from '@/data';
 import type { Payment, PayMethod, PayStatus, CreditNote } from '@/lib/schemas';
 import Page from '@/components/Page';
 import PaymentList from '@/components/sales/PaymentList';
 import IncomingPayments from '@/components/sales/IncomingPayments';
 import { paymentAuthor, reconcileStatus } from '@/lib/sales-tables';
-import ReconcileCell from '@/components/sales/ReconcileCell';
 import { useCommandIntent } from '@/lib/command-intent';
-import { UI_V2 } from '@/lib/features';
-
-type FilterKey = 'all' | 'cash' | 'wire' | 'momo' | 'cheque' | 'online' | 'pending' | 'to_match' | 'matched';
 
 const METHOD_META: Record<PayMethod, { label: string; icon: string; cls: string; sub: string }> = {
   cash:   { label: 'Cash',         icon: 'cash',          cls: 'm-cash',   sub: 'En personne'     },
@@ -41,18 +34,6 @@ const STATUS_LABEL: Record<PayStatus, string> = {
   failed:    'Échoué',
 };
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all',     label: 'Tous'          },
-  { key: 'online',  label: 'En ligne'      },
-  { key: 'momo',    label: 'Mobile Money'  },
-  { key: 'wire',    label: 'Virement'      },
-  { key: 'cheque',  label: 'Chèque'        },
-  { key: 'cash',    label: 'Cash'          },
-  { key: 'pending', label: 'En attente'    },
-  { key: 'to_match', label: 'À rapprocher' },
-  { key: 'matched',  label: 'Rapproché'    },
-];
-
 const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
   cash:   { label: 'Numéro de reçu',      placeholder: 'Reçu #0212'       },
   wire:   { label: 'Référence virement',   placeholder: '#WV0000'          },
@@ -62,12 +43,11 @@ const REF_META: Record<PayMethod, { label: string; placeholder: string }> = {
 };
 
 
-/** Rendered by SalesPage, which passes the Factures | Devis | Paiements tab switcher. */
-export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
+/** Paiements (PRO-165): payments received online, the list, and recording a payment. */
+export default function PaymentsPage() {
   const { writable } = usePermissions();
   const { invoices, setInvoices, payments, setPayments, showToast, clientsMap, orgId, loading, userLabel } = useApp();
 
-  const [filter, setFilter]     = useState<FilterKey>('all');
   const [panelOpen, setPanelOpen] = useState(false);
 
   // Form state
@@ -89,46 +69,17 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     return inv ? invoiceBalance(inv, payments, creditNotes).balance : 0;
   };
 
-  // Metrics
-  const completed = payments.filter(p => p.status === 'completed');
-  const total     = completed.reduce((s, p) => s + p.amount, 0);
-  const byMethod  = { cash: 0, wire: 0, momo: 0, cheque: 0 } as Record<PayMethod, number>;
-  completed.forEach(p => { byMethod[p.method] += p.amount; });
-  const share = (m: PayMethod) => total ? Math.round((byMethod[m] / total) * 100) : 0;
-
-  const counts: Record<FilterKey, number> = {
-    all:     payments.length,
-    online:  payments.filter(p => p.source === 'online').length,
-    cash:   payments.filter(p => p.method === 'cash').length,
-    wire:   payments.filter(p => p.method === 'wire').length,
-    momo:   payments.filter(p => p.method === 'momo').length,
-    cheque: payments.filter(p => p.method === 'cheque').length,
-    pending: payments.filter(p => p.status === 'pending').length,
-    to_match: payments.filter(p => reconcileStatus(p) === 'to_match').length,
-    matched:  payments.filter(p => reconcileStatus(p) === 'matched').length,
-  };
-
   // Payments point to the invoice's internal id; show its legal number
   const invRef = useMemo(() => {
     const byId = new Map(invoices.map(i => [i.id, invoiceRef(i)]));
     return (id: string) => byId.get(id) ?? id;
   }, [invoices]);
 
-  const filtered = useMemo(() => {
-    if (filter === 'pending') return payments.filter(p => p.status === 'pending');
-    if (filter === 'to_match' || filter === 'matched') return payments.filter(p => reconcileStatus(p) === filter);
-    if (filter === 'online')  return payments.filter(p => p.source === 'online');
-    if (filter !== 'all')     return payments.filter(p => p.method === filter);
-    return payments;
-  }, [payments, filter]);
-
-  const onlineCount = payments.filter(p => p.source === 'online').length;
-
   // Relevé: the payments currently listed, as a CSV for Excel
-  // In the ERP look the table filters itself and tells us what it lists
+  // The table filters itself and tells us what it lists
   const tableShown = useRef<Payment[]>([]);
   function exportStatement() {
-    const listed = UI_V2 ? tableShown.current : filtered;
+    const listed = tableShown.current;
     if (listed.length === 0) { showToast('Aucun paiement à exporter.', true); return; }
     const rows = listed.map(p => [
       p.date, invRef(p.inv), clientsMap[p.client]?.name ?? p.client, METHOD_META[p.method].label, p.ref, p.amount, STATUS_LABEL[p.status], paymentAuthor(p),
@@ -200,12 +151,12 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
     }
   }
 
-  if (loading) return <PageSkeleton title={UI_V2 ? 'Paiements' : 'Facturation'} subtitle="Argent reçu sur vos factures" metrics={4} rows={6} />;
+  if (loading) return <PageSkeleton title="Paiements" subtitle="Argent reçu sur vos factures" metrics={4} rows={6} />;
 
   return (
     <>
       <Page
-        title={UI_V2 ? 'Paiements' : 'Facturation'}
+        title="Paiements"
         subtitle="Argent reçu sur vos factures"
         actions={<>
           <button className="btn" onClick={exportStatement} title="Exporter les paiements affichés (CSV)">
@@ -220,187 +171,8 @@ export default function PaymentsPage({ tabs }: { tabs?: ReactNode }) {
           )}
         </>}
       >
-          {UI_V2 ? <>
             <IncomingPayments />
             <PaymentList onShownChange={rows => { tableShown.current = rows; }} />
-          </> : <>
-          {/* Metrics */}
-          <div className="metrics">
-            {/* Feature card — total received */}
-            <div className="metric-card pay-feature">
-              <div className="metric-top">
-                <div className="metric-ico pay-ico-white"><Icon name="arrow-down-left" size={15} /></div>
-                <div className="metric-label pay-label-white">Total encaissé</div>
-              </div>
-              <div className="metric-value pay-val-white tnum">
-                {fmt(total)}<span className="metric-unit pay-unit-white">F CFA</span>
-              </div>
-              <div className="metric-change pay-change-white">
-                {completed.length} paiement{completed.length > 1 ? 's' : ''} reçu{completed.length > 1 ? 's' : ''}
-              </div>
-            </div>
-
-            {/* Mobile Money */}
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico momo"><Icon name="device-mobile" size={15} /></div>
-                <div className="metric-label">Mobile Money</div>
-              </div>
-              <div className="metric-value tnum">
-                {fmtCompact(byMethod.momo)}<span className="metric-unit">F CFA</span>
-              </div>
-              <div className="share-bar">
-                <div className="share-fill" style={{ width: `${share('momo')}%`, background: 'var(--pm-momo)' }} />
-              </div>
-              <div className="metric-change neutral">{share('momo')}% du volume</div>
-            </div>
-
-            {/* Wire */}
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico wire"><Icon name="building-bank" size={15} /></div>
-                <div className="metric-label">Virement</div>
-              </div>
-              <div className="metric-value tnum">
-                {fmtCompact(byMethod.wire)}<span className="metric-unit">F CFA</span>
-              </div>
-              <div className="share-bar">
-                <div className="share-fill" style={{ width: `${share('wire')}%`, background: 'var(--pm-wire)' }} />
-              </div>
-              <div className="metric-change neutral">{share('wire')}% du volume</div>
-            </div>
-
-            {/* Cheque */}
-            <div className="metric-card">
-              <div className="metric-top">
-                <div className="metric-ico cheque"><Icon name="writing" size={15} /></div>
-                <div className="metric-label">Chèque</div>
-              </div>
-              <div className="metric-value tnum">
-                {fmtCompact(byMethod.cheque)}<span className="metric-unit">F CFA</span>
-              </div>
-              <div className="share-bar">
-                <div className="share-fill" style={{ width: `${share('cheque')}%`, background: 'var(--pm-cheque)' }} />
-              </div>
-              <div className="metric-change neutral">{share('cheque')}% du volume</div>
-            </div>
-          </div>
-
-          {/* Section header + filters */}
-          <div className="section-header">
-            {tabs ?? <div className="section-title">Transactions</div>}
-            <div className="filters">
-              {FILTERS.map(f => (
-                <button
-                  key={f.key}
-                  className={'filter-chip' + (filter === f.key ? ' active' : '')}
-                  onClick={() => setFilter(f.key)}
-                >
-                  {f.label}<span className="cnt">{counts[f.key]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Reconciliation banner — shown when online payments exist */}
-          {onlineCount > 0 && (
-            <div className="recon-banner">
-              <div className="rb-ico"><Icon name="bolt" size={18} /></div>
-              <div className="rb-text">
-                <b>Les paiements en ligne s’enregistrent automatiquement</b>
-                Chaque paiement en ligne (PI-SPI) est enregistré sur sa facture automatiquement.
-              </div>
-            </div>
-          )}
-
-          <IncomingPayments />
-
-          {/* Payments table */}
-          <div className="pay-table" {...(tabs ? { role: 'tabpanel', id: tabPanelId('sales'), 'aria-labelledby': tabId('sales', 'payments') } : {})}>
-            <div className="table-head pay-grid-cols">
-              <div className="th">Paiement</div>
-              <div className="th">Client &amp; facture</div>
-              <div className="th">Méthode</div>
-              <div className="th right">Montant</div>
-              <div className="th">Statut</div>
-              <div className="th" />
-            </div>
-
-            {filtered.length === 0 ? (
-              <EmptyState
-                illustration={<PaymentsEmptyIllustration />}
-                title="Aucun paiement"
-                description="Aucun paiement ici pour le moment. Les paiements reçus apparaîtront ici."
-              />
-            ) : (
-              filtered.map(p => {
-                const cl = clientsMap[p.client];
-                const m  = METHOD_META[p.method];
-                const isOnline = p.source === 'online';
-                return (
-                  <div key={p.id} className="pay-row pay-grid-cols">
-                    {/* Payment ID */}
-                    <div>
-                      <div className="pay-id">{p.id}</div>
-                      <div className="pay-date">{fmtDate(p.date)}</div>
-                    </div>
-
-                    {/* Client & invoice */}
-                    <div className="client-cell">
-                      {cl && <div className={`client-av ${cl.av}`}>{clientInitials(cl.name)}</div>}
-                      <div>
-                        <div className="cell-text">{cl?.name ?? p.client}</div>
-                        <div className="cell-sub">
-                          pour <span className="lnk">#{invRef(p.inv)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Method */}
-                    <div className="method-cell">
-                      <div className={`method-ico ${m.cls}`}>
-                        <Icon name={m.icon} size={16} />
-                      </div>
-                      <div>
-                        <div className="method-name">{m.label}</div>
-                        <div className="method-sub">
-                          {isOnline ? 'en ligne (PI-SPI)' : p.ref}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Amount */}
-                    <div
-                      className="pay-amount tnum"
-                      style={{
-                        textAlign: 'right',
-                        color: p.status === 'pending' ? 'var(--color-text-tertiary)' : undefined,
-                      }}
-                    >
-                      +{fmt(p.amount)}<span className="cur">F CFA</span>
-                    </div>
-
-                    {/* Status */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className={`status-pill s-${p.status}`}>{STATUS_LABEL[p.status]}</span>
-                      {isOnline && p.status === 'completed' && (
-                        <span className="auto-chip"><Icon name="bolt" size={11} /> Auto</span>
-                      )}
-                      <ReconcileCell payment={p} />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="row-actions" onClick={e => e.stopPropagation()}>
-                      <button className="icon-btn" title="Reçu">
-                        <Icon name="file-text" size={15} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          </>}
       </Page>
 
       {/* Scrim */}

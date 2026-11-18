@@ -268,7 +268,6 @@ export type PayMethod      = z.infer<typeof payMethodSchema>;
 export type PaySource      = z.infer<typeof paySourceSchema>;
 export type PayStatus      = z.infer<typeof payStatusSchema>;
 export type ProductType    = z.infer<typeof productTypeSchema>;
-export type QuoteStatus    = z.infer<typeof quoteStatusSchema>;
 export type ActivityKind   = z.infer<typeof activityKindSchema>;
 
 export type LineItem       = z.infer<typeof lineItemSchema>;

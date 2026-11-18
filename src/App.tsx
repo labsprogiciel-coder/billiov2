@@ -5,7 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
 import AppShell from '@/components/AppShell';
-import { ACCOUNTING_ENABLED, UI_V2 } from '@/lib/features';
+import { ACCOUNTING_ENABLED } from '@/lib/features';
 import FeatureGuard from '@/components/FeatureGuard';
 import type { Feature } from '@/lib/plans';
 
@@ -22,7 +22,6 @@ const ResetPasswordPage      = lazy(() => import('./pages/ResetPasswordPage'));
 const InvitePage             = lazy(() => import('./pages/InvitePage'));
 const PayPage                = lazy(() => import('./pages/PayPage'));
 const OnboardingPage         = lazy(() => import('./pages/OnboardingPage'));
-const DashboardPage          = lazy(() => import('./pages/DashboardPage'));
 const DashboardV2Page        = lazy(() => import('./pages/DashboardV2Page'));
 const SalesPage              = lazy(() => import('./pages/SalesPage'));
 const QuotesPage             = lazy(() => import('./pages/QuotesPage'));
@@ -113,14 +112,14 @@ export default function App() {
 
           {/* All other routes redirect to /onboarding when setup is missing */}
           <Route element={<OnboardingGuard />}>
-            <Route path="/dashboard" element={UI_V2 ? <DashboardV2Page /> : <DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardV2Page />} />
             <Route path="/invoices" element={<SalesPage />} />
-            {UI_V2 && <Route path="/invoices/new" element={<InvoiceEditorPage />} />}
-            {UI_V2 && <Route path="/invoices/:id/edit" element={<InvoiceEditorPage />} />}
-            {UI_V2 && <Route path="/invoices/:id/credit-note" element={<CreditNoteEditorPage />} />}
-            {UI_V2 && <Route path="/credit-notes/:cnId/edit" element={<CreditNoteEditorPage />} />}
-            {UI_V2 && <Route path="/quotes/new" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />}
-            {UI_V2 && <Route path="/quotes/:id/edit" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />}
+            <Route path="/invoices/new" element={<InvoiceEditorPage />} />
+            <Route path="/invoices/:id/edit" element={<InvoiceEditorPage />} />
+            <Route path="/invoices/:id/credit-note" element={<CreditNoteEditorPage />} />
+            <Route path="/credit-notes/:cnId/edit" element={<CreditNoteEditorPage />} />
+            <Route path="/quotes/new" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />
+            <Route path="/quotes/:id/edit" element={<Gated feature="quotes" title="Devis"><InvoiceEditorPage key="quote" doc="quote" /></Gated>} />
             <Route path="/invoices/:id" element={<InvoicePage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/clients"  element={<Navigate to="/contacts" replace />} />
@@ -141,12 +140,12 @@ export default function App() {
             {/* Reports aren't built yet; old links land on the dashboard */}
             <Route path="/reports"  element={<Navigate to="/dashboard" replace />} />
             {/* In the ERP look Devis and Paiements are pages of their own (PRO-165) */}
-            <Route path="/payments" element={UI_V2 ? <Gated feature="payments_mobilemoney" title="Paiements"><PaymentsPage /></Gated> : <Navigate to="/invoices?tab=payments" replace />} />
-            <Route path="/quotes"     element={UI_V2 ? <Gated feature="quotes" title="Devis"><QuotesPage /></Gated> : <Navigate to="/invoices?tab=quotes" replace />} />
+            <Route path="/payments" element={<Gated feature="payments_mobilemoney" title="Paiements"><PaymentsPage /></Gated>} />
+            <Route path="/quotes"     element={<Gated feature="quotes" title="Devis"><QuotesPage /></Gated>} />
             <Route path="/quotes/:id" element={<Gated feature="quotes" title="Devis"><QuotePage /></Gated>} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/settings"  element={<SettingsPage />} />
-            {UI_V2 && <Route path="/profile" element={<ProfilePage />} />}
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Route>
