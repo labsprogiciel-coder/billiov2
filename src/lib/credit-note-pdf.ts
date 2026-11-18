@@ -3,7 +3,7 @@
 
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { invoiceRef } from '@/lib/invoice-number';
-import { natureLabel } from '@/lib/credit-note';
+import { printedNature } from '@/lib/credit-note';
 import { splitTtc } from '@/lib/vat';
 import type { InvoicePDFProps } from '@/components/InvoicePDF';
 import type { CreditNote, Invoice, LineItem } from '@/lib/schemas';
@@ -36,8 +36,10 @@ export async function renderCreditNotePdf(opts: {
     documentKind: 'avoir',
     clientLabel: 'Avoir au profit de',
     creditNote: {
-      nature: cn.nature ? natureLabel(cn.nature) : '—',
-      originalRef: invoiceRef(invoice),
+      nature: cn.nature ? printedNature(cn.nature) : '—',
+      // For a discount (RRR) the DGI's original reference is « RRR »; the balance is still reduced on the invoice
+      originalRef: cn.nature === 'RRR' ? 'RRR' : invoiceRef(invoice),
+      creditedRef: invoiceRef(invoice),
       originalIssued: invoice.issued,
       reason: cn.reason,
       storedTotal: cn.amount,

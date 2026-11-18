@@ -118,6 +118,8 @@ export interface InvoicePDFProps {
    */
   creditNote?: {
     nature: string; originalRef: string; originalIssued: string; reason: string;
+    /** The invoice whose balance it reduces, when the original reference is not that invoice (RRR) */
+    creditedRef?: string;
     /** The stored total: printed as is, the rounding left in the discount or the VAT */
     storedTotal?: number;
   };
@@ -409,7 +411,7 @@ export function InvoicePDFDocument({
         ...(invoice.firstIssuedAt ? [['Émission', pdfFmtDateTime(invoice.firstIssuedAt)] as const] : []),
         ...(invoice.issuedByName ? [['Émis par', invoice.issuedByName] as const] : []),
         ['Nature', creditNote.nature],
-        ['Facture d’origine', `${creditNote.originalRef} du ${pdfFmtDate(creditNote.originalIssued)}`],
+        ['Facture d’origine', creditNote.originalRef === 'RRR' ? 'RRR' : `${creditNote.originalRef} du ${pdfFmtDate(creditNote.originalIssued)}`],
       ] as const : [
         ['Émis le', pdfFmtDate(invoice.issued)],
         // DGI mentions w and y: when the invoice was issued, and by whom
@@ -551,7 +553,7 @@ export function InvoicePDFDocument({
     <View style={s.paySection} wrap={false}>
       <View style={s.payCol}>
         <Text style={s.blockLabel}>R{'è'}glement</Text>
-        <Text style={s.notesText}>Le montant de cet avoir est d{'é'}duit du reste d{'û'} sur la facture {creditNote.originalRef}.</Text>
+        <Text style={s.notesText}>Le montant de cet avoir est d{'é'}duit du reste d{'û'} sur la facture {creditNote.creditedRef ?? creditNote.originalRef}.</Text>
       </View>
     </View>
   ) : (
@@ -680,7 +682,7 @@ export function InvoicePDFDocument({
           <View style={s.strip}>
             <Text style={s.stripText}>Émis le : {pdfFmtDate(invoice.issued)}</Text>
             {creditNote ? <>
-              <Text style={s.stripText}>Sur la facture : {creditNote.originalRef}</Text>
+              <Text style={s.stripText}>Sur la facture : {creditNote.creditedRef ?? creditNote.originalRef}</Text>
               <Text style={s.stripText}>Nature : {creditNote.nature.split(' ·')[0]}</Text>
             </> : <>
               <Text style={s.stripText}>Échéance : {pdfFmtDate(invoice.due)}</Text>
@@ -704,7 +706,7 @@ export function InvoicePDFDocument({
               <View style={s.asideSep} />
               <Text style={s.asideLabel}>{creditNote ? 'Total de l’avoir' : netAPayer !== null && !isPaid ? 'Net à payer' : 'Total dû'}</Text>
               <Text style={s.asideTotal}>{pdfFmt(amountDue)} F CFA</Text>
-              <Text style={s.asideDue}>{creditNote ? `Sur ${creditNote.originalRef}` : `Éch. ${pdfFmtDate(invoice.due)}`}</Text>
+              <Text style={s.asideDue}>{creditNote ? `Sur ${creditNote.creditedRef ?? creditNote.originalRef}` : `Éch. ${pdfFmtDate(invoice.due)}`}</Text>
             </>
           )} />
         )}
