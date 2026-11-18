@@ -8,7 +8,8 @@ import ConfirmModal from '@/components/ConfirmModal';
 import SendDocumentDialog, { type SendChannel } from '@/components/SendDocumentDialog';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { removeInvoice, updateInvoice, createInvoice, newDraftId } from '@/lib/api/invoices';
+import { removeInvoice, updateInvoice, createInvoice, newDraftId, claimInvoiceOriginal } from '@/lib/api/invoices';
+import { partiesAtIssue } from '@/lib/invoice-copy';
 import { invoiceRef, isIssuedLockedError } from '@/lib/invoice-number';
 import { createActivity } from '@/lib/api/activities';
 import { deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
@@ -254,12 +255,17 @@ export default function InvoicePage() {
     if (linesError) { showToast('Les lignes de la facture n\'ont pas pu être chargées — rechargez la page avant de télécharger le PDF.', true); return; }
     if (!paymentMethodsReady) { showToast(paymentMethodsNotReadyMessage(paymentMethodsStatus), true); return; }
     try {
+      // An issued invoice: the first PDF is the original, every later one a « DUPLICATA » drawn as issued (PRO-144)
+      const issued = invoice.status !== 'draft';
+      const duplicate = issued && !(await claimInvoiceOriginal(orgId, invoice.id));
+      const parties = issued ? partiesAtIssue(invoice, orgSettings, client) : { biz: orgSettings, client };
       const blob = await renderInvoicePdf({
         template: invoiceTemplate,
         invoice,
         lines,
-        client,
-        biz: orgSettings,
+        client: parties.client,
+        biz: parties.biz,
+        duplicate,
         paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
         deliveryTerms: orgSettings.deliveryTerms || 'À convenir',
         paymentMethods,

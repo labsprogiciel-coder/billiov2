@@ -18,6 +18,7 @@ export function dbToInvoice(row: Record<string, unknown>): Invoice {
     firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined,
     number:      row.number ? String(row.number) : undefined,
     issuedByName: row.issued_by_name ? String(row.issued_by_name) : undefined,
+    issueSnapshot: row.issue_snapshot && typeof row.issue_snapshot === 'object' ? row.issue_snapshot as Invoice['issueSnapshot'] : undefined,
     ownerId:     row.owner_id ? String(row.owner_id) : undefined,
     ownerName:   row.owner_name ? String(row.owner_name) : undefined,
     notes:       cleanRichText(row.notes) ?? undefined,
@@ -112,4 +113,23 @@ export async function removeInvoice(orgId: string, id: string): Promise<void> {
   if (MOCK) return;
   const { error } = await supabase.from('invoices').delete().eq('org_id', orgId).eq('id', id);
   if (error) throw error;
+}
+
+// Demo mode: the invoices whose original PDF was produced in this session
+const mockOriginals = new Set<string>();
+
+/**
+ * Whether the PDF about to be produced is the issued invoice's original (PRO-144): true the first
+ * time only, for any member; every later PDF is a copy and prints « DUPLICATA ». The database decides
+ * (claim_invoice_original), so two downloads at once can't both be the original.
+ */
+export async function claimInvoiceOriginal(orgId: string, invoiceId: string): Promise<boolean> {
+  if (MOCK) {
+    if (mockOriginals.has(invoiceId)) return false;
+    mockOriginals.add(invoiceId);
+    return true;
+  }
+  const { data, error } = await supabase.rpc('claim_invoice_original', { p_org_id: orgId, p_invoice_id: invoiceId });
+  if (error) throw error;
+  return data === true;
 }

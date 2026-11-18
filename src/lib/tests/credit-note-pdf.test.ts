@@ -92,4 +92,16 @@ describe('credit note PDF', () => {
     // the balance is still reduced on the invoice it was given against
     expect(rrr).toContain('FACT-2026-0001');
   }, 60000);
+  it('prints « DUPLICATA » on a copy of an issued invoice, with the original number (PRO-144)', async () => {
+    const { renderInvoicePdf } = await import('@/lib/render-pdf');
+    const invoice: Invoice = { id: 'F-9', number: 'FACT-2026-0009', subject: 'Audit', client: 'TK', issued: '2026-11-10', due: '2026-11-24', amount: 118_000, status: 'pending', discountPct: 0 };
+    const props = { invoice, lines: [{ id: 'l', desc: 'Conseil', unit: 'jour', qty: 1, price: 100_000 }], client: { name: 'TechKonsult', city: 'Ouagadougou' },
+      biz: { name: 'Studio Wend', country: 'Burkina Faso', taxRegime: 'RNI' } as never };
+    await renderInvoicePdf({ ...props, duplicate: true });
+    const copy = printed.texts.join(' ');
+    expect(copy).toContain('DUPLICATA');
+    expect(copy).toContain('Duplicata de la facture FACT-2026-0009 émise le');
+    await renderInvoicePdf(props);
+    expect(printed.texts.join(' ')).not.toContain('DUPLICATA');
+  }, 60000);
 });

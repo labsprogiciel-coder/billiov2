@@ -7,6 +7,8 @@ import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { invoiceRef } from '@/lib/invoice-number';
 import { fetchLineItems } from '@/lib/api/line-items';
+import { claimInvoiceOriginal } from '@/lib/api/invoices';
+import { partiesAtIssue } from '@/lib/invoice-copy';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { paymentUrlForInvoice } from '@/lib/api/payment-links';
 import { downloadBlob } from '@/lib/download';
@@ -44,10 +46,12 @@ export default function InvoicesPage() {
         showToast('Cette facture n\'a aucune ligne : ouvrez-la pour vérifier avant de télécharger le PDF.', true);
         return;
       }
-      const client = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
+      // The first PDF of an issued invoice is the original, every later one a « DUPLICATA » drawn as issued (PRO-144)
+      const duplicate = invoice.status !== 'draft' && !(await claimInvoiceOriginal(orgId, invoice.id));
+      const { biz, client } = partiesAtIssue(invoice, orgSettings, clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' });
       const blob = await renderInvoicePdf({
         template: invoiceTemplate,
-        invoice, lines, client, biz: orgSettings,
+        invoice, lines, client, biz, duplicate,
         paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
         deliveryTerms: orgSettings.deliveryTerms || 'À convenir',
         paymentMethods,
