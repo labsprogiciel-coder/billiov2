@@ -272,6 +272,20 @@ export const openingPiece = (piece: string, year: number) => {
  * yet): the rows saved then are replaced, a draft opening entry is removed.
  * Returns the lines saved (with the balancing line on 110 when added).
  */
+/** Debit minus credit of opening balance lines: 0 when they balance. */
+export const openingGap = (lines: Array<{ d: number; c: number }>) => lines.reduce((s, l) => s + l.d - l.c, 0);
+
+/**
+ * Puts the gap of an exercise already adopted unbalanced on 471 (compte d'attente), so the books balance again;
+ * an OD entry then moves it to the right account (PRO-121). Admins only (RLS). Returns the gap moved.
+ */
+export async function balanceOpeningBalances(orgId: string, year: number): Promise<number> {
+  if (MOCK) return 0;
+  const { data, error } = await supabase.rpc('balance_opening_balances', { p_org_id: orgId, p_year: year });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
 export async function adoptOpeningBalances(
   orgId: string,
   opts: {
@@ -284,22 +298,10 @@ export async function adoptOpeningBalances(
 ): Promise<Array<{ acct: string; d: number; c: number }>> {
   const validLines = opts.lines.filter(l => l.acct && (l.d || l.c)).map(l => ({ ...l }));
 
-  // Auto-balance with account 110 (Report à nouveau) if the entry is unbalanced
-  const totalD = validLines.reduce((s, l) => s + l.d, 0);
-  const totalC = validLines.reduce((s, l) => s + l.c, 0);
-  const diff = Math.round(totalD - totalC);
-  if (Math.abs(diff) >= 1) {
-    const existing110 = validLines.find(l => l.acct === '110');
-    if (existing110) {
-      if (diff > 0) existing110.c += diff;
-      else          existing110.d += -diff;
-    } else {
-      validLines.push(diff > 0
-        ? { acct: '110', d: 0,     c: diff  }
-        : { acct: '110', d: -diff, c: 0     },
-      );
-    }
-  }
+  // Opening balances must balance (PRO-121): never topped up silently. The page offers to put the gap on 471,
+  // in plain sight; the database refuses an unbalanced exercise anyway.
+  const gap = openingGap(validLines);
+  if (Math.abs(gap) >= 0.5) throw new Error(`Opening balances are unbalanced by ${gap}`);
   if (MOCK) return validLines;
 
   // Checked before anything is written: the journal and an open January
