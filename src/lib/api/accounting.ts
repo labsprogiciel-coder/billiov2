@@ -749,21 +749,6 @@ export async function recordSupplierBillPaymentEntry(
   await postJournalEntry(entryId);
 }
 
-/**
- * Brings the sales entry of an issued invoice in line with its amounts after
- * an edit. Posted entries can't be changed or deleted, so instead of
- * replacing the original this posts one adjustment with the difference
- * between every posted VE line of the invoice and what the invoice now says.
- * Nothing is booked when they already match. Returns whether an adjustment
- * was posted.
- */
-export async function updateInvoiceIssuanceEntry(
-  orgId: string,
-  opts: { invoiceId: string; htAmount: number; tvaAmount: number; date: string; clientName: string },
-): Promise<boolean> {
-  return syncInvoiceSalesEntry(orgId, opts);
-}
-
 async function syncInvoiceSalesEntry(
   orgId: string,
   opts: { invoiceId: string; htAmount: number; tvaAmount: number; date: string; clientName: string },

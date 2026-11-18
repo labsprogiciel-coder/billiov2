@@ -1,4 +1,4 @@
-// Choosing the client of an invoice (InvoiceClientSelect, and the editor's
+// Choosing the client of an invoice (the editor's
 // client search, PRO-167). Besides the organisation's clients there is
 // « Client comptant » (DGI client type CC) for a counter sale to an unnamed
 // buyer: the first time it's picked, a CC client is created and reused after.

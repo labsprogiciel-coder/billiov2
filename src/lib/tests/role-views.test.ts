@@ -73,6 +73,9 @@ describe('invoice page per role (PRO-174)', () => {
     expect(/Créer un avoir|Émettre un avoir/.test(html), 'credit note').toBe(credits);
     expect(html.includes('Enregistrer un paiement'), 'record a payment').toBe(role !== 'observer');
     expect(/Envoyer|Relancer/.test(html), 'send').toBe(role !== 'observer');
+    // An issued invoice is corrected with a credit note, never edited (DGI)
+    expect(html.includes('Modifier la facture'), 'edit panel').toBe(false);
+    expect(html.includes('>Modifier<'), 'edit button').toBe(false);
   });
 
   it.each(ROLES)('%s, on a draft', async role => {
