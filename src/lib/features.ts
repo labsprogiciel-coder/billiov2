@@ -16,8 +16,8 @@ export const ACCOUNTING_ENABLED = import.meta.env.VITE_ENABLE_ACCOUNTING === 'tr
 export const ASSISTANT_ENABLED = import.meta.env.VITE_ENABLE_ASSISTANT === 'true';
 
 /**
- * The ERP-style interface (PRO-160 and the "Billio — ERP redesign" project) is
- * off unless VITE_UI_V2=true at build time. With it off the app looks exactly
- * as before; pages move to the new look one at a time behind this flag.
+ * The ERP-style interface (PRO-160, "Billio — ERP redesign") is the default
+ * since PRO-179. VITE_UI_V2=false at build time brings back the old screens
+ * while the new ones are tried; the old screens and this flag go afterwards.
  */
-export const UI_V2 = import.meta.env.VITE_UI_V2 === 'true';
+export const UI_V2 = import.meta.env.VITE_UI_V2 !== 'false';
