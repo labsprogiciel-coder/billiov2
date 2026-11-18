@@ -1,7 +1,7 @@
 import { invoiceRef } from '@/lib/invoice-number';
 import { documentAmounts } from '@/lib/document-amounts';
-import { invoiceTotalMention } from '@/lib/amount-in-words';
-import { formatCadastralRef } from '@/lib/cadastral';
+import { cashStampMention, invoiceTotalMention } from '@/lib/amount-in-words';
+import { cadastralRequired, formatCadastralRef } from '@/lib/cadastral';
 import type { ReactNode } from 'react';
 import { Document, Page, View, Text, Link, StyleSheet, Svg, Rect } from '@react-pdf/renderer';
 import { cleanRichText, type RichBlock, type RichDoc, type RichInline, type RichMark, type TextAlign } from '@/lib/rich-text';
@@ -528,8 +528,13 @@ export function InvoicePDFDocument({
 
   const kind = documentKind ?? (creditNote ? 'avoir' : title === 'Devis' ? 'devis' : 'facture');
   // DGI mention t: the total in words, in every layout
+  // DGI mention s: the receipt stamp if paid in cash (Burkina Faso, CGI art. 519), on invoices
+  const stamp = kind === 'facture' && cadastralRequired(biz.country) ? cashStampMention(total) : null;
   const totalInWords = (
-    <Text style={s.totalWords}>{invoiceTotalMention(total, kind)}</Text>
+    <>
+      <Text style={stamp ? { ...s.totalWords, marginBottom: 2 } : s.totalWords}>{invoiceTotalMention(total, kind)}</Text>
+      {stamp && <Text style={s.totalWords}>{stamp}</Text>}
+    </>
   );
 
   // Compact, beside the payment methods: about as tall as three of their lines
