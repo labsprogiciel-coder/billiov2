@@ -70,9 +70,11 @@ async function renderInvoice(role: UserRole, id: string): Promise<string> {
 }
 
 describe('invoice page per role (PRO-174)', () => {
-  it.each(ROLES)('%s, on an issued invoice', async role => {
+  const ISSUED = ROLES.flatMap(role => (['pending', 'overdue'] as const).map(status => [role, status] as const));
+  it.each(ISSUED)('%s, on a %s invoice', async (role, status) => {
     const data = await import('@/data');
-    const issued = data.INITIAL_INVOICES.find(i => i.status === 'pending' || i.status === 'overdue')!;
+    const issued = data.INITIAL_INVOICES.find(i => i.status === status)!;
+    expect(issued, `a ${status} invoice in the demo set`).toBeDefined();
     const html = await renderInvoice(role, issued.id);
     expect(html).toContain(issued.subject);
     const credits = role === 'admin' || role === 'accountant';

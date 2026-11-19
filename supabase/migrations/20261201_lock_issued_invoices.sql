@@ -36,20 +36,27 @@ as $$
 declare
   v_org uuid := coalesce(new.org_id, old.org_id);
   v_inv text := coalesce(new.invoice_id, old.invoice_id);
+  v_status text;
 begin
-  if coalesce(auth.role(), '') not in ('authenticated', 'anon') or (v_inv is null and (tg_op <> 'UPDATE' or old.invoice_id is null)) then
+  if coalesce(auth.role(), '') not in ('authenticated', 'anon') then
     return coalesce(new, old);
   end if;
-  -- FOR SHARE: wait for an issue in progress on that invoice, then read its committed status.
-  -- On UPDATE both invoices count: a line can't leave an issued invoice either.
-  if exists (select 1 from invoices
-              where status <> 'draft'
-                and ((org_id = v_org and id = v_inv)
-                     or (tg_op = 'UPDATE' and old.invoice_id is not null and org_id = old.org_id and id = old.invoice_id))
-              for share) then
-    raise exception 'issued_invoice_locked'
-      using errcode = 'BL002', detail = 'The lines of an issued invoice cannot change; correct it with a credit note.';
-  end if;
+  -- The invoices the line belongs to: its own, and on UPDATE the one it leaves (a line can't leave
+  -- an issued invoice either). Each is locked by its id first (FOR SHARE), then its status is read:
+  -- a status filter in the locking query would skip a draft being issued without waiting for it.
+  -- Once the issue commits, the lock returns the invoice as issued.
+  for v_status in
+    select status from invoices
+     where (org_id = v_org and id = v_inv)
+        or (tg_op = 'UPDATE' and org_id = old.org_id and id = old.invoice_id)
+     order by org_id, id
+     for share
+  loop
+    if v_status <> 'draft' then
+      raise exception 'issued_invoice_locked'
+        using errcode = 'BL002', detail = 'The lines of an issued invoice cannot change; correct it with a credit note.';
+    end if;
+  end loop;
   return coalesce(new, old);
 end;
 $$;
