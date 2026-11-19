@@ -41,6 +41,11 @@ begin
   exception when sqlstate 'BL002' then null; end;
   begin delete from line_items where invoice_id = 'F1'; failures := failures + 1; raise warning 'line removed';
   exception when sqlstate 'BL002' then null; end;
+  -- Moved out of the issued invoice, to a draft or to a quote
+  begin update line_items set invoice_id = 'D1' where invoice_id = 'F1'; failures := failures + 1; raise warning 'line moved to a draft';
+  exception when sqlstate 'BL002' then null; end;
+  begin update line_items set invoice_id = null, quote_id = 'DEV-9' where invoice_id = 'F1'; failures := failures + 1; raise warning 'line moved to a quote';
+  exception when sqlstate 'BL002' then null; end;
   -- A draft is free, and is issued with its amount
   update invoices set subject = 'Nouveau', amount = 2000 where id = 'D1';
   delete from line_items where invoice_id = 'D1';

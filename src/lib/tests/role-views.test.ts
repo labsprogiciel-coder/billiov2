@@ -30,6 +30,12 @@ const issuedCredit: CreditNote = { id: 'AV-1', invoiceId: 'INV-0041', subject: '
 const draftCredit: CreditNote = { ...issuedCredit, id: 'AV-2', status: 'draft', number: undefined };
 vi.mock('@/lib/use-credit-notes', () => ({ useCreditNotes: () => [issuedCredit], useCreditNoteDrafts: () => [draftCredit] }));
 vi.mock('@/lib/use-team', () => ({ useTeam: () => [] }));
+// « Autres actions » renders its items only once opened: render them, so the tests see every action offered
+vi.mock('@/components/MoreMenu', async () => {
+  const { createElement: h } = await import('react');
+  return { default: ({ label, items }: { label: string; items: { label: string }[] }) =>
+    h('div', { 'data-menu': label }, label, items.map(i => h('span', { key: i.label, 'data-menu-item': '' }, i.label))) };
+});
 vi.mock('@/lib/use-reassign', () => ({ useReassign: () => ({ reassign: async () => true, busy: false }) }));
 
 const ROLES: UserRole[] = ['admin', 'accountant', 'member', 'observer'];
@@ -75,7 +81,8 @@ describe('invoice page per role (PRO-174)', () => {
     expect(/Envoyer|Relancer/.test(html), 'send').toBe(role !== 'observer');
     // An issued invoice is corrected with a credit note, never edited (DGI)
     expect(html.includes('Modifier la facture'), 'edit panel').toBe(false);
-    expect(html.includes('>Modifier<'), 'edit button').toBe(false);
+    expect(/>\s*Modifier\s*<\/button>/.test(html), 'edit button').toBe(false);
+    expect(html.includes('<span data-menu-item="">Modifier</span>'), '« Modifier » in Autres actions').toBe(false);
   });
 
   it.each(ROLES)('%s, on a draft', async role => {
@@ -83,8 +90,10 @@ describe('invoice page per role (PRO-174)', () => {
     const draft = data.INITIAL_INVOICES.find(i => i.status === 'draft');
     if (!draft) return;
     const html = await renderInvoice(role, draft.id);
-    // « Supprimer la facture » (admins) is in the « Autres actions » menu, which renders its items once opened
     expect(html.includes('Autres actions'), 'more actions').toBe(role !== 'observer');
+    expect(html.includes('<span data-menu-item="">Supprimer la facture</span>'), 'delete a draft').toBe(role === 'admin');
+    // The same pattern the issued invoice is checked with finds a draft's edit button
+    expect(/>\s*Modifier\s*<\/button>/.test(html), 'edit button').toBe(role !== 'observer');
     expect(html.includes('Émettre la facture'), 'issue').toBe(role !== 'observer');
   });
 });
