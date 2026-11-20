@@ -62,8 +62,15 @@ export async function saveInvoiceDraft(orgId: string, opts: {
     if (stored && stored.status !== 'draft') throw new DraftIssuedError(opts.id);
     throw err;
   }
-  await deleteLineItems(orgId, { invoiceId: opts.id });
-  await saveLineItems(orgId, lines, { invoiceId: opts.id });
+  // Issued meanwhile between the header and the lines: the database refuses the lines, say so plainly
+  try {
+    await deleteLineItems(orgId, { invoiceId: opts.id });
+    await saveLineItems(orgId, lines, { invoiceId: opts.id });
+  } catch (err) {
+    const stored = await fetchInvoiceIssue(orgId, opts.id).catch(() => null);
+    if (stored && stored.status !== 'draft') throw new DraftIssuedError(opts.id);
+    throw err;
+  }
   return { id: opts.id, subject, client: fields.client, issued: fields.issued, due: fields.due, amount: fields.amount, status: 'draft', discountPct: fields.discountPct, notes: fields.notes ?? undefined };
 }
 

@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { canWrite, canDelete, canCredit } from '@/lib/permissions';
 import posthog from 'posthog-js';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import InvoiceClientSelect from '@/components/InvoiceClientSelect';
 import Icon from '@/components/Icon';
 import ConfirmModal from '@/components/ConfirmModal';
 import SendDocumentDialog, { type SendChannel } from '@/components/SendDocumentDialog';
@@ -12,27 +11,26 @@ import { removeInvoice, updateInvoice, createInvoice, newDraftId, claimInvoiceOr
 import { partiesAtIssue } from '@/lib/invoice-copy';
 import { invoiceRef, isIssuedLockedError } from '@/lib/invoice-number';
 import { createActivity } from '@/lib/api/activities';
-import { deleteInvoiceEntries, updateInvoiceIssuanceEntry, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
+import { deleteInvoiceEntries, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
 import { settleInvoicePayment } from '@/lib/api/payments';
 import { updateQuote } from '@/lib/api/quotes';
 import { invoiceBalance, daysOverdue, todayISO } from '@/lib/invoice-status';
 import { paymentMethodsNotReadyMessage, usePaymentMethods } from '@/lib/use-payment-methods';
-import { filledLines, lineItemsError } from '@/lib/line-validation';
+import { lineItemsError } from '@/lib/line-validation';
 import { invoiceMessage } from '@/lib/document-messages';
 import { contactValue } from '@/lib/share-links';
-import { fetchLineItems, saveLineItems, deleteLineItems } from '@/lib/api/line-items';
+import { fetchLineItems, saveLineItems } from '@/lib/api/line-items';
 import { fetchCreditNotes } from '@/lib/api/credit-notes';
 import { useComplianceGuard } from '@/lib/use-compliance-guard';
 import { isInvoiceLimitError } from '@/lib/invoice-limit';
-import { fmt, fmtDateLong, STATUS_LABEL, newLineItem } from '@/data';
+import { fmt, fmtDateLong, STATUS_LABEL } from '@/data';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { paymentUrlForInvoice } from '@/lib/api/payment-links';
 import { downloadBlob } from '@/lib/download';
 import { getFiscalIdLabel } from '@/lib/ohada';
 import { calculateServiceWithholding, SERVICE_WITHHOLDING_RATE_LABEL, SERVICE_WITHHOLDING_THRESHOLD } from '@/lib/tax-bf';
 import type { Activity, CreditNote, LineItem, PayMethod, ServiceWithholdingScenario } from '@/lib/schemas';
-import TaxGroupSelect from '@/components/TaxGroupSelect';
-import { lineGroup, productTaxGroup, splitDocument, taxSummary, vatRows } from '@/lib/tax-groups';
+import { splitDocument, taxSummary, vatRows } from '@/lib/tax-groups';
 import { chargesVat, documentHasVat } from '@/lib/vat';
 import Page from '@/components/Page';
 import InvoiceSide from '@/components/invoice/InvoiceSide';
@@ -55,7 +53,7 @@ const BillioLogoSvg = () => (
 export default function InvoicePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { invoices, quotes, setQuotes, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, products, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
+  const { invoices, quotes, setQuotes, setInvoices, payments, setPayments, setActivity, showToast, clientsMap, orgSettings, invoiceTemplate, orgId, loading, userRole, userLabel } = useApp();
   const writable = canWrite(userRole);
   // Credit notes: admins and accountants only (PRO-174)
   const credits = canCredit(userRole);
@@ -79,31 +77,11 @@ export default function InvoicePage() {
   const [linesLoading, setLinesLoading] = useState(true);
 
   // Edit panel state
-  const [editOpen,   setEditOpen]   = useState(false);
-  const [eClient,    setEClient]    = useState('');
-  const [eSubject,   setESubject]   = useState('');
-  const [eDate,      setEDate]      = useState('');
-  const [eDue,       setEDue]       = useState('');
-  const [eLines,     setELines]     = useState<LineItem[]>([]);
-  const [eDiscount,  setEDiscount]  = useState(0);
-  const [saving,     setSaving]     = useState(false);
-  const [showPicker,   setShowPicker]   = useState(false);
-  const [pickerQuery,  setPickerQuery]  = useState('');
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [creditNotes,  setCreditNotes]  = useState<CreditNote[]>([]);
   // Goes up once a posting to the books has finished, so the side panel reads the entries again
   const [ledgerTick, setLedgerTick] = useState(0);
   const bumpLedger = () => setLedgerTick(t => t + 1);
-  const pickerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showPicker) return;
-    function onClickOutside(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowPicker(false);
-    }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [showPicker]);
 
   useEffect(() => {
     if (!id || !orgId) return;
@@ -322,64 +300,12 @@ export default function InvoicePage() {
   };
 
   // Once a credit note was issued on it, its lines stay as credited (PRO-168): corrections go through credit notes
-  const canEdit = writable && creditNotes.length === 0 && (invoice.status === 'draft' || invoice.status === 'pending' || invoice.status === 'overdue');
+  // Only a draft is edited (in the editor); an issued invoice is corrected with a credit note (DGI)
+  const canEdit = writable && invoice.status === 'draft';
   // Header and footer bands of the organisation's template (PRO-167), in the new look
   const pageBand = paperBands(invoiceTemplate);
 
-  const openEdit = () => {
-    setEClient(invoice.client);
-    setESubject(invoice.subject);
-    setEDate(invoice.issued);
-    setEDue(invoice.due);
-    setEDiscount(invoice.discountPct ?? 0);
-    setELines(lines.length ? lines.map(l => ({ ...l })) : [newLineItem()]);
-    setEditOpen(true);
-  };
 
-  const updateELine = (lid: string, field: string, val: string) =>
-    setELines(prev => prev.map(l => l.id === lid ? { ...l, [field]: field === 'qty' || field === 'price' ? Number(val) : val } : l));
-
-  const filteredProducts = products.filter(p => !pickerQuery || p.name.toLowerCase().includes(pickerQuery.toLowerCase()));
-
-  const eSums          = taxSummary(eLines, eDiscount, canInvoiceTVA);
-  const { subtotal: eSubtotal, discount: eDiscountAmt, net: eDiscountedSub, tax: eTax, total: eTotal } = eSums;
-
-  const handleSaveEdit = async () => {
-    if (!eClient) { showToast('Veuillez sélectionner un client.', true); return; }
-    const editLinesProblem = lineItemsError(eLines);
-    if (editLinesProblem) { showToast(editLinesProblem, true); return; }
-    setSaving(true);
-    try {
-      await updateInvoice(orgId, invoice.id, { subject: eSubject.trim() || 'Facture sans titre', client: eClient, issued: eDate, due: eDue, amount: eTotal, discountPct: eDiscount });
-      await deleteLineItems(orgId, { invoiceId: invoice.id });
-      await saveLineItems(orgId, filledLines(eLines), { invoiceId: invoice.id });
-      const editedClientName = (clientsMap[eClient] ?? { name: eClient }).name;
-      // A draft has no sales entry yet: it is booked when the invoice is issued
-      if (invoice.status !== 'draft') {
-        updateInvoiceIssuanceEntry(orgId, {
-          invoiceId:  invoice.id,
-          htAmount:   eDiscountedSub,
-          tvaAmount:  eTax,
-          date:       eDate,
-          clientName: editedClientName,
-        }).catch(err => {
-          console.error('Accounting update failed:', err);
-          showToast('Facture mise à jour, mais l\'écriture comptable n\'a pas pu être rectifiée. Signalez-le à votre comptable.', true);
-        }).finally(bumpLedger);
-      }
-      setInvoices(prev => prev.map(i => i.id === invoice.id
-        ? { ...i, subject: eSubject.trim() || 'Facture sans titre', client: eClient, issued: eDate, due: eDue, amount: eTotal, discountPct: eDiscount }
-        : i));
-      setLines(filledLines(eLines));
-      setEditOpen(false);
-      showToast('Facture mise à jour');
-    } catch (err) {
-      console.error('Edit invoice failed:', err);
-      showToast('Erreur lors de la mise à jour', true);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleConfirmPayment = async () => {
     if (paySaving) return;
@@ -466,7 +392,6 @@ export default function InvoicePage() {
         )}
         {writable && (
           <MoreMenu label="Autres actions" items={[
-            ...(canEdit && invoice.status !== 'draft' ? [{ label: 'Modifier', icon: 'edit', run: openEdit }] : []),
             { label: busyAction === 'duplicate' ? 'Duplication…' : 'Dupliquer', icon: 'copy', disabled: busyAction !== null || linesLoading, run: handleDuplicate },
             ...(invoice.status === 'draft' && canDelete(userRole) ? [{ label: 'Supprimer la facture', icon: 'trash', danger: true, run: handleDelete }] : []),
           ]} />
@@ -815,143 +740,6 @@ export default function InvoicePage() {
         </div>
       </div>
     )}
-      {/* Edit panel */}
-      <div className={`scrim${editOpen ? ' open' : ''}`} onClick={() => setEditOpen(false)} />
-      <div className={`new-inv-panel${editOpen ? ' open' : ''}`} role="dialog" aria-label="Modifier la facture" aria-modal="true">
-        <div className="panel-slide-head">
-          <div>
-            <div className="panel-slide-title">Modifier la facture</div>
-            <div className="panel-slide-sub">#{invoiceRef(invoice)}</div>
-          </div>
-          <button className="icon-btn" onClick={() => setEditOpen(false)} aria-label="Fermer">
-            <Icon name="x" size={15} ariaHidden />
-          </button>
-        </div>
-
-        <div className="panel-body">
-          <div className="form-group">
-            <label className="form-label">Client</label>
-            <InvoiceClientSelect value={eClient} onChange={setEClient} open={editOpen} disabled={saving} />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Date de facturation</label>
-              <input type="date" className="form-input" value={eDate} onChange={e => setEDate(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Date d'échéance</label>
-              <input type="date" className="form-input" value={eDue} onChange={e => setEDue(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Objet</label>
-            <input type="text" className="form-input" placeholder="ex. Développement web — sprint 5"
-              maxLength={255} value={eSubject} onChange={e => setESubject(e.target.value)} />
-          </div>
-
-          <div className="subhead"><span>Lignes de facturation</span></div>
-          <div className={`line-items-head${canInvoiceTVA ? ' with-tax' : ''}`}>
-            <div className="li-col">Description</div>
-            <div className="li-col">Unité</div>
-            <div className="li-col right">Qté</div>
-            <div className="li-col right">Prix</div>
-            {canInvoiceTVA && <div className="li-col">TVA</div>}
-            <div />
-          </div>
-
-          {eLines.map((li, idx) => (
-            <div key={li.id} className="line-item">
-              <div className={`line-item-row${canInvoiceTVA ? ' with-tax' : ''}`}>
-                <input className="li-input" placeholder="Description du service" value={li.desc}
-                  aria-label={`Description, ligne ${idx + 1}`}
-                  onChange={e => updateELine(li.id, 'desc', e.target.value)} />
-                <select className="li-input" value={li.unit ?? 'unité'}
-                  aria-label={`Unité, ligne ${idx + 1}`}
-                  onChange={e => updateELine(li.id, 'unit', e.target.value)}>
-                  {['unité','heure','jour','mois','an','projet','article','licence'].map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <input className="li-input num" type="number" min="0" value={li.qty}
-                  aria-label={`Quantité, ligne ${idx + 1}`}
-                  onChange={e => updateELine(li.id, 'qty', e.target.value)} />
-                <input className="li-input num" type="number" min="0" value={li.price || ''}
-                  placeholder="0" aria-label={`Prix unitaire, ligne ${idx + 1}`}
-                  onChange={e => updateELine(li.id, 'price', e.target.value)} />
-                {canInvoiceTVA && <TaxGroupSelect className="li-input" value={lineGroup(li, true)} label="Groupe de taxe"
-                  onChange={g => setELines(prev => prev.map(l => l.id === li.id ? { ...l, taxGroup: g } : l))} />}
-                <button className="li-del" onClick={() => setELines(prev => prev.length > 1 ? prev.filter(l => l.id !== li.id) : prev)} aria-label={`Supprimer la ligne ${idx + 1}`}>
-                  <Icon name="trash" size={15} ariaHidden />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <div className="line-actions">
-            <button className="add-line" onClick={() => setELines(prev => [...prev, newLineItem()])}>
-              <Icon name="plus" size={14} ariaHidden /> Ajouter une ligne
-            </button>
-            {products.length > 0 && (
-              <div className="product-picker-wrap" ref={pickerRef}>
-                <button className="catalog-btn" onClick={() => setShowPicker(v => !v)}>
-                  <Icon name="package" size={14} ariaHidden /> Depuis le catalogue
-                </button>
-                {showPicker && (
-                  <div className="product-picker-dropdown">
-                    <input autoFocus placeholder="Rechercher…" value={pickerQuery}
-                      onChange={e => setPickerQuery(e.target.value)} />
-                    {filteredProducts.length === 0
-                      ? <div className="picker-empty">Aucun produit trouvé</div>
-                      : filteredProducts.map(p => (
-                          <div key={p.id} className="picker-item" onClick={() => {
-                            setELines(prev => [...prev, { ...newLineItem(p.name, 1, p.price, p.unit, p.id), taxGroup: productTaxGroup(p.tax, canInvoiceTVA) }]);
-                            setShowPicker(false); setPickerQuery('');
-                          }}>
-                            <div>
-                              <div className="picker-item-name">{p.name}</div>
-                              <div className="picker-item-meta">{p.unit}</div>
-                            </div>
-                            <div className="picker-item-price">{fmt(p.price)} F</div>
-                          </div>
-                        ))
-                    }
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="total-block">
-            <div className="total-row"><span>Sous-total HT</span><span>{fmt(eSubtotal)} F CFA</span></div>
-            <div className="total-row" style={{ alignItems: 'center' }}>
-              <span>Remise (%)</span>
-              <input
-                type="number" min="0" max="100" step="0.5"
-                className="form-input"
-                style={{ width: 80, textAlign: 'right', padding: '3px 8px', fontSize: 13 }}
-                value={eDiscount || ''}
-                placeholder="0"
-                onChange={e => setEDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-              />
-            </div>
-            {eDiscount > 0 && <div className="total-row" style={{ color: 'var(--color-text-secondary)' }}><span>Montant remise</span><span>−{fmt(eDiscountAmt)} F CFA</span></div>}
-            {canInvoiceTVA && vatRows(eSums.groups).map(r => <div key={r.key} className="total-row"><span>{r.label}</span><span>{fmt(r.amount)} F CFA</span></div>)}
-            <div className="total-row final"><span>Total à payer</span><span>{fmt(eTotal)} F CFA</span></div>
-          </div>
-        </div>
-
-        <div className="panel-footer">
-          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditOpen(false)}>
-            Annuler
-          </button>
-          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={saving} onClick={handleSaveEdit}>
-            <Icon name="check" ariaHidden /> {saving ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
-      </div>
-
       {deleteDialog && (
         <ConfirmModal
           title="Supprimer la facture"
