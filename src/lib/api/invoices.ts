@@ -19,6 +19,7 @@ export function dbToInvoice(row: Record<string, unknown>): Invoice {
     number:      row.number ? String(row.number) : undefined,
     issuedByName: row.issued_by_name ? String(row.issued_by_name) : undefined,
     issueSnapshot: row.issue_snapshot && typeof row.issue_snapshot === 'object' ? row.issue_snapshot as Invoice['issueSnapshot'] : undefined,
+    originalPrintedAt: row.original_printed_at ? String(row.original_printed_at) : undefined,
     ownerId:     row.owner_id ? String(row.owner_id) : undefined,
     ownerName:   row.owner_name ? String(row.owner_name) : undefined,
     notes:       cleanRichText(row.notes) ?? undefined,
@@ -78,7 +79,7 @@ export async function updateInvoice(
   patch: Partial<Pick<Invoice, 'status' | 'subject' | 'client' | 'issued' | 'due' | 'amount' | 'discountPct'>> & { notes?: RichDoc | null },
   /** Only while the stored invoice is still a draft (the editor's saves): no row otherwise, and it throws */
   opts: { onlyDraft?: boolean } = {},
-): Promise<{ firstIssuedAt?: string; number?: string; issuedByName?: string }> {
+): Promise<{ firstIssuedAt?: string; number?: string; issuedByName?: string; issueSnapshot?: Invoice['issueSnapshot'] }> {
   if (MOCK) return patch.status && patch.status !== 'draft' ? { number: mockNumber() } : {};
   const dbPatch: Record<string, unknown> = {};
   if (patch.status      !== undefined) dbPatch.status       = patch.status;
@@ -91,12 +92,16 @@ export async function updateInvoice(
   if (patch.notes       !== undefined) dbPatch.notes        = patch.notes;
   let query = supabase.from('invoices').update(dbPatch).eq('org_id', orgId).eq('id', id);
   if (opts.onlyDraft) query = query.eq('status', 'draft');
-  const { data, error } = await query.select('first_issued_at, number, issued_by_name').maybeSingle();
+  const { data, error } = await query.select('first_issued_at, number, issued_by_name, issue_snapshot').maybeSingle();
   if (error) throw error;
   // No row: the invoice was deleted meanwhile, or this user can't change it
   if (!data) throw new Error(`invoice ${id} not found or not writable`);
-  const row = data as { first_issued_at?: string | null; number?: string | null; issued_by_name?: string | null };
-  return { firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined, number: row.number ?? undefined, issuedByName: row.issued_by_name ?? undefined };
+  const row = data as { first_issued_at?: string | null; number?: string | null; issued_by_name?: string | null; issue_snapshot?: unknown };
+  return {
+    firstIssuedAt: row.first_issued_at ? String(row.first_issued_at) : undefined, number: row.number ?? undefined, issuedByName: row.issued_by_name ?? undefined,
+    // Taken by the database at issue (PRO-144): the PDF right after needs it, before realtime brings it
+    issueSnapshot: row.issue_snapshot && typeof row.issue_snapshot === 'object' ? row.issue_snapshot as Invoice['issueSnapshot'] : undefined,
+  };
 }
 
 /** The invoice's stored status and legal number, or null if it doesn't exist. */
@@ -132,4 +137,15 @@ export async function claimInvoiceOriginal(orgId: string, invoiceId: string): Pr
   const { data, error } = await supabase.rpc('claim_invoice_original', { p_org_id: orgId, p_invoice_id: invoiceId });
   if (error) throw error;
   return data === true;
+}
+
+/**
+ * Claims the original (see claimInvoiceOriginal) and notes in the app's state that the invoice now
+ * has one, claimed here or by someone else: its next PDF goes straight to a copy.
+ */
+export async function claimOriginal(orgId: string, invoiceId: string, setInvoices: (update: (prev: Invoice[]) => Invoice[]) => void): Promise<boolean> {
+  const claimed = await claimInvoiceOriginal(orgId, invoiceId);
+  const at = new Date().toISOString();
+  setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, originalPrintedAt: i.originalPrintedAt ?? at } : i));
+  return claimed;
 }

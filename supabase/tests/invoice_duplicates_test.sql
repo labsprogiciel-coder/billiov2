@@ -13,7 +13,7 @@ create function public.my_org_ids() returns setof uuid language sql stable secur
 create table public.organizations (id uuid primary key, name text, address text, city text, country text, email text, phone text,
   ifu text, rccm text, tax_regime text, division_fiscale text, cadastral_ref text);
 create table public.clients (org_id uuid, code text, name text, contact text, email text, phone text, city text, country text,
-  ifu text, rccm text, tax_regime text, fiscal_division text, client_type text, primary key (org_id, code));
+  ifu text, rccm text, tax_regime text, fiscal_division text, client_type text, withholding_scenario text, primary key (org_id, code));
 create table public.invoices (org_id uuid, id text, client_code text, status text, amount numeric, first_issued_at timestamptz,
   primary key (org_id, id));
 create table public.line_items (org_id uuid, id serial primary key, invoice_id text, description text, qty numeric, price numeric);
@@ -51,21 +51,28 @@ begin
   exception when check_violation then null;
   end;
   delete from line_items where invoice_id = 'F1' and price = 0;
+  update clients set withholding_scenario = 'non_resident' where code = 'TK';
   update invoices set status = 'pending', issue_snapshot = '{"forged": true}', original_printed_at = now() where id = 'F1';
   select issue_snapshot into snap from invoices where id = 'F1';
   if snap #>> '{seller,ifu}' is distinct from '00012345A' or snap #>> '{client,ifu}' is distinct from '00099999B' then
     failures := failures + 1; raise warning 'snapshot wrong or forged: %', snap;
+  end if;
+  -- The withholding at issue, and the fields empty at issue (kept as empty, not left out)
+  if snap #>> '{client,withholding_scenario}' is distinct from 'non_resident'
+     or not (snap -> 'client' ? 'phone') or snap #>> '{client,phone}' is not null then
+    failures := failures + 1; raise warning 'withholding or empty fields not in the snapshot: %', snap;
   end if;
   if (select original_printed_at from invoices where id = 'F1') is not null then
     failures := failures + 1; raise warning 'the app set original_printed_at itself';
   end if;
 
   -- Later changes don't touch the snapshot
-  update clients set name = 'TK Renamed', ifu = 'X' where code = 'TK';
+  update clients set name = 'TK Renamed', ifu = 'X', withholding_scenario = null, phone = '+226 70 00 00 00' where code = 'TK';
   update organizations set name = 'Other' where id = o;
   update invoices set amount = 5000 where id = 'F1';
   if (select issue_snapshot #>> '{client,name}' from invoices where id = 'F1') <> 'TechKonsult'
-     or (select issue_snapshot #>> '{seller,name}' from invoices where id = 'F1') <> 'Studio Wend' then
+     or (select issue_snapshot #>> '{seller,name}' from invoices where id = 'F1') <> 'Studio Wend'
+     or (select issue_snapshot #>> '{client,withholding_scenario}' from invoices where id = 'F1') <> 'non_resident' then
     failures := failures + 1; raise warning 'snapshot changed after issue';
   end if;
 

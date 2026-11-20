@@ -25,7 +25,8 @@ update invoices i set issue_snapshot = jsonb_build_object(
                       'name', c.name, 'contact', c.contact, 'email', c.email, 'phone', c.phone,
                       'city', c.city, 'country', c.country, 'ifu', c.ifu, 'rccm', c.rccm,
                       'tax_regime', c.tax_regime, 'fiscal_division', c.fiscal_division,
-                      'client_type', c.client_type)
+                      'client_type', c.client_type,
+                      'withholding_scenario', c.withholding_scenario)
                     from clients c where c.org_id = i.org_id and c.code = i.client_code))
 ,
        original_printed_at = coalesce(i.original_printed_at, i.first_issued_at, now())
@@ -63,7 +64,8 @@ begin
                         'name', c.name, 'contact', c.contact, 'email', c.email, 'phone', c.phone,
                         'city', c.city, 'country', c.country, 'ifu', c.ifu, 'rccm', c.rccm,
                         'tax_regime', c.tax_regime, 'fiscal_division', c.fiscal_division,
-                        'client_type', c.client_type)
+                        'client_type', c.client_type,
+                      'withholding_scenario', c.withholding_scenario)
                       from clients c where c.org_id = new.org_id and c.code = new.client_code))
     into new.issue_snapshot;
   return new;
@@ -111,16 +113,23 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_status text;
 begin
   if tg_table_name = 'line_items' then
-    if new.invoice_id is not null and new.qty * new.price <= 0
-       and exists (select 1 from invoices where org_id = new.org_id and id = new.invoice_id and status <> 'draft') then
+    if new.invoice_id is null or new.qty * new.price > 0 then return new; end if;
+    -- Lock the invoice by its id first (FOR SHARE), then read its status: an issue in progress is
+    -- waited for, and the line is checked against the status it commits with
+    select status into v_status from invoices where org_id = new.org_id and id = new.invoice_id for share;
+    if v_status is not null and v_status <> 'draft' then
       raise exception 'an issued invoice cannot have a line worth zero or less (%)', new.description
         using errcode = '23514', hint = 'zero_line';
     end if;
     return new;
   end if;
-  -- invoices: issuing (draft → not draft) checks the lines and the total
+  -- invoices: issuing (draft → not draft) checks the lines and the total. The row is locked by the
+  -- update itself, so a line being written waits for the issue, or the issue for the line, and
+  -- this reads the lines as committed.
   if new.status <> 'draft' and (tg_op = 'INSERT' or old.status = 'draft') then
     if exists (select 1 from line_items where org_id = new.org_id and invoice_id = new.id and qty * price <= 0) then
       raise exception 'an invoice with a line worth zero or less cannot be issued'

@@ -747,7 +747,7 @@ export function InvoicePDFDocument({
           pageNumber === 1 ? null : (
             <View style={s.fixedHeaderRow}>
               <Text style={s.fixedHeaderBiz}>{bizName}</Text>
-              <Text style={s.fixedHeaderRef}>{title} #{invoiceRef(invoice)}{duplicate ? ' — DUPLICATA' : ''}</Text>
+              <Text style={s.fixedHeaderRef}>{title} #{invoiceRef(invoice)}{duplicate ? ` — DUPLICATA émise le ${pdfFmtDate(invoice.issued)}` : ''}</Text>
             </View>
           )
         } />

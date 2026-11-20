@@ -50,6 +50,8 @@ export const invoiceSchema = z.object({
     seller: z.record(z.string(), z.unknown()).nullable().optional(),
     client: z.record(z.string(), z.unknown()).nullable().optional(),
   }).optional(),
+  /** When its original PDF was produced (PRO-144): every later PDF is a « DUPLICATA » */
+  originalPrintedAt: z.string().optional(),
   /** « Responsable »: the team member in charge (PRO-172), set and named by the database */
   ownerId:     z.string().optional(),
   ownerName:   z.string().optional(),
