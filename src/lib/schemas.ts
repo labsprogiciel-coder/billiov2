@@ -45,6 +45,13 @@ export const invoiceSchema = z.object({
   number:      z.string().optional(),
   /** Who issued it (set by the database at first issue): the operator mention */
   issuedByName: z.string().optional(),
+  /** Seller's and client's details as they were at issue (PRO-144), taken by the database: copies print these */
+  issueSnapshot: z.object({
+    seller: z.record(z.string(), z.unknown()).nullable().optional(),
+    client: z.record(z.string(), z.unknown()).nullable().optional(),
+  }).optional(),
+  /** When its original PDF was produced (PRO-144): every later PDF is a « DUPLICATA » */
+  originalPrintedAt: z.string().optional(),
   /** « Responsable »: the team member in charge (PRO-172), set and named by the database */
   ownerId:     z.string().optional(),
   ownerName:   z.string().optional(),

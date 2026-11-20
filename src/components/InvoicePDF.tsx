@@ -1,4 +1,5 @@
 import { invoiceRef } from '@/lib/invoice-number';
+import { duplicateMention } from '@/lib/invoice-copy';
 import { documentTaxes } from '@/lib/document-amounts';
 import { taxSummary, vatRows } from '@/lib/tax-groups';
 import { cashStampMention, invoiceTotalMention } from '@/lib/amount-in-words';
@@ -137,6 +138,11 @@ export interface InvoicePDFProps {
    * printed without one (PRO-187).
    */
   paymentUrl?: string | null;
+  /**
+   * A copy of an issued invoice (PRO-144): « DUPLICATA » across every page and under the title,
+   * with the original's number and date. The original is the first PDF of the issued invoice.
+   */
+  duplicate?: boolean;
 }
 
 // Page frame in points (1 mm ≈ 2.83 pt). 15 mm sides; content starts 18 mm down
@@ -337,7 +343,7 @@ const pdfFmtDateTime = (iso: string): string => {
 
 export function InvoicePDFDocument({
   invoice, lines, client, biz, template, title = 'Facture', documentKind, clientLabel = 'Facturé à',
-  paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [], certification, creditNote, paymentUrl,
+  paymentTerms = 'Net 14 jours', deliveryTerms = 'À convenir', paymentMethods = [], certification, creditNote, paymentUrl, duplicate = false,
 }: InvoicePDFProps) {
   registerPdfFonts();
   const t = normalizeConfig(template ?? DEFAULT_CONFIG);
@@ -715,7 +721,19 @@ export function InvoicePDFDocument({
           )} />
         )}
 
+        {/* A copy (PRO-144): faint across every page, and plainly under the header */}
+        {duplicate && (
+          <Text fixed style={{ position: 'absolute', top: 360, left: 40, right: 40, textAlign: 'center', fontSize: 84, fontWeight: 700, color: '#B42318', opacity: 0.08, transform: 'rotate(-30deg)' }}>
+            DUPLICATA
+          </Text>
+        )}
         {top}
+        {duplicate && (
+          <View style={{ marginTop: 8, marginBottom: 6, borderWidth: 1.2, borderColor: '#B42318', borderRadius: 3, paddingVertical: 5, paddingHorizontal: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: 700, color: '#B42318', letterSpacing: 2 }}>DUPLICATA</Text>
+            <Text style={{ fontSize: 8, color: '#B42318' }}>{duplicateMention(invoiceRef(invoice), pdfFmtDate(invoice.issued))}</Text>
+          </View>
+        )}
         {subject}
         {table}
         {totals}
@@ -729,7 +747,7 @@ export function InvoicePDFDocument({
           pageNumber === 1 ? null : (
             <View style={s.fixedHeaderRow}>
               <Text style={s.fixedHeaderBiz}>{bizName}</Text>
-              <Text style={s.fixedHeaderRef}>{title} #{invoiceRef(invoice)}</Text>
+              <Text style={s.fixedHeaderRef}>{title} #{invoiceRef(invoice)}{duplicate ? ` — DUPLICATA émise le ${pdfFmtDate(invoice.issued)}` : ''}</Text>
             </View>
           )
         } />

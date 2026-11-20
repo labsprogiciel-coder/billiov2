@@ -31,6 +31,10 @@ describe('lineItemsError', () => {
   it('rejects zero quantities, negative prices and a zero total', () => {
     expect(lineItemsError([line('A', 0, 1000)])).toMatch(/quantités/);
     expect(lineItemsError([line('A', 1, -5)])).toMatch(/négatifs/);
-    expect(lineItemsError([line('A', 1, 0)])).toMatch(/total/);
+    expect(lineItemsError([line('A', 1, 0)])).toBe('La ligne « A » a un montant nul : indiquez un prix.');
+  });
+
+  it('refuses a line worth zero even when the total is positive, naming it (PRO-145)', () => {
+    expect(lineItemsError([line('Conseil', 1, 50000), line('Offert', 2, 0)])).toBe('La ligne « Offert » a un montant nul : indiquez un prix.');
   });
 });

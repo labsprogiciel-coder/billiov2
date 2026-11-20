@@ -7,7 +7,8 @@ import ConfirmModal from '@/components/ConfirmModal';
 import SendDocumentDialog, { type SendChannel } from '@/components/SendDocumentDialog';
 import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
-import { removeInvoice, updateInvoice, createInvoice, newDraftId } from '@/lib/api/invoices';
+import { removeInvoice, updateInvoice, createInvoice, newDraftId, claimOriginal } from '@/lib/api/invoices';
+import { originalOrCopy, partiesAtIssue } from '@/lib/invoice-copy';
 import { invoiceRef, isIssuedLockedError } from '@/lib/invoice-number';
 import { createActivity } from '@/lib/api/activities';
 import { deleteInvoiceEntries, recordInvoiceIssuanceEntry } from '@/lib/api/accounting';
@@ -207,9 +208,10 @@ export default function InvoicePage() {
     if (linesProblem) { showToast(`${linesProblem} Modifiez la facture avant de l'émettre.`, true); return; }
     setBusyAction('issue');
     try {
-      const { firstIssuedAt, number, issuedByName } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
-      // Keep the database's legal number and first issue time (the Solo limit counts it; now in demo mode)
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, number: number ?? i.number, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString(), issuedByName: issuedByName ?? i.issuedByName ?? userLabel } : i));
+      const { firstIssuedAt, number, issuedByName, issueSnapshot } = await updateInvoice(orgId, invoice.id, { status: 'pending', amount: total });
+      // Keep the database's legal number, first issue time (the Solo limit counts it; now in demo mode)
+      // and the details it took at issue (the PDF prints those)
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, status: 'pending' as const, amount: total, number: number ?? i.number, firstIssuedAt: firstIssuedAt ?? i.firstIssuedAt ?? new Date().toISOString(), issuedByName: issuedByName ?? i.issuedByName ?? userLabel, issueSnapshot: issueSnapshot ?? i.issueSnapshot } : i));
       try {
         await recordInvoiceIssuanceEntry(orgId, { invoiceId: invoice.id, htAmount: discountedSub, tvaAmount: tax, date: invoice.issued, clientName: client.name });
         showToast(`Facture #${number ?? invoiceRef(invoice)} émise`);
@@ -232,17 +234,22 @@ export default function InvoicePage() {
     if (linesError) { showToast('Les lignes de la facture n\'ont pas pu être chargées — rechargez la page avant de télécharger le PDF.', true); return; }
     if (!paymentMethodsReady) { showToast(paymentMethodsNotReadyMessage(paymentMethodsStatus), true); return; }
     try {
-      const blob = await renderInvoicePdf({
+      // An issued invoice: the first PDF is the original, every later one a « DUPLICATA » drawn as issued (PRO-144)
+      const issued = invoice.status !== 'draft';
+      const parties = issued ? partiesAtIssue(invoice, orgSettings, client) : { biz: orgSettings, client };
+      const paymentUrl = await paymentUrlForInvoice(orgId, invoice, online);
+      const blob = await originalOrCopy(invoice, () => claimOriginal(orgId, invoice.id, setInvoices), duplicate => renderInvoicePdf({
         template: invoiceTemplate,
         invoice,
         lines,
-        client,
-        biz: orgSettings,
+        client: parties.client,
+        biz: parties.biz,
+        duplicate,
         paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
         deliveryTerms: orgSettings.deliveryTerms || 'À convenir',
         paymentMethods,
-        paymentUrl: await paymentUrlForInvoice(orgId, invoice, online),
-      });
+        paymentUrl,
+      }));
       downloadBlob(blob, `facture-${invoiceRef(invoice).toLowerCase()}.pdf`);
       posthog.capture('invoice_pdf_downloaded', { invoice_id: invoice.id });
     } catch (err) {

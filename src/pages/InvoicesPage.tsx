@@ -7,6 +7,8 @@ import { PageSkeleton } from '@/components/SkeletonLoader';
 import { useApp } from '@/context/AppContext';
 import { invoiceRef } from '@/lib/invoice-number';
 import { fetchLineItems } from '@/lib/api/line-items';
+import { claimOriginal } from '@/lib/api/invoices';
+import { originalOrCopy, partiesAtIssue } from '@/lib/invoice-copy';
 import { renderInvoicePdf } from '@/lib/render-pdf';
 import { paymentUrlForInvoice } from '@/lib/api/payment-links';
 import { downloadBlob } from '@/lib/download';
@@ -18,7 +20,7 @@ import { useCommandIntent } from '@/lib/command-intent';
 /** Factures: the list (PRO-165). Invoices are written on their own page, /invoices/new (PRO-167). */
 export default function InvoicesPage() {
   const { writable } = usePermissions();
-  const { invoices, showToast, clientsMap, orgSettings, invoiceTemplate, orgId, loading } = useApp();
+  const { invoices, setInvoices, showToast, clientsMap, orgSettings, invoiceTemplate, orgId, loading } = useApp();
   const navigate = useNavigate();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const { lines: paymentMethods, status: paymentMethodsStatus, online } = usePaymentMethods();
@@ -44,15 +46,17 @@ export default function InvoicesPage() {
         showToast('Cette facture n\'a aucune ligne : ouvrez-la pour vérifier avant de télécharger le PDF.', true);
         return;
       }
-      const client = clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' };
-      const blob = await renderInvoicePdf({
+      // The first PDF of an issued invoice is the original, every later one a « DUPLICATA » drawn as issued (PRO-144)
+      const { biz, client } = partiesAtIssue(invoice, orgSettings, clientsMap[invoice.client] ?? { name: invoice.client, city: '—', av: 'av-a' });
+      const paymentUrl = await paymentUrlForInvoice(orgId, invoice, online);
+      const blob = await originalOrCopy(invoice, () => claimOriginal(orgId, invoice.id, setInvoices), duplicate => renderInvoicePdf({
         template: invoiceTemplate,
-        invoice, lines, client, biz: orgSettings,
+        invoice, lines, client, biz, duplicate,
         paymentTerms: orgSettings.paymentTerms || 'Net 14 jours',
         deliveryTerms: orgSettings.deliveryTerms || 'À convenir',
         paymentMethods,
-        paymentUrl: await paymentUrlForInvoice(orgId, invoice, online),
-      });
+        paymentUrl,
+      }));
       downloadBlob(blob, `facture-${invoiceRef(invoice).toLowerCase()}.pdf`);
       posthog.capture('invoice_pdf_downloaded', { invoice_id: id, from: 'list' });
     } catch (err) {
