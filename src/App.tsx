@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
 import AppShell from '@/components/AppShell';
+import Toast from '@/components/Toast';
 import { ACCOUNTING_ENABLED } from '@/lib/features';
 import FeatureGuard from '@/components/FeatureGuard';
 import type { Feature } from '@/lib/plans';
@@ -74,21 +75,23 @@ export default function App() {
     <AppProvider>
       <Suspense fallback={<div style={{ background: 'var(--color-background-primary)', minHeight: '100dvh' }} />}>
       <Routes>
-        {/* Root / login — default landing */}
+        {/* Root: the landing page for visitors, the app for signed-in users */}
         <Route
           path="/"
-          element={authed && !isRecovery
-            ? <Navigate to="/dashboard" replace />
-            : <AuthPage onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
-          }
+          element={resolving ? null : authed && !isRecovery ? <Navigate to="/dashboard" replace /> : <LandingPage />}
         />
-        <Route path="/login" element={<Navigate to="/" replace />} />
-
-        {/* Legacy landing page */}
-        <Route
-          path="/landing"
-          element={authed ? <Navigate to="/dashboard" replace /> : <LandingPage />}
-        />
+        {/* Sign-in and sign-up are the same page, opened on one form or the other */}
+        {(['login', 'signup'] as const).map(mode => (
+          <Route
+            key={mode}
+            path={`/${mode}`}
+            element={authed && !isRecovery
+              ? <Navigate to="/dashboard" replace />
+              : <AuthPage mode={mode} onLogin={MOCK ? () => setMockAuthed(true) : undefined} />
+            }
+          />
+        ))}
+        <Route path="/landing" element={<Navigate to="/" replace />} />
 
         {/* Public tools */}
         <Route path="/invoice-generator" element={<InvoiceGeneratorPage />} />
@@ -104,11 +107,14 @@ export default function App() {
         <Route path="/payer/:token" element={<PayPage />} />
 
         {/* Protected — wait for session to resolve before redirecting */}
+        {/* The setup wizard takes the whole screen: no app menu until the business is set up */}
         <Route
-          element={resolving ? null : authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/" replace />}
+          path="/onboarding"
+          element={resolving ? null : authed ? <><OnboardingPage onLogout={onLogout} /><Toast /></> : <Navigate to="/login" replace />}
+        />
+        <Route
+          element={resolving ? null : authed ? <AppShell onLogout={onLogout} /> : <Navigate to="/login" replace />}
         >
-          {/* Onboarding renders inside AppShell (gets the sidebar), not guarded */}
-          <Route path="/onboarding" element={<OnboardingPage />} />
 
           {/* All other routes redirect to /onboarding when setup is missing */}
           <Route element={<OnboardingGuard />}>

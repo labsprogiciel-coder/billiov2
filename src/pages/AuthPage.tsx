@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import posthog from 'posthog-js';
 import Icon from '@/components/Icon';
 import { supabase } from '@/lib/supabase';
 import { authErrorMessage } from '@/lib/auth-errors';
 import BillioMark from '@/components/BillioMark';
+import SampleInvoice from '@/components/SampleInvoice';
 
 const MOCK = import.meta.env.VITE_MOCK_AUTH === 'true';
 
@@ -12,11 +14,13 @@ type AuthMode = 'login' | 'signup';
 const COUNTRIES = ['Burkina Faso', 'Mali', "Côte d'Ivoire", 'Sénégal', 'Niger'];
 
 interface AuthPageProps {
+  /** Which form is open: « /login » or « /signup » */
+  mode?: AuthMode;
   onLogin?: () => void; // used in mock mode; real mode relies on onAuthStateChange
 }
 
-export default function AuthPage({ onLogin }: AuthPageProps = {}) {
-  const [mode, setMode] = useState<AuthMode>('login');
+export default function AuthPage({ mode = 'login', onLogin }: AuthPageProps = {}) {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -86,8 +90,9 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
     }
   };
 
+  // The two forms are two addresses, so each can be linked to; what was typed stays
   const switchMode = (next: AuthMode) => {
-    setMode(next);
+    navigate(`/${next}`, { replace: true });
     setErrors({});
     setLoading(false);
     setAuthError('');
@@ -99,44 +104,16 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
       <h1 className="sr-only">Billio — connexion ou création de compte</h1>
       <div className="auth-card">
         {/* Panneau marque */}
-        <aside className="brand-panel">
-          <div className="brand-logo">
-            <div className="mark"><BillioMark /></div>
-            <div>
-              <div className="name">Billio</div>
-              <div className="tag">Facturation</div>
-            </div>
+        <aside className="brand-panel brand-panel--sample">
+          <Link to="/" className="brand-logo" aria-label="Billio, retour à l’accueil">
+            <div className="mark"><BillioMark size={22} /></div>
+            <div className="name">Billio</div>
+          </Link>
+          <div className="brand-sample">
+            <SampleInvoice compact />
+            <p>Des factures conformes, sans y penser.</p>
           </div>
-
-          <div className="brand-head">
-            <h2>La facturation qui accélère vos paiements.</h2>
-            <p>Créez, envoyez et suivez vos factures en quelques minutes — Mobile Money, relances et rapports inclus.</p>
-            <div className="brand-features">
-              <div className="bf">
-                <span className="ck"><Icon name="check" /></span>
-                Mobile Money &amp; virements bancaires
-              </div>
-              <div className="bf">
-                <span className="ck"><Icon name="check" /></span>
-                Relances automatiques de paiement
-              </div>
-              <div className="bf">
-                <span className="ck"><Icon name="check" /></span>
-                Rapports de revenus en temps réel
-              </div>
-            </div>
-          </div>
-
-          <div className="mini-invoice">
-            <div className="dot" aria-hidden="true">
-              <Icon name="circle-check-filled" />
-            </div>
-            <div>
-              <div className="mi-top">#FAC-0040 payée</div>
-              <div className="mi-sub">Sahel Banque · à l'instant</div>
-            </div>
-            <div className="mi-amt">1,2M F CFA</div>
-          </div>
+          <div className="brand-legal">© {new Date().getFullYear()} Billio</div>
         </aside>
 
         {/* Panneau formulaire */}
@@ -146,7 +123,7 @@ export default function AuthPage({ onLogin }: AuthPageProps = {}) {
             <div className="fp-title">{isSignup ? 'Créer votre compte' : 'Connexion à Billio'}</div>
             <div className="fp-sub">
               {isSignup
-                ? 'Lancez votre facturation en quelques minutes — sans carte requise.'
+                ? 'Émettez votre première facture en quelques minutes. Sans carte bancaire.'
                 : 'Saisissez vos identifiants pour accéder à votre espace.'}
             </div>
 

@@ -72,14 +72,13 @@ function Nav() {
   return (
     <header className={`ig-nav${scrolled ? ' scrolled' : ''}`}>
       <div className="ig-nav-in">
-        <Link to="/landing" className="ig-brand">
+        <Link to="/" className="ig-brand">
           <span className="ig-brand-icon"><BillioMark size={18} /></span>
           <span>Billio</span>
         </Link>
         <nav className="ig-nav-links">
-          <Link to="/landing#features">Pourquoi Billio</Link>
-          <Link to="/landing#pricing">Tarifs</Link>
-          <Link to="/landing#faq">FAQ</Link>
+          <Link to="/#fonctionnalites">Pourquoi Billio</Link>
+          <Link to="/#tarifs">Tarifs</Link>
         </nav>
         <div className="ig-nav-cta">
           <Link to="/login" className="ig-signin">Connexion</Link>
@@ -621,7 +620,7 @@ export default function InvoiceGeneratorPage() {
               <Link to="/login" className="ig-btn ig-btn--white ig-btn--lg">
                 Commencer gratuitement <i className="ti ti-arrow-right" />
               </Link>
-              <Link to="/landing#pricing" className="ig-btn ig-btn--light ig-btn--lg">
+              <Link to="/#tarifs" className="ig-btn ig-btn--light ig-btn--lg">
                 <i className="ti ti-tag" /> Voir les tarifs
               </Link>
             </div>

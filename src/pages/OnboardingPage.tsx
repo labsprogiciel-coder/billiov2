@@ -135,7 +135,7 @@ function Ico({ name, style }: { name: IcoName; style?: React.CSSProperties }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
-export default function OnboardingPage() {
+export default function OnboardingPage({ onLogout }: { onLogout?: () => void } = {}) {
   const navigate = useNavigate();
   const { orgId, userId, completeOnboarding, showToast, clients: orgClients, setClients: setOrgClients, orgSettings, setOrgSettings } = useApp();
   const { managesOrg, writable } = usePermissions();
@@ -558,46 +558,52 @@ export default function OnboardingPage() {
   /* ── render ── */
   return (
     <div className="ob-root">
-      <div className="ob-wiz">
+      {/* ───── Steps ───── */}
+      <aside className="ob-rail">
+        <div className="ob-rail-brand">
+          <span className="ob-rail-mark" aria-hidden>
+            <img src="/assets/ICONE LOGO BILIO.png" width="22" height="22" alt="" style={{ display: 'block', objectFit: 'contain' }} />
+          </span>
+          <span className="ob-rail-name">Billio</span>
+        </div>
 
-        {/* ───── Head ───── */}
-        <header className="ob-head">
-          <div className="ob-logo-mark">
-            <div className="ob-logo-icon" aria-hidden>
-              <img src="/assets/ICONE LOGO BILIO.png" width="18" height="18" alt="" style={{ display: 'block', objectFit: 'contain' }} />
-            </div>
-            <div>
-              <div className="ob-logo-text">Billio</div>
-              <div className="ob-logo-tag">Invoicing</div>
-            </div>
-          </div>
+        <nav className="ob-rail-nav" aria-label="Étapes de la configuration">
+          <p className="ob-rail-title">{complete ? 'Mentions de la facture' : 'Configuration du compte'}</p>
+          <ol className="ob-rail-steps">
+            {steps.map((k, i) => {
+              const locked = i > maxReached;
+              return (
+                <li key={k}>
+                  <button
+                    type="button"
+                    className={`ob-rail-step${i === step ? ' active' : ''}${i < step ? ' done' : ''}`}
+                    aria-current={i === step ? 'step' : undefined}
+                    disabled={locked}
+                    onClick={() => goTo(i)}
+                  >
+                    <span className="ob-rail-dot">{i < step ? <Ico name="check" /> : i + 1}</span>
+                    <span className="ob-rail-label">{STEP_INFO[k].label}</span>
+                    {STEP_INFO[k].skippable && <span className="ob-rail-opt">facultatif</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="ob-rail-progress">Étape {step + 1} sur {steps.length}</p>
+        </nav>
 
-          <div className="ob-progress-wrap">
-            <div className="ob-seg-track">
-              {steps.map((k, i) => (
-                <div
-                  key={k}
-                  className={`ob-seg${i === step ? ' active' : ''}${i < step ? ' done' : ''}${i > maxReached ? ' locked' : ''}`}
-                  onClick={() => i <= maxReached && goTo(i)}
-                  title={STEP_INFO[k].label}
-                >
-                  <span className="ob-seg-fill" />
-                </div>
-              ))}
-            </div>
-            <div className="ob-progress-label">
-              Étape <b>{step + 1}</b> sur {steps.length} · <span className="pl-name">{cur ? STEP_INFO[cur].label : ''}</span>
-            </div>
-          </div>
-
-          <div className="ob-head-right">
+        <div className="ob-rail-foot">
+          <p>Tout reste modifiable ensuite dans les Paramètres.</p>
+          <div className="ob-rail-links">
             {complete
-              ? <button className="ob-skip-link" onClick={postpone}>Plus tard <Ico name="arrow-right" /></button>
-              : <button className="ob-skip-link" onClick={() => navigate('/dashboard')}>
-                  Passer la config <Ico name="arrow-right" />
-                </button>}
+              ? <button type="button" className="ob-rail-link" onClick={postpone}>Plus tard</button>
+              : <button type="button" className="ob-rail-link" onClick={() => navigate('/dashboard')}>Passer la configuration</button>}
+            {onLogout && <button type="button" className="ob-rail-link" onClick={onLogout}>Se déconnecter</button>}
           </div>
-        </header>
+        </div>
+      </aside>
+
+      <div className="ob-wiz">
 
         {/* ───── Body ───── */}
         <div className="ob-body">
