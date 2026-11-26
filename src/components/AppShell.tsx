@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import TopNav from '@/components/TopNav';
 import Icon from '@/components/Icon';
-import { useToast } from '@/context/ToastContext';
+import Toast from '@/components/Toast';
 import { useApp } from '@/context/AppContext';
 import { ASSISTANT_ENABLED } from '@/lib/features';
 
@@ -12,7 +12,6 @@ import { ASSISTANT_ENABLED } from '@/lib/features';
 const Assistant = ASSISTANT_ENABLED ? lazy(() => import('@/components/Assistant')) : null;
 
 export default function AppShell({ onLogout }: { onLogout: () => void }) {
-  const { toastMsg, toastVisible, toastError } = useToast();
   const { userRole, loading } = useApp();
 
   return (
@@ -27,14 +26,7 @@ export default function AppShell({ onLogout }: { onLogout: () => void }) {
         )}
         <Outlet />
         {Assistant && <Suspense fallback={null}><Assistant /></Suspense>}
-        <div
-          className={`toast${toastVisible ? ' show' : ''}`}
-          role={toastError ? 'alert' : 'status'}
-          aria-live={toastError ? 'assertive' : 'polite'}
-        >
-          <Icon name={toastError ? 'alert-triangle' : 'circle-check-filled'} ariaHidden style={{ color: toastError ? '#F0A0A0' : '#7BD17B' }} />
-          <span>{toastMsg}</span>
-        </div>
+        <Toast />
       </div>
     </div>
   );

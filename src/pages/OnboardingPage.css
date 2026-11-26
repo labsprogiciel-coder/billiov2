@@ -1,81 +1,39 @@
-/* Onboarding wizard — embedded inside AppShell's main-rel */
+/* Setup wizard: full screen. A navy rail lists the steps; the form and its
+   live preview sit beside it. */
 
-.ob-root {
-  flex: 1;
-  padding: 12px;
-  background:
-    radial-gradient(1100px 620px at 10% -12%, #EAF2FB 0%, rgba(234,242,251,0) 58%),
-    radial-gradient(900px 600px at 108% 116%, #E7EFF8 0%, rgba(231,239,248,0) 54%),
-    var(--color-background-tertiary);
-  display: flex;
-  align-items: stretch;
-  overflow: hidden;
-}
+.ob-root { height: 100vh; height: 100dvh; display: flex; background: var(--color-background-primary); overflow: hidden; }
 
-.ob-wiz {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-background-primary);
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-card);
-}
+.ob-wiz { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--color-background-primary); }
 
-/* Head */
-.ob-head {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 18px;
-  padding: 16px 22px;
-  border-bottom: 0.5px solid var(--color-border-tertiary);
-  background: var(--color-background-primary);
+/* Rail */
+.ob-rail { width: 300px; flex-shrink: 0; background: var(--nav-bg, #13324F); color: #fff; padding: 32px 24px 28px; display: flex; flex-direction: column; gap: 40px; overflow-y: auto; }
+.ob-rail-brand { display: flex; align-items: center; gap: 10px; padding: 0 12px; }
+.ob-rail-mark { width: 34px; height: 34px; border-radius: 6px; background: #fff; display: grid; place-items: center; }
+.ob-rail-name { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.ob-rail-nav { flex: 1; }
+.ob-rail-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #8FBDEB; padding: 0 12px; margin-bottom: 14px; }
+.ob-rail-steps { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.ob-rail-step {
+  width: 100%; min-height: 48px; display: flex; align-items: center; gap: 13px;
+  padding: 8px 12px; border: none; border-radius: 9px; background: transparent;
+  color: #C1D0E0; font-family: var(--font-sans); font-size: 14.5px; font-weight: 500;
+  text-align: left; cursor: pointer; transition: background .12s, color .12s;
 }
-.ob-logo-mark { display: flex; align-items: center; gap: 10px; }
-.ob-logo-icon {
-  width: 32px; height: 32px; flex-shrink: 0;
-  border-radius: 9px;
-  background: linear-gradient(155deg, color-mix(in srgb, var(--brand) 78%, white) 0%, var(--brand) 55%, var(--brand-dark) 100%);
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 6px -1px rgba(12,68,124,0.45), inset 0 1px 0 rgba(255,255,255,0.22);
-}
-.ob-logo-text { font-size: 17px; font-weight: 700; color: var(--color-text-primary); letter-spacing: -0.5px; line-height: 1; }
-.ob-logo-tag  { font-size: 9.5px; color: var(--color-text-tertiary); letter-spacing: 1.4px; text-transform: uppercase; margin-top: 3px; font-weight: 600; }
-
-.ob-progress-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 320px; }
-.ob-seg-track { display: flex; gap: 6px; }
-.ob-seg {
-  width: 46px; height: 5px; border-radius: 3px;
-  background: var(--color-border-secondary);
-  cursor: pointer;
-  transition: background .2s, width .2s;
-  position: relative; overflow: hidden;
-}
-.ob-seg-fill {
-  position: absolute; inset: 0; width: 0;
-  background: var(--brand); border-radius: 3px;
-  transition: width .35s cubic-bezier(.22,.61,.36,1);
-}
-.ob-seg.done .ob-seg-fill  { width: 100%; }
-.ob-seg.active             { width: 58px; }
-.ob-seg.active .ob-seg-fill { width: 100%; }
-.ob-seg.locked             { cursor: default; }
-.ob-progress-label { font-size: 11.5px; font-weight: 600; color: var(--color-text-secondary); letter-spacing: 0.1px; }
-.ob-progress-label b { color: var(--brand); font-weight: 700; }
-.ob-progress-label .pl-name { color: var(--color-text-primary); }
-
-.ob-head-right { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
-.ob-skip-link {
-  font-size: 12.5px; font-weight: 600; color: var(--color-text-secondary);
-  cursor: pointer; text-decoration: none;
-  padding: 7px 12px; border-radius: var(--border-radius-md);
-  transition: background .12s, color .12s;
-  display: flex; align-items: center; gap: 5px;
-}
-.ob-skip-link:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+.ob-rail-step:hover:not(:disabled):not(.active) { background: rgba(255,255,255,0.06); }
+.ob-rail-step:focus-visible { outline: 2px solid #8FBDEB; outline-offset: 1px; }
+.ob-rail-step:disabled { cursor: default; opacity: 0.7; }
+.ob-rail-step.active { background: var(--nav-bg-hover, #1E4366); color: #fff; font-weight: 700; }
+.ob-rail-step.done { color: #fff; }
+.ob-rail-dot { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; border: 1.5px solid #5B7FA3; }
+.ob-rail-step.active .ob-rail-dot { background: #fff; border-color: #fff; color: #13324F; }
+.ob-rail-step.done .ob-rail-dot { background: #8FBDEB; border-color: #8FBDEB; color: #13324F; font-size: 15px; }
+.ob-rail-label { flex: 1; min-width: 0; }
+.ob-rail-opt { font-size: 11.5px; font-weight: 500; color: #C1D0E0; }
+.ob-rail-progress { display: none; font-size: 12.5px; font-weight: 600; color: #C1D0E0; }
+.ob-rail-foot { padding: 0 12px; font-size: 13px; color: #C1D0E0; line-height: 1.5; }
+.ob-rail-links { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 12px; }
+.ob-rail-link { background: none; border: none; padding: 6px 0; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: #fff; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.ob-rail-link:hover { color: #8FBDEB; }
 
 /* Body split */
 .ob-body  { flex: 1; display: flex; min-height: 0; }
@@ -364,12 +322,18 @@ select.ob-input {
 .ob-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Responsive */
-@media (max-width: 1080px) { .ob-aside { display: none; } .ob-main-inner { max-width: 620px; } }
-@media (max-width: 620px)  {
-  .ob-progress-wrap { min-width: 0; }
-  .ob-seg { width: 26px; }  .ob-seg.active { width: 34px; }
-  .ob-main-inner { padding: 28px 24px; }
-  .ob-head { padding: 14px 16px; }
+@media (max-width: 1280px) { .ob-aside { display: none; } .ob-main-inner { max-width: 620px; } }
+/* Narrow screens: the rail becomes a bar on top, with the current step only */
+@media (max-width: 860px) {
+  .ob-root { flex-direction: column; }
+  .ob-rail { width: auto; flex-direction: row; align-items: center; gap: 16px; padding: 12px 16px; overflow: visible; }
+  .ob-rail-brand { padding: 0; }
+  .ob-rail-nav { display: flex; justify-content: flex-end; }
+  .ob-rail-title, .ob-rail-steps, .ob-rail-foot { display: none; }
+  .ob-rail-progress { display: block; }
+  .ob-main-inner { padding: 28px 20px; }
+  .ob-foot { flex-wrap: wrap; }
+  .ob-foot-hint { display: none; }
 }
 
 /* Completion mode: a required field that is still empty */
