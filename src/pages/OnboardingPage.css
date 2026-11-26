@@ -328,9 +328,14 @@ select.ob-input {
   .ob-root { flex-direction: column; }
   .ob-rail { width: auto; flex-direction: row; align-items: center; gap: 16px; padding: 12px 16px; overflow: visible; }
   .ob-rail-brand { padding: 0; }
+  .ob-rail { flex-wrap: wrap; row-gap: 4px; }
   .ob-rail-nav { display: flex; justify-content: flex-end; }
-  .ob-rail-title, .ob-rail-steps, .ob-rail-foot { display: none; }
+  .ob-rail-title, .ob-rail-steps, .ob-rail-foot p { display: none; }
   .ob-rail-progress { display: block; }
+  /* « Plus tard » and « Se déconnecter » stay reachable: there is no app menu here */
+  .ob-rail-foot { padding: 0; }
+  .ob-rail-links { margin-top: 0; gap: 0 16px; }
+  .ob-rail-link { padding: 10px 0; }
   .ob-main-inner { padding: 28px 20px; }
   .ob-foot { flex-wrap: wrap; }
   .ob-foot-hint { display: none; }
