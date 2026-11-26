@@ -46,6 +46,21 @@ const FEATURES: { title: string; text: string; icon: React.ReactNode }[] = [
     icon: <><circle cx="9" cy="8" r="3.5" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-4-5.6" /></> },
 ];
 
+/**
+ * Billio's social accounts, shown in the footer.
+ * TODO(PRO-246): the addresses aren't known yet; each link points to the top of the page until it has one.
+ */
+const SOCIALS: { name: string; label: string; url: string; icon: React.ReactNode }[] = [
+  { name: 'facebook', label: 'Billio sur Facebook', url: '',
+    icon: <path d="M7 10v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3V3h-3a5 5 0 0 0-5 5v2H7z" /> },
+  { name: 'linkedin', label: 'Billio sur LinkedIn', url: '',
+    icon: <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 11v5M8 8v.01M12 16v-5M16 16v-3a2 2 0 0 0-4 0" /></> },
+  { name: 'whatsapp', label: 'Écrire à Billio sur WhatsApp', url: '',
+    icon: <><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" /><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" /></> },
+  { name: 'x', label: 'Billio sur X', url: '',
+    icon: <><path d="M4 4l11.7 16H20L8.3 4z" /><path d="M4 20l6.8-6.8M13.2 10.8L20 4" /></> },
+];
+
 const ACCOUNTING = ['Journaux et plan comptable', 'Balance générale', 'Résultat et bilan', 'TVA mois par mois', 'Clôture des mois', 'Immobilisations'];
 
 function PlanCard({ plan }: { plan: PlanDef }) {
@@ -185,6 +200,13 @@ export default function LandingPage() {
           <div className="lp-footer-about">
             <div className="lp-brand"><Brand small /></div>
             <p>Facturation et comptabilité pour les entreprises du Burkina Faso. Application web, à utiliser sur ordinateur.</p>
+            <div className="lp-socials">
+              {SOCIALS.map(n => (
+                <a key={n.name} href={n.url || '#top'} aria-label={n.label} {...(n.url ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{n.icon}</svg>
+                </a>
+              ))}
+            </div>
           </div>
           <nav aria-label="Pied de page" className="lp-footer-nav">
             <a href="#conformite">Conformité</a>

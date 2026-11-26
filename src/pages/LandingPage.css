@@ -101,6 +101,9 @@
 .lp-footer-in { padding-top: 44px; padding-bottom: 36px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 28px 48px; }
 .lp-footer-about { flex: 1 1 280px; min-width: 0; }
 .lp-footer-about p { margin-top: 14px; font-size: 14px; max-width: 340px; }
+.lp-socials { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.lp-socials a { width: 44px; height: 44px; border-radius: 8px; border: 1px solid #2E5276; color: #fff; display: grid; place-items: center; transition: background .12s; }
+.lp-socials a:hover { background: #1E4366; }
 .lp-footer-nav { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: flex-start; font-size: 14.5px; }
 .lp-footer-nav a { color: #C1D0E0; padding: 12px 10px; }
 .lp-footer-nav a:hover { color: #fff; }
