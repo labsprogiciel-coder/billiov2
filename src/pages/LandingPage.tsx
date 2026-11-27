@@ -1,6 +1,7 @@
+import posthog from 'posthog-js';
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { PLANS, formatPrice, type PlanDef } from '@/lib/plans';
+import { CERTIFIED_OFFER, PLANS, formatPrice, type PlanDef } from '@/lib/plans';
 import BillioMark from '@/components/BillioMark';
 import SampleInvoice from '@/components/SampleInvoice';
 import './LandingPage.css';
@@ -178,6 +179,20 @@ export default function LandingPage() {
           </div>
           <div className="lp-plans">
             {PLANS.map(p => <PlanCard key={p.id} plan={p} />)}
+          </div>
+          {/* Certified e-invoicing (PRO-137): announced, not sold yet */}
+          <div className="lp-certified">
+            <div className="lp-certified-main">
+              <div className="lp-certified-head">
+                <h3>{CERTIFIED_OFFER.name}</h3>
+                <span className="lp-certified-badge">{CERTIFIED_OFFER.badge}</span>
+              </div>
+              <p className="lp-certified-price">À partir de <strong>{formatPrice(CERTIFIED_OFFER.annualPrice)} F CFA</strong> / an, en plus de votre plan</p>
+            </div>
+            <ul className="lp-certified-points">
+              {CERTIFIED_OFFER.points.map(pt => <li key={pt}><Check />{pt}</li>)}
+            </ul>
+            <Link to="/signup" className="lp-btn lp-btn--outline lp-certified-cta" onClick={() => posthog.capture('certified_invoicing_interest', { source: 'landing_page' })}>{CERTIFIED_OFFER.ctaLabel}</Link>
           </div>
         </div>
       </section>

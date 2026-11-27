@@ -90,6 +90,19 @@
 .lp-plan-perks li { display: flex; gap: 9px; }
 .lp-plan-perks svg { flex-shrink: 0; margin-top: 2px; color: #185FA5; }
 
+/* Certified e-invoicing, under the plans: an option, not a fifth plan */
+.lp-certified { margin-top: 20px; background: #fff; border: 1px solid #D0D7E0; border-radius: 14px; padding: 22px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 32px; }
+.lp-certified-main { flex: 1 1 280px; min-width: 0; }
+.lp-certified-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.lp-certified-head h3 { font-size: 18px; font-weight: 700; }
+.lp-certified-badge { font-size: 12px; font-weight: 700; color: #0C447C; background: #E6F1FB; padding: 3px 9px; border-radius: 20px; }
+.lp-certified-price { margin-top: 6px; font-size: 15px; color: #4E5A6B; }
+.lp-certified-price strong { color: #18222F; }
+.lp-certified-points { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; }
+.lp-certified-points li { display: flex; gap: 9px; }
+.lp-certified-points svg { flex-shrink: 0; margin-top: 2px; color: #185FA5; }
+.lp-certified-cta { font-size: 15px; padding: 13px 20px; border-radius: 8px; }
+
 /* Final call + footer */
 .lp-final { padding: 96px 0; }
 .lp-final-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 28px 48px; }
